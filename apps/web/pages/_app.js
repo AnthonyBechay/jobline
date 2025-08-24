@@ -1,4 +1,6 @@
 
+import 'bootstrap/dist/css/bootstrap.min.css';
+import { AuthProvider } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
 
 export default function App({ Component, pageProps }){
@@ -6,8 +8,10 @@ export default function App({ Component, pageProps }){
   const noLayout = Component.noLayout || false;
   const Wrap = noLayout ? ({children})=> <>{children}</> : Layout;
   return (
-    <Wrap>
-      <Component {...pageProps} />
-    </Wrap>
+    <AuthProvider>
+      <Wrap>
+        <Component {...pageProps} />
+      </Wrap>
+    </AuthProvider>
   );
 }

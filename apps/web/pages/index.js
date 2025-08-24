@@ -1,20 +1,27 @@
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
+import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 
 export default function Dashboard(){
-  const [data,setData]=useState(null);
-  const [user,setUser]=useState(null);
-  useEffect(()=>{
-    const u = localStorage.getItem('user');
-    if(!u){ window.location.href='/login'; return; }
-    setUser(JSON.parse(u));
-    api('/api/dashboard/summary').then(setData).catch(err=>{
-      if(err.message==='Unauthorized') window.location.href='/login';
-    });
-  },[]);
+  const { user, loading, isAuthenticated } = useAuth();
+  const router = useRouter();
+  const [data, setData] = useState(null);
 
-  if(!data) return <div>Loading…</div>;
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.push('/login');
+    }
+  }, [loading, isAuthenticated, router]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      api('/api/dashboard/summary').then(setData).catch(console.error);
+    }
+  }, [isAuthenticated]);
+
+  if (loading || !data) return <div>Loading…</div>;
   return (
     <div>
       <h1>Dashboard</h1>

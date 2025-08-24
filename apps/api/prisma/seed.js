@@ -46,7 +46,7 @@ async function main() {
       dob: new Date('1995-06-15'),
       nationality: 'Philippines',
       education: 'High School',
-      skills: ['cooking', 'childcare'],
+      skills: JSON.stringify(['cooking', 'childcare']),
       experienceSummary: '3 years experience',
       status: 'Available_Abroad',
       agentId: agent.id
