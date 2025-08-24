@@ -1,0 +1,13 @@
+{
+  "name": "jobline",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "postinstall": "npm run -w @jobline/api prisma:generate",
+    "build": "echo \"Use app-level build scripts\"",
+    "dev": "echo \"Use app-level dev scripts\""
+  }
+}
