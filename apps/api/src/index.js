@@ -9,6 +9,7 @@ import { PrismaClient } from '@prisma/client';
 import authRoutes from './routes/auth.js';
 import apiRoutes from './routes/api.js';
 import publicRoutes from './routes/public.js';
+import settingsRoutes from './routes/settings.js';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -31,6 +32,7 @@ app.get('/health', (req,res)=>res.json({ ok: true }));
 app.use('/auth', authRoutes);
 app.use('/api', apiRoutes);
 app.use('/public', publicRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Start
 app.listen(PORT, () => {

@@ -1,20 +1,27 @@
 
-import { useState } from 'react';
-import { api } from '../lib/api';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Login(){
-  const [email,setEmail]=useState('owner@jobline.local');
-  const [password,setPassword]=useState('admin123');
-  const [error,setError]=useState('');
+  const { login, isAuthenticated, loading } = useAuth();
+  const router = useRouter();
+  const [email, setEmail] = useState('owner@jobline.local');
+  const [password, setPassword] = useState('admin123');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      router.push('/');
+    }
+  }, [isAuthenticated, loading, router]);
 
   async function submit(e){
     e.preventDefault();
     setError('');
     try {
-      const data = await api('/auth/login', { method:'POST', body: JSON.stringify({ email, password }) });
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      window.location.href='/';
+      await login(email, password);
+      router.push('/');
     } catch (e) {
       setError(e.message);
     }
