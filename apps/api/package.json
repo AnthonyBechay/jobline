@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "build": "echo \"No build step for pure Node\"",
+    "build": "npx prisma generate",
     "prisma:generate": "prisma generate --schema=prisma/schema.prisma",
     "prisma:migrate:dev": "prisma migrate dev --schema=prisma/schema.prisma",
     "prisma:migrate:deploy": "prisma migrate deploy --schema=prisma/schema.prisma",

@@ -6,7 +6,6 @@
     "apps/*"
   ],
   "scripts": {
-    "postinstall": "npm run -w @jobline/api prisma:generate",
     "build": "echo \"Use app-level build scripts\"",
     "dev": "echo \"Use app-level dev scripts\""
   }
