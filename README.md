@@ -1,7 +1,7 @@
 # Jobline Monorepo (Vercel + Render)
 
 **Frontend:** Next.js (apps/web) → Vercel  
-**Backend:** Express + Prisma (apps/api) → Render PostgreSQL
+**Backend:** Express + Prisma (apps/api) → Render PostgreSQLs
 
 ## Deploy quickstart
 
