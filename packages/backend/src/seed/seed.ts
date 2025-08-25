@@ -7,26 +7,26 @@ async function main() {
   console.log('🌱 Starting seed...');
 
   // Create default users
-  const superAdminPassword = await bcrypt.hash('admin123', 10);
-  const adminPassword = await bcrypt.hash('secretary123', 10);
+  const superAdminPassword = await bcrypt.hash('Admin123!', 10);
+  const adminPassword = await bcrypt.hash('Secretary123!', 10);
 
   await prisma.user.upsert({
-    where: { email: 'owner@jobline.lb' },
+    where: { email: 'admin@jobline.com' },
     update: {},
     create: {
-      name: 'Agency Owner',
-      email: 'owner@jobline.lb',
+      name: 'Admin User',
+      email: 'admin@jobline.com',
       passwordHash: superAdminPassword,
       role: UserRole.SUPER_ADMIN,
     },
   });
 
   await prisma.user.upsert({
-    where: { email: 'secretary@jobline.lb' },
+    where: { email: 'secretary@jobline.com' },
     update: {},
     create: {
       name: 'Office Secretary',
-      email: 'secretary@jobline.lb',
+      email: 'secretary@jobline.com',
       passwordHash: adminPassword,
       role: UserRole.ADMIN,
     },
@@ -173,8 +173,8 @@ async function main() {
 
   console.log('🎉 Seed completed successfully!');
   console.log('\n📝 Login credentials:');
-  console.log('Super Admin: owner@jobline.lb / admin123');
-  console.log('Admin: secretary@jobline.lb / secretary123');
+  console.log('Super Admin: admin@jobline.com / Admin123!');
+  console.log('Admin: secretary@jobline.com / Secretary123!');
 }
 
 main()

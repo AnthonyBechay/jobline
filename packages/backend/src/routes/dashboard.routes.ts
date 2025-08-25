@@ -57,7 +57,7 @@ router.get('/stats', async (req: AuthRequest, res) => {
     ]);
     
     // Get financial summary (Super Admin only)
-    let financialSummary = null;
+    let financialSummary: { revenue: number; costs: number; profit: number } | null = null;
     if (req.user?.role === 'SUPER_ADMIN') {
       const [monthlyRevenue, monthlyCosts] = await Promise.all([
         prisma.payment.aggregate({
