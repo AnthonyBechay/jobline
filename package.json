@@ -7,7 +7,11 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev:backend & npm run dev:frontend",
+    "clean": "node -e \"const fs=require('fs'),path=require('path');['node_modules','dist','build','.turbo','.cache','package-lock.json'].forEach(d=>{const rmdirSync=(dir)=>{if(fs.existsSync(dir)){fs.readdirSync(dir).forEach(f=>{const p=path.join(dir,f);fs.lstatSync(p).isDirectory()?rmdirSync(p):fs.unlinkSync(p)});fs.rmdirSync(dir)}};['.','.','packages/backend','packages/frontend','packages/shared'].forEach(base=>{const p=path.join(base,d);if(fs.existsSync(p)){console.log('Removing',p);fs.lstatSync(p).isDirectory()?rmdirSync(p):fs.unlinkSync(p)}})})\"",
+    "clean:install": "npm run clean && npm install",
+    "setup": "npm run clean:install && npm run build:shared && npm run db:migrate && npm run db:seed",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:windows": "start cmd /k \"cd packages/backend && npm run dev\" && start cmd /k \"cd packages/frontend && npm run dev\"",
     "dev:backend": "npm run dev --workspace=@jobline/backend",
     "dev:frontend": "npm run dev --workspace=@jobline/frontend",
     "build": "npm run build:shared && npm run build:backend && npm run build:frontend",
@@ -15,16 +19,19 @@
     "build:backend": "npm run build --workspace=@jobline/backend",
     "build:frontend": "npm run build --workspace=@jobline/frontend",
     "start": "npm run start --workspace=@jobline/backend",
-    "test": "npm run test --workspaces",
-    "lint": "npm run lint --workspaces",
+    "start:prod": "npm run build && npm run start",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --write \"packages/**/*.{js,jsx,ts,tsx,json,css,md}\"",
     "db:migrate": "npm run db:migrate --workspace=@jobline/backend",
     "db:seed": "npm run db:seed --workspace=@jobline/backend",
-    "db:reset": "npm run db:reset --workspace=@jobline/backend"
+    "db:reset": "npm run db:reset --workspace=@jobline/backend",
+    "db:studio": "cd packages/backend && npx prisma studio"
   },
   "devDependencies": {
-    "prettier": "^3.0.3",
-    "eslint": "^8.52.0"
+    "concurrently": "^8.2.2",
+    "eslint": "^8.52.0",
+    "prettier": "^3.0.3"
   },
   "engines": {
     "node": ">=18.0.0",

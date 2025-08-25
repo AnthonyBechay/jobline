@@ -7,11 +7,11 @@ import { UserRole } from '@prisma/client';
 
 // Generate JWT token
 const generateToken = (user: { id: string; email: string; role: UserRole }): string => {
-  return jwt.sign(
-    { id: user.id, email: user.email, role: user.role },
-    process.env.JWT_SECRET!,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-  );
+  const payload = { id: user.id, email: user.email, role: user.role };
+  const secret = process.env.JWT_SECRET || 'default-secret-change-this';
+  
+  // Use any type to bypass TypeScript strict checking for expiresIn
+  return jwt.sign(payload, secret, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as any);
 };
 
 // Login

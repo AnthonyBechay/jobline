@@ -10,6 +10,12 @@ export interface AuthRequest extends Request {
   };
 }
 
+interface JWTPayload {
+  id: string;
+  email: string;
+  role: UserRole;
+}
+
 export const authenticate = async (
   req: AuthRequest,
   res: Response,
@@ -23,7 +29,8 @@ export const authenticate = async (
       return;
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+    const secret = process.env.JWT_SECRET || 'default-secret-change-this';
+    const decoded = jwt.verify(token, secret) as JWTPayload;
     req.user = {
       id: decoded.id,
       email: decoded.email,
