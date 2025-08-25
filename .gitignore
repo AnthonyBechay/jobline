@@ -1,37 +1,46 @@
+# Jobline
+
+/node_modules
+/dist
+/build
+/.turbo
+
+# Environment files
+.env
+.env.local
+.env.production
+
 # Logs
-logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
 
-# Dependency directories
-node_modules/
-**/node_modules/
-
-# Build output
-dist/
-build/
-.next/
-out/
-coverage/
-
-# Local environment variables
-.env
-.env.local
-.env.*.local
-
-# System files
+# OS files
 .DS_Store
 Thumbs.db
 
-# Editor directories and files
-.vscode/
-.idea/
+# IDE
+.vscode/settings.json
+.idea
 *.swp
+*.swo
 
-# Optional: keep lockfiles in repo (DO NOT ignore)
-# package-lock.json
-# yarn.lock
-# pnpm-lock.yaml
+# Database
+*.sqlite
+*.sqlite3
+prisma/migrations/dev
+
+# Uploads
+uploads/
+temp/
+
+# Coverage
+coverage/
+.nyc_output
+
+# Build outputs
+packages/*/dist
+packages/*/build
+packages/*/.next
+packages/*/.turbo

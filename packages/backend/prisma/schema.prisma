@@ -1,0 +1,238 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication and role management
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+}
+
+// Agent model for sourcing agents
+model Agent {
+  id             String      @id @default(uuid())
+  name           String
+  contactDetails Json        @map("contact_details")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  candidates     Candidate[]
+
+  @@map("agents")
+}
+
+// Broker model for arrival brokers
+model Broker {
+  id             String        @id @default(uuid())
+  name           String
+  contactDetails Json          @map("contact_details")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  applications   Application[]
+
+  @@map("brokers")
+}
+
+// Candidate model
+model Candidate {
+  id                String           @id @default(uuid())
+  firstName         String           @map("first_name")
+  lastName          String           @map("last_name")
+  photoUrl          String?          @map("photo_url")
+  dateOfBirth       DateTime?        @map("date_of_birth")
+  nationality       String
+  education         String?
+  skills            Json?
+  experienceSummary String?          @map("experience_summary")
+  status            CandidateStatus
+  agentId           String?          @map("agent_id")
+  agent             Agent?           @relation(fields: [agentId], references: [id])
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+  applications      Application[]
+
+  @@index([status])
+  @@index([nationality])
+  @@map("candidates")
+}
+
+enum CandidateStatus {
+  AVAILABLE_ABROAD
+  AVAILABLE_IN_LEBANON
+  RESERVED
+  IN_PROCESS
+  PLACED
+}
+
+// Client model
+model Client {
+  id               String        @id @default(uuid())
+  name             String
+  phone            String
+  address          String?
+  notes            String?
+  referredByClient String?       @map("referred_by_client_id")
+  referrer         Client?       @relation("ClientReferrals", fields: [referredByClient], references: [id])
+  referrals        Client[]      @relation("ClientReferrals")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  applications     Application[]
+  payments         Payment[]
+
+  @@map("clients")
+}
+
+// Application model - central entity linking Client, Candidate, and Process
+model Application {
+  id               String                  @id @default(uuid())
+  clientId         String                  @map("client_id")
+  client           Client                  @relation(fields: [clientId], references: [id])
+  candidateId      String                  @map("candidate_id")
+  candidate        Candidate               @relation(fields: [candidateId], references: [id])
+  status           ApplicationStatus
+  type             ApplicationType
+  brokerId         String?                 @map("broker_id")
+  broker           Broker?                 @relation(fields: [brokerId], references: [id])
+  permitExpiryDate DateTime?               @map("permit_expiry_date")
+  shareableLink    String                  @unique @map("shareable_link")
+  createdAt        DateTime                @default(now()) @map("created_at")
+  updatedAt        DateTime                @updatedAt @map("updated_at")
+  payments         Payment[]
+  costs            Cost[]
+  documentItems    DocumentChecklistItem[]
+
+  @@index([status])
+  @@index([clientId])
+  @@index([candidateId])
+  @@map("applications")
+}
+
+enum ApplicationStatus {
+  PENDING_MOL
+  MOL_AUTH_RECEIVED
+  VISA_PROCESSING
+  VISA_RECEIVED
+  WORKER_ARRIVED
+  LABOUR_PERMIT_PROCESSING
+  RESIDENCY_PERMIT_PROCESSING
+  ACTIVE_EMPLOYMENT
+  CONTRACT_ENDED
+  RENEWAL_PENDING
+}
+
+enum ApplicationType {
+  NEW_CANDIDATE
+  GUARANTOR_CHANGE
+}
+
+// Payment model for tracking revenue
+model Payment {
+  id            String      @id @default(uuid())
+  applicationId String      @map("application_id")
+  application   Application @relation(fields: [applicationId], references: [id])
+  clientId      String      @map("client_id")
+  client        Client      @relation(fields: [clientId], references: [id])
+  amount        Decimal     @db.Decimal(10, 2)
+  currency      String      @default("USD")
+  paymentDate   DateTime    @default(now()) @map("payment_date")
+  notes         String?
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  @@index([applicationId])
+  @@index([clientId])
+  @@map("payments")
+}
+
+// Cost model for tracking expenses (Super Admin only)
+model Cost {
+  id            String      @id @default(uuid())
+  applicationId String      @map("application_id")
+  application   Application @relation(fields: [applicationId], references: [id])
+  amount        Decimal     @db.Decimal(10, 2)
+  currency      String      @default("USD")
+  costDate      DateTime    @default(now()) @map("cost_date")
+  costType      CostType    @map("cost_type")
+  description   String?
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  @@index([applicationId])
+  @@map("costs")
+}
+
+enum CostType {
+  AGENT_FEE
+  BROKER_FEE
+  GOV_FEE
+  TICKET
+  EXPEDITED_FEE
+  ATTORNEY_FEE
+  OTHER
+}
+
+// DocumentChecklistItem model for tracking document status
+model DocumentChecklistItem {
+  id            String           @id @default(uuid())
+  applicationId String           @map("application_id")
+  application   Application      @relation(fields: [applicationId], references: [id])
+  documentName  String           @map("document_name")
+  status        DocumentStatus
+  stage         ApplicationStatus
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  @@index([applicationId])
+  @@map("document_checklist_items")
+}
+
+enum DocumentStatus {
+  PENDING
+  RECEIVED
+  SUBMITTED
+}
+
+// Settings model for system configuration (Super Admin only)
+model Setting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       Json
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+// DocumentTemplate model for managing required documents per stage
+model DocumentTemplate {
+  id        String            @id @default(uuid())
+  stage     ApplicationStatus
+  name      String
+  required  Boolean           @default(true)
+  order     Int               @default(0)
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  @@unique([stage, name])
+  @@map("document_templates")
+}

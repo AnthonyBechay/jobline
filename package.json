@@ -1,12 +1,33 @@
 {
   "name": "jobline",
-  "private": true,
   "version": "1.0.0",
+  "private": true,
+  "description": "Jobline Recruitment Platform - A comprehensive web application for recruitment agencies in Lebanon",
   "workspaces": [
-    "apps/*"
+    "packages/*"
   ],
   "scripts": {
-    "build": "echo \"Use app-level build scripts\"",
-    "dev": "echo \"Use app-level dev scripts\""
+    "dev": "npm run dev:backend & npm run dev:frontend",
+    "dev:backend": "npm run dev --workspace=@jobline/backend",
+    "dev:frontend": "npm run dev --workspace=@jobline/frontend",
+    "build": "npm run build:shared && npm run build:backend && npm run build:frontend",
+    "build:shared": "npm run build --workspace=@jobline/shared",
+    "build:backend": "npm run build --workspace=@jobline/backend",
+    "build:frontend": "npm run build --workspace=@jobline/frontend",
+    "start": "npm run start --workspace=@jobline/backend",
+    "test": "npm run test --workspaces",
+    "lint": "npm run lint --workspaces",
+    "format": "prettier --write \"packages/**/*.{js,jsx,ts,tsx,json,css,md}\"",
+    "db:migrate": "npm run db:migrate --workspace=@jobline/backend",
+    "db:seed": "npm run db:seed --workspace=@jobline/backend",
+    "db:reset": "npm run db:reset --workspace=@jobline/backend"
+  },
+  "devDependencies": {
+    "prettier": "^3.0.3",
+    "eslint": "^8.52.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   }
 }
