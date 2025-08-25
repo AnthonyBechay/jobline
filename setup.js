@@ -43,7 +43,14 @@ async function main() {
   log('========================================', colors.bright);
   log('');
 
-  // Step 1: Install root dependencies
+  // Step 1: Check if PostgreSQL is accessible
+  log('📋 Prerequisites:', colors.cyan);
+  log('1. PostgreSQL must be installed and running', colors.yellow);
+  log('2. Create a database named: jobline_db', colors.yellow);
+  log('   Run: psql -U postgres -c "CREATE DATABASE jobline_db;"', colors.dim);
+  log('');
+
+  // Step 2: Install root dependencies
   log('📦 Installing root dependencies...', colors.cyan);
   if (!runCommand('npm install')) {
     log('❌ Failed to install root dependencies', colors.red);
@@ -52,22 +59,17 @@ async function main() {
   log('✅ Root dependencies installed', colors.green);
   log('');
 
-  // Step 2: Install shared package dependencies
-  log('📦 Installing shared package dependencies...', colors.cyan);
+  // Step 3: Install and build shared package
+  log('📦 Setting up shared package...', colors.cyan);
   if (!runCommand('npm install', path.join(__dirname, 'packages', 'shared'))) {
     log('❌ Failed to install shared dependencies', colors.red);
     process.exit(1);
   }
-  log('✅ Shared dependencies installed', colors.green);
-  log('');
-
-  // Step 3: Build shared package
-  log('🔨 Building shared package...', colors.cyan);
   if (!runCommand('npm run build', path.join(__dirname, 'packages', 'shared'))) {
     log('❌ Failed to build shared package', colors.red);
     process.exit(1);
   }
-  log('✅ Shared package built', colors.green);
+  log('✅ Shared package ready', colors.green);
   log('');
 
   // Step 4: Install backend dependencies
@@ -89,25 +91,41 @@ async function main() {
   log('');
 
   // Step 6: Setup database
-  log('🗄️  Setting up database...', colors.cyan);
+  log('🗄️  Setting up PostgreSQL database...', colors.cyan);
   
   // Check if .env exists in backend
   const envPath = path.join(__dirname, 'packages', 'backend', '.env');
   if (!fs.existsSync(envPath)) {
-    log('Creating .env file...', colors.yellow);
-    const envContent = `DATABASE_URL="file:./dev.db"
-JWT_SECRET="jobline-secret-key-change-in-production"
-JWT_EXPIRES_IN="7d"
+    log('Creating .env file with default settings...', colors.yellow);
+    const envContent = `# Database
+DATABASE_URL="postgresql://postgres:password@localhost:5432/jobline_db?schema=public"
+
+# Server
 PORT=5000
 NODE_ENV=development
+
+# JWT
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+JWT_EXPIRES_IN=7d
+
+# Setup
+SETUP_KEY=jobline-setup-2024
+
+# CORS
+FRONTEND_URL=http://localhost:5173
+
+# File Upload
+MAX_FILE_SIZE=5242880
+UPLOAD_DIR=./uploads
 `;
     fs.writeFileSync(envPath, envContent);
     log('✅ .env file created', colors.green);
+    log('⚠️  Please update the DATABASE_URL with your PostgreSQL credentials', colors.yellow);
   }
 
   // Generate Prisma client
   log('Generating Prisma client...', colors.cyan);
-  if (!runCommand('npm run db:generate', path.join(__dirname, 'packages', 'backend'))) {
+  if (!runCommand('npx prisma generate', path.join(__dirname, 'packages', 'backend'))) {
     log('❌ Failed to generate Prisma client', colors.red);
     process.exit(1);
   }
@@ -115,32 +133,22 @@ NODE_ENV=development
 
   // Run migrations
   log('Running database migrations...', colors.cyan);
-  if (!runCommand('npm run db:migrate', path.join(__dirname, 'packages', 'backend'))) {
-    log('⚠️  Migration failed or no migrations needed', colors.yellow);
+  if (!runCommand('npx prisma migrate dev --name init', path.join(__dirname, 'packages', 'backend'))) {
+    log('⚠️  Migration failed. Make sure PostgreSQL is running and credentials are correct.', colors.yellow);
   } else {
     log('✅ Database migrations completed', colors.green);
   }
 
-  // Seed database
-  log('Seeding database with sample data...', colors.cyan);
-  if (!runCommand('npm run db:seed:simple', path.join(__dirname, 'packages', 'backend'))) {
-    log('⚠️  Database seeding failed (may already be seeded)', colors.yellow);
-  } else {
-    log('✅ Database seeded with sample data', colors.green);
-  }
   log('');
-
-  // Success message
   log('========================================', colors.bright);
   log('✅ Setup completed successfully!', colors.green);
   log('========================================', colors.bright);
   log('');
-  log('To start the application, run:', colors.cyan);
-  log('  node start.js', colors.bright);
-  log('');
-  log('Login credentials:', colors.cyan);
-  log('  Super Admin: admin@jobline.com / admin123', colors.dim);
-  log('  Admin: secretary@jobline.com / secretary123', colors.dim);
+  log('Next steps:', colors.cyan);
+  log('1. Start the application: node start.js', colors.bright);
+  log('2. Open http://localhost:5173/register', colors.bright);
+  log('3. Create your first Super Admin account', colors.bright);
+  log('   Setup Key: jobline-setup-2024', colors.yellow);
   log('');
 }
 

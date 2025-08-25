@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { login, register, getCurrentUser, changePassword } from '../controllers/auth.controller';
+import { login, register, registerFirst, getCurrentUser, changePassword } from '../controllers/auth.controller';
 import { authenticate, superAdminOnly } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validate.middleware';
 
@@ -15,6 +15,19 @@ router.post(
   ],
   validate,
   login
+);
+
+// Register first super admin (only works if no users exist)
+router.post(
+  '/register-first',
+  [
+    body('name').notEmpty().trim(),
+    body('email').isEmail().normalizeEmail(),
+    body('password').isLength({ min: 6 }),
+    body('setupKey').notEmpty(),
+  ],
+  validate,
+  registerFirst
 );
 
 // Register route (Super Admin only can create new users)

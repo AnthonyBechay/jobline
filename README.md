@@ -9,149 +9,83 @@ A comprehensive web application for recruitment agencies in Lebanon specializing
 - npm (v7 or higher)
 - PostgreSQL (v12 or higher)
 
-### Database Setup
+### Installation
 
-1. **Create PostgreSQL Database**
+1. **Create Database**
    ```bash
    psql -U postgres
    CREATE DATABASE jobline_db;
    \q
    ```
 
-2. **Configure Environment**
-   
-   Make sure your `.env` file in `packages/backend/` has:
-   ```env
-   DATABASE_URL="postgresql://postgres:password@localhost:5432/jobline_db?schema=public"
-   JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-   JWT_EXPIRES_IN=7d
-   PORT=5000
-   NODE_ENV=development
-   FRONTEND_URL=http://localhost:5173
-   ```
-
-### Installation & Setup
-
-1. **Quick Fix (if you're having issues)**
+2. **Setup Project**
    ```bash
-   node fix.js
+   node setup.js
    ```
 
-2. **Full Setup (first time)**
-   ```bash
-   # Install dependencies
-   npm install
-   cd packages/shared && npm install && npm run build && cd ../..
-   cd packages/backend && npm install && cd ../..
-   cd packages/frontend && npm install && cd ../..
-   
-   # Setup database
-   cd packages/backend
-   npx prisma generate
-   npx prisma migrate dev --name init
-   npm run db:seed:simple
-   cd ../..
-   ```
-
-3. **Start the Application**
-
-   **Windows:**
-   ```bash
-   start-windows.bat
-   ```
-   
-   **Or using Node:**
+3. **Start Application**
    ```bash
    node start.js
    ```
 
-   **Or manually:**
-   ```bash
-   # Terminal 1 - Backend
-   cd packages/backend
-   npm run dev
-   
-   # Terminal 2 - Frontend
-   cd packages/frontend
-   npm run dev
-   ```
+4. **Initial Setup**
+   - Open http://localhost:5173/register
+   - Create your first Super Admin account
+   - Setup Key: `jobline-setup-2024` (from .env file)
 
-4. **Access the Application**
-   - Frontend: http://localhost:5173
-   - Backend API: http://localhost:5000
-
-### Login Credentials
-
-**Super Admin** (Full access including financial data):
-- Email: admin@jobline.com
-- Password: admin123
-
-**Admin** (Operational access, no financial data):
-- Email: secretary@jobline.com
-- Password: secretary123
-
-## 🔨 Troubleshooting
-
-### White Screen / Module Errors
-
-If you see errors about missing exports or white screen:
-
-1. **Rebuild shared package:**
-   ```bash
-   cd packages/shared
-   npm run build
-   ```
-
-2. **Clear Vite cache:**
-   ```bash
-   cd packages/frontend
-   rm -rf node_modules/.vite
-   ```
-
-3. **Restart services**
-
-### Database Connection Issues
-
-1. **Make sure PostgreSQL is running:**
-   ```bash
-   # Windows
-   net start postgresql-x64-14
-   
-   # Linux/Mac
-   sudo service postgresql start
-   ```
-
-2. **Check your credentials in .env file**
-
-3. **Recreate database if needed:**
-   ```bash
-   psql -U postgres -c "DROP DATABASE IF EXISTS jobline_db;"
-   psql -U postgres -c "CREATE DATABASE jobline_db;"
-   cd packages/backend
-   npx prisma migrate dev --name init
-   npm run db:seed:simple
-   ```
-
-### Port Already in Use
-
-- Backend runs on port 5000
-- Frontend runs on port 5173
-
-Kill processes using these ports or change them in the configuration files.
+### Access Points
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:5000
 
 ## 📁 Project Structure
 
 ```
 jobline/
 ├── packages/
-│   ├── shared/         # Shared TypeScript types and constants
-│   ├── backend/        # Express.js backend with Prisma & PostgreSQL
-│   └── frontend/       # React frontend with Material-UI & Vite
-├── start.js            # Development server launcher
-├── start-windows.bat   # Windows batch file to start services
-├── fix.js              # Quick fix script for common issues
+│   ├── shared/         # Shared TypeScript types
+│   ├── backend/        # Express.js + Prisma + PostgreSQL
+│   └── frontend/       # React + Material-UI + Vite
+├── setup.js            # Setup script
+├── start.js            # Start development servers
+├── clean.js            # Clean build artifacts
 └── README.md           # This file
 ```
+
+## 🔧 Scripts
+
+### Main Scripts
+- `node setup.js` - Initial setup (install dependencies, setup database)
+- `node start.js` - Start development servers
+- `node clean.js` - Clean all build artifacts and dependencies
+
+### Backend Commands (from packages/backend)
+```bash
+npm run dev              # Start development server
+npm run build            # Build for production
+npx prisma studio        # Database GUI
+npx prisma migrate dev   # Run migrations
+```
+
+### Frontend Commands (from packages/frontend)
+```bash
+npm run dev              # Start development server
+npm run build            # Build for production
+```
+
+## 👥 User Management
+
+### First Time Setup
+1. Use the `/register` page to create the first Super Admin
+2. Requires a setup key from the `.env` file
+3. Only works when no users exist in the database
+
+### User Roles
+- **Super Admin**: Full system access, financial data, user management
+- **Admin**: Operational access, no financial data
+
+### Creating Additional Users
+- Super Admins can create new users from Settings > Users
+- Both Admin and Super Admin roles can be assigned
 
 ## 📋 Features
 
@@ -165,7 +99,7 @@ jobline/
 
 ### For Admin
 - Candidate management
-- Client management
+- Client management  
 - Application tracking
 - Payment recording (revenue only)
 - Document checklist management
@@ -175,46 +109,55 @@ jobline/
 - View application status via shareable link
 - See required documents
 - Track payment history
-- No login required (access via unique link)
+- No login required
 
-## 🔐 Security Notes
+## 🔐 Security
 
-- Default credentials are for development only
-- Change all passwords in production
-- Update JWT_SECRET in production
-- Use HTTPS in production
-- Configure proper CORS origins
-- Use environment variables for sensitive data
-
-## 🛠️ Common Commands
-
-### Backend Commands (from packages/backend)
-```bash
-npm run dev              # Start backend in development mode
-npm run build            # Build for production
-npx prisma studio        # Open Prisma Studio (database GUI)
-npx prisma migrate dev   # Run migrations
-npm run db:seed:simple   # Seed with sample data
-npm run db:reset         # Reset database (WARNING: deletes all data)
+### Environment Variables
+Update `.env` file in `packages/backend/`:
+```env
+DATABASE_URL="postgresql://postgres:yourpassword@localhost:5432/jobline_db"
+JWT_SECRET=your-super-secret-jwt-key
+SETUP_KEY=your-setup-key
 ```
 
-### Frontend Commands (from packages/frontend)
+### Production Security
+- Change all default passwords
+- Use strong JWT_SECRET
+- Update SETUP_KEY
+- Enable HTTPS
+- Configure CORS properly
+
+## 🚀 Deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions to:
+- Render (Backend)
+- Vercel (Frontend)
+
+## 🔨 Troubleshooting
+
+### Database Connection Issues
 ```bash
-npm run dev              # Start frontend in development mode
-npm run build            # Build for production
-npm run preview          # Preview production build
+# Check PostgreSQL is running
+psql -U postgres -c "\l"
+
+# Recreate database
+psql -U postgres -c "DROP DATABASE IF EXISTS jobline_db;"
+psql -U postgres -c "CREATE DATABASE jobline_db;"
 ```
 
-### Shared Package Commands (from packages/shared)
+### Port Issues
+- Backend: Port 5000
+- Frontend: Port 5173
+- Kill processes using these ports or change in config
+
+### Build Issues
 ```bash
-npm run build            # Build TypeScript to JavaScript
-npm run dev              # Build in watch mode
+# Clean everything and start fresh
+node clean.js
+node setup.js
 ```
 
 ## 📄 License
 
 Private - All rights reserved
-
-## 👥 Support
-
-For issues or questions, please contact the development team.

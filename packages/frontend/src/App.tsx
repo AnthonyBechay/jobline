@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 
 // Pages
 import Login from './pages/Login'
+import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Candidates from './pages/Candidates'
 import Clients from './pages/Clients'
@@ -23,6 +24,7 @@ function App() {
     <Routes>
       {/* Public routes */}
       <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
+      <Route path="/register" element={!user ? <Register /> : <Navigate to="/dashboard" />} />
       <Route path="/status/:shareableLink" element={<ClientStatus />} />
       
       {/* Protected routes */}

@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
-        '@jobline/shared': path.resolve(__dirname, '../shared/src'),
+        '@jobline/shared': path.resolve(__dirname, './src/shared'),
       },
     },
     server: {
@@ -23,8 +23,12 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-    optimizeDeps: {
-      include: ['@jobline/shared'],
+    build: {
+      outDir: 'dist',
+      sourcemap: true,
+    },
+    define: {
+      'process.env': {},
     },
   }
 })

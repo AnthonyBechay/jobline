@@ -14,6 +14,53 @@ const generateToken = (user: { id: string; email: string; role: UserRole }): str
   return jwt.sign(payload, secret, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as any);
 };
 
+// Register first super admin (only works if no users exist)
+export const registerFirst = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { name, email, password, setupKey } = req.body;
+
+    // Check setup key
+    const validSetupKey = process.env.SETUP_KEY || 'jobline-setup-2024';
+    if (setupKey !== validSetupKey) {
+      res.status(403).json({ error: 'Invalid setup key' });
+      return;
+    }
+
+    // Check if any users exist
+    const userCount = await prisma.user.count();
+    if (userCount > 0) {
+      res.status(403).json({ error: 'Initial setup already completed' });
+      return;
+    }
+
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Create first super admin
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        passwordHash,
+        role: UserRole.SUPER_ADMIN,
+      },
+    });
+
+    res.status(201).json({
+      message: 'Super Admin account created successfully',
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error('Register first error:', error);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+};
+
 // Login
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
