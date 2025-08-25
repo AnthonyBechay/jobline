@@ -41,7 +41,7 @@ export const useToast = (): ToastState => {
 // Simple toast helper functions
 export const toast = {
   success: (message: string, duration?: number) => {
-    console.log('Success:', message);
+    console.log('Successs:', message);
   },
   error: (message: string, duration?: number) => {
     console.error('Error:', message);
