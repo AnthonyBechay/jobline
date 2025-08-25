@@ -11,6 +11,7 @@
     "lint": "eslint src/**/*.ts",
     "db:migrate": "prisma migrate dev",
     "db:seed": "ts-node src/seed/seed.ts",
+    "db:seed:simple": "ts-node src/seed/seed-simple.ts",
     "db:reset": "prisma migrate reset --force",
     "db:generate": "prisma generate"
   },

@@ -99,10 +99,10 @@ const Login = () => {
               For demo purposes:
             </Typography>
             <Typography variant="caption" color="text.secondary" align="center" display="block">
-              Super Admin: owner@jobline.lb / admin123
+              Super Admin: admin@jobline.com / admin123
             </Typography>
             <Typography variant="caption" color="text.secondary" align="center" display="block">
-              Admin: secretary@jobline.lb / secretary123
+              Admin: secretary@jobline.com / secretary123
             </Typography>
           </Box>
         </Paper>

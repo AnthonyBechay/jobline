@@ -11,16 +11,20 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
+        '@jobline/shared': path.resolve(__dirname, '../shared/src'),
       },
     },
     server: {
-      port: 3000,
+      port: 5173,
       proxy: {
         '/api': {
           target: env.VITE_API_URL || 'http://localhost:5000',
           changeOrigin: true,
         },
       },
+    },
+    optimizeDeps: {
+      include: ['@jobline/shared'],
     },
   }
 })
