@@ -1,224 +1,414 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import {
+  Box,
   Container,
   Paper,
   Typography,
-  Box,
-  Chip,
+  Stepper,
+  Step,
+  StepLabel,
+  Card,
+  CardContent,
   List,
   ListItem,
+  ListItemIcon,
   ListItemText,
-  CircularProgress,
+  Chip,
   Alert,
+  CircularProgress,
+  Grid,
   Divider,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
 } from '@mui/material'
-import { APPLICATION_STATUS_LABELS, DOCUMENT_STATUS_LABELS } from '@jobline/shared'
-import axios from 'axios'
+import {
+  CheckCircle as CheckIcon,
+  RadioButtonUnchecked as PendingIcon,
+  HourglassEmpty as WaitingIcon,
+  Description as DocumentIcon,
+  Flight as FlightIcon,
+  Home as HomeIcon,
+  AttachMoney as MoneyIcon,
+  Warning as WarningIcon,
+} from '@mui/icons-material'
+import { 
+  Application, 
+  ApplicationStatus, 
+  DocumentChecklistItem,
+  DocumentStatus,
+  Payment,
+} from '../shared/types'
+import api from '../services/api'
+
+// Status workflow mapping for client view
+const statusWorkflow = {
+  [ApplicationStatus.PENDING_MOL]: {
+    label: 'Ministry of Labour Pre-Authorization',
+    description: 'Your application is being prepared for submission to the Ministry of Labour.',
+    icon: <DocumentIcon />,
+    color: 'warning' as const,
+  },
+  [ApplicationStatus.MOL_AUTH_RECEIVED]: {
+    label: 'Authorization Received',
+    description: 'Great news! The Ministry of Labour has approved your application.',
+    icon: <CheckIcon />,
+    color: 'success' as const,
+  },
+  [ApplicationStatus.VISA_PROCESSING]: {
+    label: 'Visa Processing',
+    description: 'Your worker\'s visa is being processed.',
+    icon: <DocumentIcon />,
+    color: 'info' as const,
+  },
+  [ApplicationStatus.VISA_RECEIVED]: {
+    label: 'Visa Approved',
+    description: 'The visa has been approved! Preparing for worker arrival.',
+    icon: <FlightIcon />,
+    color: 'success' as const,
+  },
+  [ApplicationStatus.WORKER_ARRIVED]: {
+    label: 'Worker Arrived',
+    description: 'Your worker has arrived in Lebanon. Final paperwork is being processed.',
+    icon: <HomeIcon />,
+    color: 'success' as const,
+  },
+  [ApplicationStatus.LABOUR_PERMIT_PROCESSING]: {
+    label: 'Labour Permit Processing',
+    description: 'Processing the labour permit with the Ministry of Labour.',
+    icon: <DocumentIcon />,
+    color: 'info' as const,
+  },
+  [ApplicationStatus.RESIDENCY_PERMIT_PROCESSING]: {
+    label: 'Residency Permit Processing',
+    description: 'Processing the residency permit with General Security.',
+    icon: <DocumentIcon />,
+    color: 'info' as const,
+  },
+  [ApplicationStatus.ACTIVE_EMPLOYMENT]: {
+    label: 'Active Employment',
+    description: 'All paperwork is complete. Your worker is legally employed.',
+    icon: <CheckIcon />,
+    color: 'success' as const,
+  },
+  [ApplicationStatus.CONTRACT_ENDED]: {
+    label: 'Contract Ended',
+    description: 'The employment contract has been terminated.',
+    icon: <CheckIcon />,
+    color: 'default' as const,
+  },
+  [ApplicationStatus.RENEWAL_PENDING]: {
+    label: 'Renewal Required',
+    description: 'Your worker\'s permits are due for renewal.',
+    icon: <WarningIcon />,
+    color: 'warning' as const,
+  },
+}
 
 const ClientStatus = () => {
   const { shareableLink } = useParams()
-  const [data, setData] = useState<any>(null)
+  const [application, setApplication] = useState<Application | null>(null)
+  const [documents, setDocuments] = useState<DocumentChecklistItem[]>([])
+  const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    fetchApplicationStatus()
+    if (shareableLink) {
+      fetchApplicationStatus()
+    }
   }, [shareableLink])
 
   const fetchApplicationStatus = async () => {
     try {
-      const response = await axios.get(`/api/public/status/${shareableLink}`)
-      setData(response.data)
+      const response = await api.get(`/applications/status/${shareableLink}`)
+      setApplication(response.data.application)
+      setDocuments(response.data.documents || [])
+      setPayments(response.data.payments || [])
     } catch (err: any) {
-      setError('Application not found or invalid link')
-      console.error(err)
+      setError('Unable to load application status. Please check your link or contact the office.')
     } finally {
       setLoading(false)
     }
   }
 
+  const getStatusSteps = () => {
+    const steps = [
+      ApplicationStatus.PENDING_MOL,
+      ApplicationStatus.MOL_AUTH_RECEIVED,
+      ApplicationStatus.VISA_PROCESSING,
+      ApplicationStatus.VISA_RECEIVED,
+      ApplicationStatus.WORKER_ARRIVED,
+      ApplicationStatus.LABOUR_PERMIT_PROCESSING,
+      ApplicationStatus.RESIDENCY_PERMIT_PROCESSING,
+      ApplicationStatus.ACTIVE_EMPLOYMENT,
+    ]
+    return steps
+  }
+
+  const getDocumentIcon = (status: DocumentStatus) => {
+    switch (status) {
+      case DocumentStatus.SUBMITTED:
+        return <CheckIcon color="success" />
+      case DocumentStatus.RECEIVED:
+        return <WaitingIcon color="info" />
+      default:
+        return <PendingIcon color="action" />
+    }
+  }
+
+  const getDocumentStatusText = (status: DocumentStatus) => {
+    switch (status) {
+      case DocumentStatus.SUBMITTED:
+        return 'Submitted to authorities'
+      case DocumentStatus.RECEIVED:
+        return 'Received by office'
+      default:
+        return 'Pending - Please provide'
+    }
+  }
+
+  const calculateBalance = () => {
+    if (!application) return 0
+    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0)
+    // In a real app, you'd have the total amount due from the application
+    // For now, we'll use a placeholder
+    const totalDue = 5000 // This should come from the application
+    return totalDue - totalPaid
+  }
+
   if (loading) {
     return (
-      <Container maxWidth="md" sx={{ mt: 4 }}>
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      <Container maxWidth="md" sx={{ mt: 8 }}>
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
           <CircularProgress />
         </Box>
       </Container>
     )
   }
 
-  if (error) {
+  if (error || !application) {
     return (
-      <Container maxWidth="md" sx={{ mt: 4 }}>
-        <Alert severity="error">{error}</Alert>
+      <Container maxWidth="md" sx={{ mt: 8 }}>
+        <Alert severity="error">
+          {error || 'Application not found'}
+        </Alert>
       </Container>
     )
   }
 
-  if (!data) {
-    return (
-      <Container maxWidth="md" sx={{ mt: 4 }}>
-        <Alert severity="info">No data available</Alert>
-      </Container>
-    )
-  }
-
-  const getStatusColor = (status: string) => {
-    if (status.includes('PENDING')) return 'warning'
-    if (status.includes('RECEIVED') || status.includes('PROCESSING')) return 'info'
-    if (status.includes('ACTIVE') || status === 'SUBMITTED') return 'success'
-    return 'default'
-  }
+  const statusInfo = statusWorkflow[application.status]
+  const steps = getStatusSteps()
+  const activeStep = steps.indexOf(application.status)
+  const pendingDocuments = documents.filter(d => d.status === DocumentStatus.PENDING)
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Paper elevation={3} sx={{ p: 4 }}>
-        <Typography variant="h4" gutterBottom align="center">
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      {/* Header */}
+      <Paper sx={{ p: 4, mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+        <Typography variant="h3" gutterBottom>
           Application Status
         </Typography>
-        
-        <Box sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Application Details
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-            <Chip 
-              label={APPLICATION_STATUS_LABELS[data.status as keyof typeof APPLICATION_STATUS_LABELS] || data.status}
-              color={getStatusColor(data.status)}
-            />
-            <Chip 
-              label={data.type === 'NEW_CANDIDATE' ? 'New Candidate' : 'Guarantor Change'}
-              variant="outlined"
-            />
-          </Box>
-        </Box>
-
-        <Divider sx={{ my: 3 }} />
-
-        <Box sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Worker Information
-          </Typography>
-          <List dense>
-            <ListItem>
-              <ListItemText 
-                primary="Name"
-                secondary={`${data.candidate.firstName} ${data.candidate.lastName}`}
-              />
-            </ListItem>
-            <ListItem>
-              <ListItemText 
-                primary="Nationality"
-                secondary={data.candidate.nationality}
-              />
-            </ListItem>
-          </List>
-        </Box>
-
-        <Divider sx={{ my: 3 }} />
-
-        <Box sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Required Documents
-          </Typography>
-          <List>
-            {data.documents.map((doc: any, index: number) => (
-              <ListItem key={index}>
-                <ListItemText 
-                  primary={doc.name}
-                  secondary={
-                    <Chip 
-                      label={DOCUMENT_STATUS_LABELS[doc.status as keyof typeof DOCUMENT_STATUS_LABELS]}
-                      size="small"
-                      color={getStatusColor(doc.status)}
-                    />
-                  }
-                />
-              </ListItem>
-            ))}
-          </List>
-        </Box>
-
-        <Divider sx={{ my: 3 }} />
-
-        <Box sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Financial Summary
-          </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-            <Typography>Total Paid:</Typography>
-            <Typography variant="h6" color="primary">
-              {data.financials.currency} {data.financials.totalPaid.toLocaleString()}
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-            <Typography>Outstanding Balance:</Typography>
-            <Typography variant="h6" color={data.financials.outstandingBalance > 0 ? 'error' : 'success.main'}>
-              {data.financials.currency} {data.financials.outstandingBalance.toLocaleString()}
-            </Typography>
-          </Box>
-
-          {data.financials.payments.length > 0 && (
-            <>
-              <Typography variant="subtitle1" sx={{ mt: 3, mb: 1 }}>
-                Payment History
-              </Typography>
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Date</TableCell>
-                      <TableCell align="right">Amount</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {data.financials.payments.map((payment: any, index: number) => (
-                      <TableRow key={index}>
-                        <TableCell>
-                          {new Date(payment.paymentDate).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell align="right">
-                          {payment.currency} {Number(payment.amount).toLocaleString()}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </>
-          )}
-        </Box>
-
-        {data.permitExpiryDate && (
-          <>
-            <Divider sx={{ my: 3 }} />
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Permit Information
-              </Typography>
-              <ListItem>
-                <ListItemText 
-                  primary="Permit Expiry Date"
-                  secondary={new Date(data.permitExpiryDate).toLocaleDateString()}
-                />
-              </ListItem>
-            </Box>
-          </>
-        )}
-
-        <Box sx={{ mt: 4, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-          <Typography variant="body2" color="text.secondary" align="center">
-            For questions or assistance, please contact the agency office.
-          </Typography>
-        </Box>
+        <Typography variant="h6" sx={{ opacity: 0.9 }}>
+          Welcome, {application.client?.name}
+        </Typography>
+        <Typography variant="body1" sx={{ mt: 1, opacity: 0.8 }}>
+          Application ID: #{application.id.substring(0, 8).toUpperCase()}
+        </Typography>
       </Paper>
+
+      {/* Current Status Alert */}
+      <Alert 
+        severity={statusInfo.color === 'warning' ? 'warning' : statusInfo.color === 'success' ? 'success' : 'info'}
+        icon={statusInfo.icon}
+        sx={{ mb: 3 }}
+      >
+        <Typography variant="h6" gutterBottom>{statusInfo.label}</Typography>
+        <Typography>{statusInfo.description}</Typography>
+      </Alert>
+
+      {/* Progress Stepper */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" gutterBottom>Application Progress</Typography>
+        <Stepper activeStep={activeStep} alternativeLabel>
+          {steps.map((step) => (
+            <Step key={step}>
+              <StepLabel>
+                <Typography variant="caption">
+                  {statusWorkflow[step].label.split(' ').slice(0, 2).join(' ')}
+                </Typography>
+              </StepLabel>
+            </Step>
+          ))}
+        </Stepper>
+      </Paper>
+
+      <Grid container spacing={3}>
+        {/* Application Details */}
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Application Details
+              </Typography>
+              <List dense>
+                <ListItem>
+                  <ListItemText
+                    primary="Worker Name"
+                    secondary={`${application.candidate?.firstName} ${application.candidate?.lastName}`}
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemText
+                    primary="Nationality"
+                    secondary={application.candidate?.nationality}
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemText
+                    primary="Application Type"
+                    secondary={application.type.replace(/_/g, ' ')}
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemText
+                    primary="Started Date"
+                    secondary={new Date(application.createdAt).toLocaleDateString()}
+                  />
+                </ListItem>
+                {application.permitExpiryDate && (
+                  <ListItem>
+                    <ListItemText
+                      primary="Permit Expiry"
+                      secondary={new Date(application.permitExpiryDate).toLocaleDateString()}
+                    />
+                  </ListItem>
+                )}
+              </List>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Required Documents */}
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Required Documents
+                {pendingDocuments.length > 0 && (
+                  <Chip 
+                    label={`${pendingDocuments.length} Pending`} 
+                    color="warning" 
+                    size="small" 
+                    sx={{ ml: 2 }}
+                  />
+                )}
+              </Typography>
+              {documents.length === 0 ? (
+                <Typography color="textSecondary">
+                  No documents required at this stage.
+                </Typography>
+              ) : (
+                <List dense>
+                  {documents.map((doc) => (
+                    <ListItem key={doc.id}>
+                      <ListItemIcon>
+                        {getDocumentIcon(doc.status)}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={doc.documentName}
+                        secondary={getDocumentStatusText(doc.status)}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+              {pendingDocuments.length > 0 && (
+                <Alert severity="warning" sx={{ mt: 2 }}>
+                  Please provide the pending documents to the office as soon as possible.
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Payment Summary */}
+        <Grid item xs={12}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                <MoneyIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
+                Payment Summary
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={8}>
+                  {payments.length === 0 ? (
+                    <Typography color="textSecondary">
+                      No payments recorded yet.
+                    </Typography>
+                  ) : (
+                    <List dense>
+                      {payments.map((payment) => (
+                        <ListItem key={payment.id}>
+                          <ListItemText
+                            primary={`Payment on ${new Date(payment.paymentDate).toLocaleDateString()}`}
+                            secondary={payment.notes || 'Payment received'}
+                          />
+                          <Typography variant="h6" color="success.main">
+                            ${payment.amount}
+                          </Typography>
+                        </ListItem>
+                      ))}
+                    </List>
+                  )}
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.100', textAlign: 'center' }}>
+                    <Typography variant="subtitle2" color="textSecondary">
+                      Outstanding Balance
+                    </Typography>
+                    <Typography variant="h4" color={calculateBalance() > 0 ? 'error.main' : 'success.main'}>
+                      ${calculateBalance()}
+                    </Typography>
+                    {calculateBalance() > 0 && (
+                      <Typography variant="caption" color="textSecondary">
+                        Please contact the office for payment details
+                      </Typography>
+                    )}
+                  </Paper>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Contact Information */}
+        <Grid item xs={12}>
+          <Card sx={{ bgcolor: 'primary.50' }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Need Help?
+              </Typography>
+              <Typography variant="body1" paragraph>
+                If you have any questions about your application status or need to provide documents,
+                please contact our office:
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={4}>
+                  <Typography variant="subtitle2">Phone</Typography>
+                  <Typography>+961 1 234 567</Typography>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Typography variant="subtitle2">Email</Typography>
+                  <Typography>info@jobline.lb</Typography>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Typography variant="subtitle2">Office Hours</Typography>
+                  <Typography>Mon-Fri: 9:00 AM - 5:00 PM</Typography>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
     </Container>
   )
 }
