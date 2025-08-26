@@ -329,7 +329,7 @@ const ApplicationList = () => {
 
       <Paper sx={{ height: 600, width: '100%' }}>
         <DataGrid
-          rows={applications}
+          rows={applications || []}
           columns={columns}
           paginationModel={{ page, pageSize }}
           pageSizeOptions={[5, 10, 25, 50]}
@@ -370,15 +370,22 @@ const ApplicationForm = () => {
         api.get<PaginatedResponse<Client>>('/clients?limit=100'),
         api.get<PaginatedResponse<Candidate>>('/candidates?limit=100&status=' + CandidateStatus.AVAILABLE_ABROAD),
       ])
-      setClients(clientsRes.data.data)
-      setCandidates(candidatesRes.data.data)
+      setClients(clientsRes.data?.data || [])
+      setCandidates(candidatesRes.data?.data || [])
       
       if (user?.role === UserRole.SUPER_ADMIN) {
-        const brokersRes = await api.get<Broker[]>('/brokers')
-        setBrokers(brokersRes.data)
+        try {
+          const brokersRes = await api.get<Broker[]>('/brokers')
+          setBrokers(brokersRes.data || [])
+        } catch {
+          setBrokers([])
+        }
       }
     } catch (err) {
       console.error('Failed to fetch data:', err)
+      setClients([])
+      setCandidates([])
+      setBrokers([])
     }
   }
 
@@ -447,7 +454,7 @@ const ApplicationForm = () => {
                     helperText={errors.clientId?.message}
                   >
                     <MenuItem value="">Select a client</MenuItem>
-                    {clients.map((client) => (
+                    {clients && clients.length > 0 && clients.map((client) => (
                       <MenuItem key={client.id} value={client.id}>
                         {client.name}
                       </MenuItem>
@@ -471,7 +478,7 @@ const ApplicationForm = () => {
                     helperText={errors.candidateId?.message}
                   >
                     <MenuItem value="">Select a candidate</MenuItem>
-                    {candidates.map((candidate) => (
+                    {candidates && candidates.length > 0 && candidates.map((candidate) => (
                       <MenuItem key={candidate.id} value={candidate.id}>
                         {candidate.firstName} {candidate.lastName} - {candidate.nationality}
                       </MenuItem>
@@ -493,7 +500,7 @@ const ApplicationForm = () => {
                       label="Broker (Optional)"
                     >
                       <MenuItem value="">None</MenuItem>
-                      {brokers.map((broker) => (
+                      {brokers && brokers.length > 0 && brokers.map((broker) => (
                         <MenuItem key={broker.id} value={broker.id}>
                           {broker.name}
                         </MenuItem>
@@ -550,15 +557,22 @@ const ApplicationDetails = () => {
       ])
       
       setApplication(appRes.data)
-      setDocuments(docsRes.data)
-      setPayments(paymentsRes.data)
+      setDocuments(docsRes.data || [])
+      setPayments(paymentsRes.data || [])
       
       if (user?.role === UserRole.SUPER_ADMIN) {
-        const costsRes = await api.get<Cost[]>(`/applications/${id}/costs`)
-        setCosts(costsRes.data)
+        try {
+          const costsRes = await api.get<Cost[]>(`/applications/${id}/costs`)
+          setCosts(costsRes.data || [])
+        } catch {
+          setCosts([])
+        }
       }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to fetch application details')
+      setDocuments([])
+      setPayments([])
+      setCosts([])
     } finally {
       setLoading(false)
     }

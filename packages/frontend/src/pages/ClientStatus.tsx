@@ -120,11 +120,13 @@ const ClientStatus = () => {
   const fetchApplicationStatus = async () => {
     try {
       const response = await api.get(`/applications/status/${shareableLink}`)
-      setApplication(response.data.application)
-      setDocuments(response.data.documents || [])
-      setPayments(response.data.payments || [])
+      setApplication(response.data?.application || null)
+      setDocuments(response.data?.documents || [])
+      setPayments(response.data?.payments || [])
     } catch (err: any) {
       setError('Unable to load application status. Please check your link or contact the office.')
+      setDocuments([])
+      setPayments([])
     } finally {
       setLoading(false)
     }

@@ -50,6 +50,53 @@ interface FinancialSummary {
   profitByMonth: { month: string; revenue: number; costs: number; profit: number }[]
 }
 
+// Helper function to calculate monthly data
+const calculateMonthlyData = (payments: Payment[], costs: Cost[]) => {
+  const monthlyRevenue: { [key: string]: number } = {}
+  const monthlyCosts: { [key: string]: number } = {}
+
+  // Process payments
+  payments.forEach(payment => {
+    const month = new Date(payment.paymentDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
+    monthlyRevenue[month] = (monthlyRevenue[month] || 0) + payment.amount
+  })
+
+  // Process costs
+  costs.forEach(cost => {
+    const month = new Date(cost.costDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
+    monthlyCosts[month] = (monthlyCosts[month] || 0) + cost.amount
+  })
+
+  // Combine all months
+  const allMonths = [...new Set([...Object.keys(monthlyRevenue), ...Object.keys(monthlyCosts)])].sort()
+
+  const revenueByMonth = allMonths.map(month => ({
+    month,
+    amount: monthlyRevenue[month] || 0
+  }))
+
+  const profitByMonth = allMonths.map(month => ({
+    month,
+    revenue: monthlyRevenue[month] || 0,
+    costs: monthlyCosts[month] || 0,
+    profit: (monthlyRevenue[month] || 0) - (monthlyCosts[month] || 0)
+  }))
+
+  return { revenueByMonth, profitByMonth }
+}
+
+// Helper function to calculate costs by type
+const calculateCostsByType = (costs: Cost[]) => {
+  const costsByType: { [key: string]: number } = {}
+
+  costs.forEach(cost => {
+    const type = cost.costType.replace(/_/g, ' ')
+    costsByType[type] = (costsByType[type] || 0) + cost.amount
+  })
+
+  return Object.entries(costsByType).map(([type, amount]) => ({ type, amount }))
+}
+
 const Financial = () => {
   const [tabValue, setTabValue] = useState(0)
   const [payments, setPayments] = useState<Payment[]>([])
@@ -80,15 +127,70 @@ const Financial = () => {
       params.append('startDate', selectedDateRange.startDate.toISOString())
       params.append('endDate', selectedDateRange.endDate.toISOString())
 
-      const [paymentsRes, costsRes, summaryRes] = await Promise.all([
-        api.get<Payment[]>(`/payments?${params}`),
-        api.get<Cost[]>(`/costs?${params}`),
-        api.get<FinancialSummary>(`/financial/summary?${params}`),
-      ])
+      // Fetch payments and costs from applications
+      // Note: These endpoints might need to be created in the backend
+      // For now, we'll use the application endpoints to get payment/cost data
+      let allPayments: Payment[] = []
+      let allCosts: Cost[] = []
+      
+      try {
+        // Get all applications first
+        const applicationsRes = await api.get<PaginatedResponse<Application>>('/applications?limit=100')
+        const applications = applicationsRes.data?.data || []
+        
+        // Fetch payments and costs for each application
+        if (applications.length > 0) {
+          const promises = applications.map(async (app) => {
+            try {
+              const [paymentsRes, costsRes] = await Promise.all([
+                api.get<Payment[]>(`/applications/${app.id}/payments`).catch(() => ({ data: [] })),
+                api.get<Cost[]>(`/applications/${app.id}/costs`).catch(() => ({ data: [] })),
+              ])
+              return { payments: paymentsRes.data || [], costs: costsRes.data || [] }
+            } catch {
+              return { payments: [], costs: [] }
+            }
+          })
+          
+          const results = await Promise.all(promises)
+          allPayments = results.flatMap(r => r.payments)
+          allCosts = results.flatMap(r => r.costs)
+          
+          // Filter by date range
+          allPayments = allPayments.filter(p => {
+            const date = new Date(p.paymentDate)
+            return date >= selectedDateRange.startDate && date <= selectedDateRange.endDate
+          })
+          
+          allCosts = allCosts.filter(c => {
+            const date = new Date(c.costDate)
+            return date >= selectedDateRange.startDate && date <= selectedDateRange.endDate
+          })
+        }
+      } catch (err) {
+        console.error('Error fetching financial data:', err)
+      }
 
-      setPayments(paymentsRes.data)
-      setCosts(costsRes.data)
-      setSummary(summaryRes.data)
+      setPayments(allPayments)
+      setCosts(allCosts)
+
+      // Calculate summary from the data
+      const totalRevenue = allPayments.reduce((sum, p) => sum + p.amount, 0)
+      const totalCosts = allCosts.reduce((sum, c) => sum + c.amount, 0)
+      const profit = totalRevenue - totalCosts
+
+      // Group by month for charts
+      const monthlyData = calculateMonthlyData(allPayments, allCosts)
+      const costsByType = calculateCostsByType(allCosts)
+
+      setSummary({
+        totalRevenue,
+        totalCosts,
+        profit,
+        revenueByMonth: monthlyData.revenueByMonth,
+        costsByType,
+        profitByMonth: monthlyData.profitByMonth,
+      })
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to fetch financial data')
     } finally {
@@ -99,9 +201,10 @@ const Financial = () => {
   const fetchApplications = async () => {
     try {
       const response = await api.get<PaginatedResponse<Application>>('/applications?limit=100')
-      setApplications(response.data.data)
+      setApplications(response.data?.data || [])
     } catch (err) {
       console.error('Failed to fetch applications:', err)
+      setApplications([])
     }
   }
 
@@ -255,7 +358,7 @@ const Financial = () => {
       </Paper>
 
       {/* Charts */}
-      {summary && (
+      {summary && summary.profitByMonth.length > 0 && (
         <Grid container spacing={3} mb={3}>
           <Grid item xs={12} md={6}>
             <Paper sx={{ p: 2 }}>
@@ -410,7 +513,7 @@ const Financial = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {applications.map((app) => {
+                  {applications && applications.length > 0 ? applications.map((app) => {
                     const appPayments = payments.filter(p => p.applicationId === app.id)
                     const appCosts = costs.filter(c => c.applicationId === app.id)
                     const revenue = appPayments.reduce((sum, p) => sum + p.amount, 0)
@@ -441,7 +544,13 @@ const Financial = () => {
                         </TableCell>
                       </TableRow>
                     )
-                  })}
+                  }) : (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center">
+                        No applications found
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>
@@ -467,11 +576,17 @@ const Financial = () => {
                       select
                       label="Application"
                     >
-                      {applications.map((app) => (
-                        <MenuItem key={app.id} value={app.id}>
-                          #{app.id.substring(0, 8)} - {app.client?.name} - {app.candidate?.firstName} {app.candidate?.lastName}
+                      {applications && applications.length > 0 ? (
+                        applications.map((app) => (
+                          <MenuItem key={app.id} value={app.id}>
+                            #{app.id.substring(0, 8)} - {app.client?.name} - {app.candidate?.firstName} {app.candidate?.lastName}
+                          </MenuItem>
+                        ))
+                      ) : (
+                        <MenuItem value="" disabled>
+                          No applications available
                         </MenuItem>
-                      ))}
+                      )}
                     </TextField>
                   )}
                 />
@@ -548,11 +663,17 @@ const Financial = () => {
                       select
                       label="Application"
                     >
-                      {applications.map((app) => (
-                        <MenuItem key={app.id} value={app.id}>
-                          #{app.id.substring(0, 8)} - {app.client?.name} - {app.candidate?.firstName} {app.candidate?.lastName}
+                      {applications && applications.length > 0 ? (
+                        applications.map((app) => (
+                          <MenuItem key={app.id} value={app.id}>
+                            #{app.id.substring(0, 8)} - {app.client?.name} - {app.candidate?.firstName} {app.candidate?.lastName}
+                          </MenuItem>
+                        ))
+                      ) : (
+                        <MenuItem value="" disabled>
+                          No applications available
                         </MenuItem>
-                      ))}
+                      )}
                     </TextField>
                   )}
                 />

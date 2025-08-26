@@ -266,7 +266,7 @@ const CandidateList = () => {
 
       <Paper sx={{ height: 600, width: '100%' }}>
         <DataGrid
-          rows={candidates}
+          rows={candidates || []}
           columns={columns}
           paginationModel={{ page, pageSize }}
           pageSizeOptions={[5, 10, 25, 50]}
@@ -316,9 +316,10 @@ const CandidateForm = () => {
   const fetchAgents = async () => {
     try {
       const response = await api.get<Agent[]>('/agents')
-      setAgents(response.data)
+      setAgents(response.data || [])
     } catch (err) {
       console.error('Failed to fetch agents:', err)
+      setAgents([])
     }
   }
 
@@ -452,7 +453,7 @@ const CandidateForm = () => {
                       label="Agent"
                     >
                       <MenuItem value="">None</MenuItem>
-                      {agents.map((agent) => (
+                      {agents && agents.length > 0 && agents.map((agent) => (
                         <MenuItem key={agent.id} value={agent.id}>
                           {agent.name}
                         </MenuItem>

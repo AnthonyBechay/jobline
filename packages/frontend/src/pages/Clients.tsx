@@ -216,7 +216,7 @@ const ClientList = () => {
 
       <Paper sx={{ height: 600, width: '100%' }}>
         <DataGrid
-          rows={clients}
+          rows={clients || []}
           columns={columns}
           paginationModel={{ page, pageSize }}
           pageSizeOptions={[5, 10, 25, 50]}
@@ -263,9 +263,10 @@ const ClientForm = () => {
   const fetchClients = async () => {
     try {
       const response = await api.get<PaginatedResponse<Client>>('/clients?limit=100')
-      setClients(response.data.data)
+      setClients(response.data?.data || [])
     } catch (err) {
       console.error('Failed to fetch clients:', err)
+      setClients([])
     }
   }
 
@@ -355,7 +356,7 @@ const ClientForm = () => {
                     SelectProps={{ native: true }}
                   >
                     <option value="">None</option>
-                    {clients.map((client) => (
+                    {clients && clients.length > 0 && clients.map((client) => (
                       <option key={client.id} value={client.id}>
                         {client.name}
                       </option>
@@ -426,9 +427,10 @@ const ClientDetails = () => {
   const fetchClientApplications = async () => {
     try {
       const response = await api.get<Application[]>(`/applications?clientId=${clientId}`)
-      setApplications(response.data)
+      setApplications(response.data || [])
     } catch (err) {
       console.error('Failed to fetch applications:', err)
+      setApplications([])
     }
   }
 

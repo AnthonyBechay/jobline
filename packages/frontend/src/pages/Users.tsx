@@ -165,10 +165,14 @@ const Users = () => {
 
       <Paper sx={{ height: 600, width: '100%' }}>
         <DataGrid
-          rows={users}
+          rows={users || []}
           columns={columns}
-          pageSize={10}
-          rowsPerPageOptions={[5, 10, 25]}
+          initialState={{
+            pagination: {
+              paginationModel: { pageSize: 10 }
+            }
+          }}
+          pageSizeOptions={[5, 10, 25]}
           loading={loading}
           disableRowSelectionOnClick
         />
