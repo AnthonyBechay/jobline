@@ -1,187 +1,207 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import {
-  Container,
-  Paper,
-  TextField,
-  Button,
-  Typography,
-  Box,
-  Alert,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-} from '@mui/material'
-import api from '../services/api'
-import { UserRole } from '@jobline/shared'
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Box, Paper, TextField, Button, Typography, Alert, Container, Divider } from '@mui/material';
+import axios from 'axios';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const Register = () => {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
+    companyName: '',
     name: '',
     email: '',
     password: '',
     confirmPassword: '',
-    setupKey: '',
-  })
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  });
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
-    })
-  }
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-
+    e.preventDefault();
+    setError('');
+    
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match')
-      return
+      setError('Passwords do not match');
+      return;
     }
 
     // Validate password length
     if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters')
-      return
+      setError('Password must be at least 6 characters long');
+      return;
     }
 
-    setLoading(true)
+    setLoading(true);
 
     try {
-      // Register the first super admin
-      await api.post('/auth/register-first', {
+      // Register company and super admin
+      const response = await axios.post(`${API_URL}/api/auth/register`, {
+        companyName: formData.companyName,
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        setupKey: formData.setupKey,
-      })
+      });
+
+      // Store token and redirect
+      localStorage.setItem('token', response.data.token);
       
-      // Redirect to login
-      navigate('/login')
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.')
+      setSuccess(true);
+      setTimeout(() => {
+        window.location.href = '/dashboard'; // Force reload to update auth context
+      }, 1500);
+    } catch (error: any) {
+      setError(error.response?.data?.error || 'Registration failed. Please try again.');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <Container component="main" maxWidth="xs">
+    <Container maxWidth="sm">
       <Box
         sx={{
-          marginTop: 8,
+          minHeight: '100vh',
           display: 'flex',
           flexDirection: 'column',
+          justifyContent: 'center',
           alignItems: 'center',
         }}
       >
         <Paper elevation={3} sx={{ padding: 4, width: '100%' }}>
-          <Typography component="h1" variant="h5" align="center" gutterBottom>
-            Initial Setup
-          </Typography>
-          <Typography variant="body2" color="text.secondary" align="center" gutterBottom>
-            Create the first Super Admin account
+          <Typography variant="h4" align="center" gutterBottom>
+            Create Your Recruitment Office
           </Typography>
           
+          <Typography variant="body2" color="textSecondary" align="center" sx={{ mb: 3 }}>
+            Set up your agency account to start managing domestic worker recruitment
+          </Typography>
+
+          <Divider sx={{ mb: 3 }} />
+
           {error && (
-            <Alert severity="error" sx={{ mt: 2, mb: 2 }}>
+            <Alert severity="error" sx={{ mb: 2 }}>
               {error}
             </Alert>
           )}
+          
+          {success && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              Registration successful! Setting up your office...
+            </Alert>
+          )}
 
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
+          <form onSubmit={handleSubmit}>
+            {/* Company Information */}
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              Office Information
+            </Typography>
+            
             <TextField
-              margin="normal"
-              required
               fullWidth
-              id="name"
-              label="Full Name"
+              margin="normal"
+              label="Company/Office Name"
+              name="companyName"
+              value={formData.companyName}
+              onChange={handleChange}
+              required
+              placeholder="e.g., Beirut Recruitment Agency"
+              helperText="This will be your office name in the system"
+            />
+
+            <Divider sx={{ my: 3 }} />
+
+            {/* Admin Information */}
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              Administrator Account
+            </Typography>
+            
+            <TextField
+              fullWidth
+              margin="normal"
+              label="Your Name"
               name="name"
-              autoComplete="name"
-              autoFocus
               value={formData.name}
               onChange={handleChange}
-            />
-            <TextField
-              margin="normal"
               required
+              autoComplete="name"
+            />
+            
+            <TextField
               fullWidth
-              id="email"
-              label="Email Address"
+              margin="normal"
+              label="Email"
               name="email"
-              autoComplete="email"
+              type="email"
               value={formData.email}
               onChange={handleChange}
-            />
-            <TextField
-              margin="normal"
               required
+              autoComplete="email"
+              helperText="You'll use this to login"
+            />
+            
+            <TextField
               fullWidth
-              name="password"
+              margin="normal"
               label="Password"
+              name="password"
               type="password"
-              id="password"
-              autoComplete="new-password"
               value={formData.password}
               onChange={handleChange}
+              required
+              autoComplete="new-password"
               helperText="At least 6 characters"
             />
+            
             <TextField
-              margin="normal"
-              required
               fullWidth
-              name="confirmPassword"
+              margin="normal"
               label="Confirm Password"
+              name="confirmPassword"
               type="password"
-              id="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
-            />
-            <TextField
-              margin="normal"
               required
-              fullWidth
-              name="setupKey"
-              label="Setup Key"
-              type="password"
-              id="setupKey"
-              value={formData.setupKey}
-              onChange={handleChange}
-              helperText="Enter the setup key from your .env file"
+              autoComplete="new-password"
             />
+            
             <Button
-              type="submit"
               fullWidth
+              type="submit"
               variant="contained"
-              sx={{ mt: 3, mb: 2 }}
+              color="primary"
+              disabled={loading || success}
+              sx={{ mt: 3, mb: 2, py: 1.5 }}
+            >
+              {loading ? 'Creating Office...' : 'Create Office & Admin Account'}
+            </Button>
+          </form>
+          
+          <Box sx={{ textAlign: 'center', mt: 2 }}>
+            <Typography variant="body2" color="textSecondary" gutterBottom>
+              Already have an office account?
+            </Typography>
+            <Button
+              color="primary"
+              onClick={() => navigate('/login')}
               disabled={loading}
             >
-              {loading ? 'Creating Account...' : 'Create Super Admin Account'}
+              Login to existing office
             </Button>
-          </Box>
-
-          <Box sx={{ mt: 2, textAlign: 'center' }}>
-            <Typography variant="body2" color="text.secondary">
-              Already have an account?{' '}
-              <Button
-                size="small"
-                onClick={() => navigate('/login')}
-                sx={{ textTransform: 'none' }}
-              >
-                Go to Login
-              </Button>
-            </Typography>
           </Box>
         </Paper>
       </Box>
     </Container>
-  )
-}
+  );
+};
 
-export default Register
+export default Register;

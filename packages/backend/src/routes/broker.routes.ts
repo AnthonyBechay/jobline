@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate, superAdminOnly } from '../middleware/auth.middleware';
+import { authenticate, superAdminOnly, AuthRequest } from '../middleware/auth.middleware';
 import { prisma } from '../index';
 
 const router = Router();
@@ -7,10 +7,13 @@ const router = Router();
 router.use(authenticate);
 router.use(superAdminOnly);
 
-// Get all brokers
-router.get('/', async (req, res) => {
+// Get all brokers (company-specific)
+router.get('/', async (req: AuthRequest, res) => {
   try {
+    const companyId = req.user!.companyId;
+    
     const brokers = await prisma.broker.findMany({
+      where: { companyId },
       include: {
         _count: {
           select: { applications: true },
@@ -26,15 +29,17 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Create broker
-router.post('/', async (req, res) => {
+// Create broker (company-specific)
+router.post('/', async (req: AuthRequest, res) => {
   try {
     const { name, contactDetails } = req.body;
+    const companyId = req.user!.companyId;
     
     const broker = await prisma.broker.create({
       data: {
         name,
         contactDetails,
+        companyId,
       },
     });
     
@@ -45,11 +50,22 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update broker
-router.put('/:id', async (req, res) => {
+// Update broker (company-specific)
+router.put('/:id', async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { name, contactDetails } = req.body;
+    const companyId = req.user!.companyId;
+    
+    // Check broker belongs to company
+    const existingBroker = await prisma.broker.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!existingBroker) {
+      res.status(404).json({ error: 'Broker not found' });
+      return;
+    }
     
     const broker = await prisma.broker.update({
       where: { id },
@@ -66,10 +82,21 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Delete broker
-router.delete('/:id', async (req, res) => {
+// Delete broker (company-specific)
+router.delete('/:id', async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
+    const companyId = req.user!.companyId;
+    
+    // Check broker belongs to company
+    const broker = await prisma.broker.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!broker) {
+      res.status(404).json({ error: 'Broker not found' });
+      return;
+    }
     
     // Check if broker has applications
     const applicationsCount = await prisma.application.count({

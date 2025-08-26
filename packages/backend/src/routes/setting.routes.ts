@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate, superAdminOnly } from '../middleware/auth.middleware';
+import { authenticate, superAdminOnly, AuthRequest } from '../middleware/auth.middleware';
 import { prisma } from '../index';
 
 const router = Router();
@@ -7,10 +7,13 @@ const router = Router();
 router.use(authenticate);
 router.use(superAdminOnly);
 
-// Get all settings
-router.get('/', async (req, res) => {
+// Get all settings (company-specific)
+router.get('/', async (req: AuthRequest, res) => {
   try {
+    const companyId = req.user!.companyId;
+    
     const settings = await prisma.setting.findMany({
+      where: { companyId },
       orderBy: { key: 'asc' },
     });
     
@@ -21,13 +24,17 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get setting by key
-router.get('/:key', async (req, res) => {
+// Get setting by key (company-specific)
+router.get('/:key', async (req: AuthRequest, res) => {
   try {
     const { key } = req.params;
+    const companyId = req.user!.companyId;
     
-    const setting = await prisma.setting.findUnique({
-      where: { key },
+    const setting = await prisma.setting.findFirst({
+      where: { 
+        key,
+        companyId,
+      },
     });
     
     if (!setting) {
@@ -42,16 +49,22 @@ router.get('/:key', async (req, res) => {
   }
 });
 
-// Create or update setting
-router.put('/:key', async (req, res) => {
+// Create or update setting (company-specific)
+router.put('/:key', async (req: AuthRequest, res) => {
   try {
     const { key } = req.params;
     const { value, description } = req.body;
+    const companyId = req.user!.companyId;
     
     const setting = await prisma.setting.upsert({
-      where: { key },
+      where: { 
+        companyId_key: {
+          companyId,
+          key,
+        },
+      },
       update: { value, description },
-      create: { key, value, description },
+      create: { key, value, description, companyId },
     });
     
     res.json(setting);
@@ -61,13 +74,23 @@ router.put('/:key', async (req, res) => {
   }
 });
 
-// Delete setting
-router.delete('/:key', async (req, res) => {
+// Delete setting (company-specific)
+router.delete('/:key', async (req: AuthRequest, res) => {
   try {
     const { key } = req.params;
+    const companyId = req.user!.companyId;
+    
+    const setting = await prisma.setting.findFirst({
+      where: { key, companyId },
+    });
+    
+    if (!setting) {
+      res.status(404).json({ error: 'Setting not found' });
+      return;
+    }
     
     await prisma.setting.delete({
-      where: { key },
+      where: { id: setting.id },
     });
     
     res.json({ message: 'Setting deleted successfully' });
@@ -77,10 +100,13 @@ router.delete('/:key', async (req, res) => {
   }
 });
 
-// Get document templates
-router.get('/documents/templates', async (req, res) => {
+// Get document templates (company-specific)
+router.get('/documents/templates', async (req: AuthRequest, res) => {
   try {
+    const companyId = req.user!.companyId;
+    
     const templates = await prisma.documentTemplate.findMany({
+      where: { companyId },
       orderBy: [{ stage: 'asc' }, { order: 'asc' }],
     });
     
@@ -91,10 +117,11 @@ router.get('/documents/templates', async (req, res) => {
   }
 });
 
-// Create document template
-router.post('/documents/templates', async (req, res) => {
+// Create document template (company-specific)
+router.post('/documents/templates', async (req: AuthRequest, res) => {
   try {
     const { stage, name, required, order } = req.body;
+    const companyId = req.user!.companyId;
     
     const template = await prisma.documentTemplate.create({
       data: {
@@ -102,6 +129,7 @@ router.post('/documents/templates', async (req, res) => {
         name,
         required,
         order,
+        companyId,
       },
     });
     
@@ -112,11 +140,22 @@ router.post('/documents/templates', async (req, res) => {
   }
 });
 
-// Update document template
-router.put('/documents/templates/:id', async (req, res) => {
+// Update document template (company-specific)
+router.put('/documents/templates/:id', async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { stage, name, required, order } = req.body;
+    const companyId = req.user!.companyId;
+    
+    // Check template belongs to company
+    const existingTemplate = await prisma.documentTemplate.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!existingTemplate) {
+      res.status(404).json({ error: 'Document template not found' });
+      return;
+    }
     
     const template = await prisma.documentTemplate.update({
       where: { id },
@@ -135,10 +174,21 @@ router.put('/documents/templates/:id', async (req, res) => {
   }
 });
 
-// Delete document template
-router.delete('/documents/templates/:id', async (req, res) => {
+// Delete document template (company-specific)
+router.delete('/documents/templates/:id', async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
+    const companyId = req.user!.companyId;
+    
+    // Check template belongs to company
+    const template = await prisma.documentTemplate.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!template) {
+      res.status(404).json({ error: 'Document template not found' });
+      return;
+    }
     
     await prisma.documentTemplate.delete({
       where: { id },

@@ -10,6 +10,28 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Company model - each Super Admin creates a company/office
+model Company {
+  id            String   @id @default(uuid())
+  name          String
+  phone         String?
+  address       String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  users         User[]
+  agents        Agent[]
+  brokers       Broker[]
+  candidates    Candidate[]
+  clients       Client[]
+  applications  Application[]
+  settings      Setting[]
+  templates     DocumentTemplate[]
+
+  @@map("companies")
+}
+
 // User model for authentication and role management
 model User {
   id           String   @id @default(uuid())
@@ -17,9 +39,12 @@ model User {
   email        String   @unique
   passwordHash String   @map("password_hash")
   role         UserRole
+  companyId    String   @map("company_id")
+  company      Company  @relation(fields: [companyId], references: [id])
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
+  @@index([companyId])
   @@map("users")
 }
 
@@ -33,10 +58,13 @@ model Agent {
   id             String      @id @default(uuid())
   name           String
   contactDetails Json        @map("contact_details")
+  companyId      String      @map("company_id")
+  company        Company     @relation(fields: [companyId], references: [id])
   createdAt      DateTime    @default(now()) @map("created_at")
   updatedAt      DateTime    @updatedAt @map("updated_at")
   candidates     Candidate[]
 
+  @@index([companyId])
   @@map("agents")
 }
 
@@ -45,10 +73,13 @@ model Broker {
   id             String        @id @default(uuid())
   name           String
   contactDetails Json          @map("contact_details")
+  companyId      String        @map("company_id")
+  company        Company       @relation(fields: [companyId], references: [id])
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
   applications   Application[]
 
+  @@index([companyId])
   @@map("brokers")
 }
 
@@ -66,12 +97,15 @@ model Candidate {
   status            CandidateStatus
   agentId           String?          @map("agent_id")
   agent             Agent?           @relation(fields: [agentId], references: [id])
+  companyId         String           @map("company_id")
+  company           Company          @relation(fields: [companyId], references: [id])
   createdAt         DateTime         @default(now()) @map("created_at")
   updatedAt         DateTime         @updatedAt @map("updated_at")
   applications      Application[]
 
   @@index([status])
   @@index([nationality])
+  @@index([companyId])
   @@map("candidates")
 }
 
@@ -93,11 +127,14 @@ model Client {
   referredByClient String?       @map("referred_by_client_id")
   referrer         Client?       @relation("ClientReferrals", fields: [referredByClient], references: [id])
   referrals        Client[]      @relation("ClientReferrals")
+  companyId        String        @map("company_id")
+  company          Company       @relation(fields: [companyId], references: [id])
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
   applications     Application[]
   payments         Payment[]
 
+  @@index([companyId])
   @@map("clients")
 }
 
@@ -114,6 +151,8 @@ model Application {
   broker           Broker?                 @relation(fields: [brokerId], references: [id])
   permitExpiryDate DateTime?               @map("permit_expiry_date")
   shareableLink    String                  @unique @map("shareable_link")
+  companyId        String                  @map("company_id")
+  company          Company                 @relation(fields: [companyId], references: [id])
   createdAt        DateTime                @default(now()) @map("created_at")
   updatedAt        DateTime                @updatedAt @map("updated_at")
   payments         Payment[]
@@ -123,6 +162,7 @@ model Application {
   @@index([status])
   @@index([clientId])
   @@index([candidateId])
+  @@index([companyId])
   @@map("applications")
 }
 
@@ -214,12 +254,16 @@ enum DocumentStatus {
 // Settings model for system configuration (Super Admin only)
 model Setting {
   id          String   @id @default(uuid())
-  key         String   @unique
+  key         String   
   value       Json
   description String?
+  companyId   String   @map("company_id")
+  company     Company  @relation(fields: [companyId], references: [id])
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  @@unique([companyId, key])
+  @@index([companyId])
   @@map("settings")
 }
 
@@ -230,9 +274,12 @@ model DocumentTemplate {
   name      String
   required  Boolean           @default(true)
   order     Int               @default(0)
+  companyId String            @map("company_id")
+  company   Company           @relation(fields: [companyId], references: [id])
   createdAt DateTime          @default(now()) @map("created_at")
   updatedAt DateTime          @updatedAt @map("updated_at")
 
-  @@unique([stage, name])
+  @@unique([companyId, stage, name])
+  @@index([companyId])
   @@map("document_templates")
 }

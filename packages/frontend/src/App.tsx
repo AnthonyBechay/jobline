@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
+import { UserRole } from './shared/types'
 
 // Pages
 import Login from './pages/Login'
@@ -37,27 +38,27 @@ function App() {
           
           {/* Super Admin only routes */}
           <Route path="/financial/*" element={
-            <ProtectedRoute requiredRole="SUPER_ADMIN">
+            <ProtectedRoute requiredRole={UserRole.SUPER_ADMIN}>
               <Financial />
             </ProtectedRoute>
           } />
           <Route path="/settings" element={
-            <ProtectedRoute requiredRole="SUPER_ADMIN">
+            <ProtectedRoute requiredRole={UserRole.SUPER_ADMIN}>
               <Settings />
             </ProtectedRoute>
           } />
           <Route path="/users" element={
-            <ProtectedRoute requiredRole="SUPER_ADMIN">
+            <ProtectedRoute requiredRole={UserRole.SUPER_ADMIN}>
               <Users />
             </ProtectedRoute>
           } />
           <Route path="/agents" element={
-            <ProtectedRoute requiredRole="SUPER_ADMIN">
+            <ProtectedRoute requiredRole={UserRole.SUPER_ADMIN}>
               <Agents />
             </ProtectedRoute>
           } />
           <Route path="/brokers" element={
-            <ProtectedRoute requiredRole="SUPER_ADMIN">
+            <ProtectedRoute requiredRole={UserRole.SUPER_ADMIN}>
               <Brokers />
             </ProtectedRoute>
           } />

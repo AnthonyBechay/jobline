@@ -1,63 +1,36 @@
 import { Router } from 'express';
-import { body } from 'express-validator';
-import { login, register, registerFirst, getCurrentUser, changePassword } from '../controllers/auth.controller';
-import { authenticate, superAdminOnly } from '../middleware/auth.middleware';
-import { validate } from '../middleware/validate.middleware';
+import { authenticate } from '../middleware/auth.middleware';
+import { 
+  register, 
+  login, 
+  getCurrentUser, 
+  changePassword,
+  createUser
+} from '../controllers/auth.controller';
+import { UserRole } from '@prisma/client';
 
 const router = Router();
 
-// Login route
-router.post(
-  '/login',
-  [
-    body('email').isEmail().normalizeEmail(),
-    body('password').notEmpty().isLength({ min: 6 }),
-  ],
-  validate,
-  login
-);
+// Public routes
+router.post('/register', register);
+router.post('/login', login);
 
-// Register first super admin (only works if no users exist)
-router.post(
-  '/register-first',
-  [
-    body('name').notEmpty().trim(),
-    body('email').isEmail().normalizeEmail(),
-    body('password').isLength({ min: 6 }),
-    body('setupKey').notEmpty(),
-  ],
-  validate,
-  registerFirst
-);
-
-// Register route (Super Admin only can create new users)
-router.post(
-  '/register',
-  authenticate,
-  superAdminOnly,
-  [
-    body('name').notEmpty().trim(),
-    body('email').isEmail().normalizeEmail(),
-    body('password').isLength({ min: 6 }),
-    body('role').isIn(['ADMIN', 'SUPER_ADMIN']),
-  ],
-  validate,
-  register
-);
-
-// Get current user
+// Protected routes
 router.get('/me', authenticate, getCurrentUser);
+router.post('/change-password', authenticate, changePassword);
 
-// Change password
-router.post(
-  '/change-password',
-  authenticate,
-  [
-    body('currentPassword').notEmpty(),
-    body('newPassword').isLength({ min: 6 }),
-  ],
-  validate,
-  changePassword
+// Super Admin only routes - Fix the middleware to properly return void
+router.post('/users', 
+  authenticate, 
+  (req, res, next) => {
+    // Manual authorization check for Super Admin
+    if ((req as any).user?.role !== UserRole.SUPER_ADMIN) {
+      res.status(403).json({ error: 'Only Super Admin can create users' });
+      return;
+    }
+    next();
+  }, 
+  createUser
 );
 
 export default router;

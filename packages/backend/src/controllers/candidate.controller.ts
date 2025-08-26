@@ -3,12 +3,15 @@ import { prisma } from '../index';
 import { CandidateStatus } from '@prisma/client';
 import { AuthRequest } from '../middleware/auth.middleware';
 
-// Get all candidates with filters
-export const getAllCandidates = async (req: Request, res: Response): Promise<void> => {
+// Get all candidates with filters (company-specific)
+export const getAllCandidates = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { status, nationality, search, page = 1, limit = 20 } = req.query;
+    const companyId = req.user!.companyId;
     
-    const where: any = {};
+    const where: any = {
+      companyId, // Filter by company
+    };
     
     if (status) {
       where.status = status as CandidateStatus;
@@ -58,13 +61,17 @@ export const getAllCandidates = async (req: Request, res: Response): Promise<voi
   }
 };
 
-// Get candidate by ID
-export const getCandidateById = async (req: Request, res: Response): Promise<void> => {
+// Get candidate by ID (company-specific)
+export const getCandidateById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const companyId = req.user!.companyId;
     
-    const candidate = await prisma.candidate.findUnique({
-      where: { id },
+    const candidate = await prisma.candidate.findFirst({
+      where: { 
+        id,
+        companyId, // Ensure candidate belongs to user's company
+      },
       include: {
         agent: true,
         applications: {
@@ -88,9 +95,10 @@ export const getCandidateById = async (req: Request, res: Response): Promise<voi
   }
 };
 
-// Create new candidate
+// Create new candidate (company-specific)
 export const createCandidate = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const companyId = req.user!.companyId;
     const {
       firstName,
       lastName,
@@ -104,8 +112,17 @@ export const createCandidate = async (req: AuthRequest, res: Response): Promise<
       agentId,
     } = req.body;
     
-    // Only Super Admin can assign agents
-    const agentData = req.user?.role === 'SUPER_ADMIN' && agentId ? { agentId } : {};
+    // Verify agent belongs to the same company if provided
+    if (agentId && req.user?.role === 'SUPER_ADMIN') {
+      const agent = await prisma.agent.findFirst({
+        where: { id: agentId, companyId },
+      });
+      
+      if (!agent) {
+        res.status(400).json({ error: 'Invalid agent ID' });
+        return;
+      }
+    }
     
     const candidate = await prisma.candidate.create({
       data: {
@@ -118,7 +135,8 @@ export const createCandidate = async (req: AuthRequest, res: Response): Promise<
         skills,
         experienceSummary,
         status,
-        ...agentData,
+        companyId, // Set company ID
+        ...(req.user?.role === 'SUPER_ADMIN' && agentId ? { agentId } : {}),
       },
       include: {
         agent: true,
@@ -132,14 +150,34 @@ export const createCandidate = async (req: AuthRequest, res: Response): Promise<
   }
 };
 
-// Update candidate
+// Update candidate (company-specific)
 export const updateCandidate = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const companyId = req.user!.companyId;
     const updateData = { ...req.body };
     
-    // Remove agentId if user is not Super Admin
-    if (req.user?.role !== 'SUPER_ADMIN') {
+    // Check candidate belongs to company
+    const existingCandidate = await prisma.candidate.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!existingCandidate) {
+      res.status(404).json({ error: 'Candidate not found' });
+      return;
+    }
+    
+    // Verify agent belongs to the same company if provided
+    if (updateData.agentId && req.user?.role === 'SUPER_ADMIN') {
+      const agent = await prisma.agent.findFirst({
+        where: { id: updateData.agentId, companyId },
+      });
+      
+      if (!agent) {
+        res.status(400).json({ error: 'Invalid agent ID' });
+        return;
+      }
+    } else if (req.user?.role !== 'SUPER_ADMIN') {
       delete updateData.agentId;
     }
     
@@ -162,10 +200,21 @@ export const updateCandidate = async (req: AuthRequest, res: Response): Promise<
   }
 };
 
-// Delete candidate
-export const deleteCandidate = async (req: Request, res: Response): Promise<void> => {
+// Delete candidate (company-specific)
+export const deleteCandidate = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const companyId = req.user!.companyId;
+    
+    // Check candidate belongs to company
+    const candidate = await prisma.candidate.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!candidate) {
+      res.status(404).json({ error: 'Candidate not found' });
+      return;
+    }
     
     // Check if candidate has applications
     const applicationsCount = await prisma.application.count({
@@ -190,8 +239,8 @@ export const deleteCandidate = async (req: Request, res: Response): Promise<void
   }
 };
 
-// Import candidates from CSV
-export const importCandidates = async (req: Request, res: Response): Promise<void> => {
+// Import candidates from CSV (company-specific)
+export const importCandidates = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // This would handle CSV file upload and parsing
     // For now, returning a placeholder response
@@ -204,10 +253,13 @@ export const importCandidates = async (req: Request, res: Response): Promise<voi
   }
 };
 
-// Export candidates to CSV
-export const exportCandidates = async (req: Request, res: Response): Promise<void> => {
+// Export candidates to CSV (company-specific)
+export const exportCandidates = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const companyId = req.user!.companyId;
+    
     const candidates = await prisma.candidate.findMany({
+      where: { companyId },
       include: {
         agent: true,
       },

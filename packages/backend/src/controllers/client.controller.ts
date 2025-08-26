@@ -1,12 +1,16 @@
 import { Request, Response } from 'express';
 import { prisma } from '../index';
+import { AuthRequest } from '../middleware/auth.middleware';
 
-// Get all clients with search
-export const getAllClients = async (req: Request, res: Response): Promise<void> => {
+// Get all clients with filters (company-specific)
+export const getAllClients = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { search, page = 1, limit = 20 } = req.query;
+    const companyId = req.user!.companyId;
     
-    const where: any = {};
+    const where: any = {
+      companyId, // Filter by company
+    };
     
     if (search) {
       where.OR = [
@@ -21,16 +25,13 @@ export const getAllClients = async (req: Request, res: Response): Promise<void> 
       prisma.client.findMany({
         where,
         include: {
+          _count: {
+            select: { applications: true },
+          },
           referrer: {
             select: {
               id: true,
               name: true,
-            },
-          },
-          _count: {
-            select: {
-              applications: true,
-              referrals: true,
             },
           },
         },
@@ -56,13 +57,17 @@ export const getAllClients = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-// Get client by ID
-export const getClientById = async (req: Request, res: Response): Promise<void> => {
+// Get client by ID (company-specific)
+export const getClientById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const companyId = req.user!.companyId;
     
-    const client = await prisma.client.findUnique({
-      where: { id },
+    const client = await prisma.client.findFirst({
+      where: { 
+        id,
+        companyId, // Ensure client belongs to user's company
+      },
       include: {
         referrer: true,
         referrals: true,
@@ -91,50 +96,23 @@ export const getClientById = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-// Get client hiring history
-export const getClientHistory = async (req: Request, res: Response): Promise<void> => {
+// Create new client (company-specific)
+export const createClient = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
-    
-    const applications = await prisma.application.findMany({
-      where: { clientId: id },
-      include: {
-        candidate: true,
-        payments: {
-          select: {
-            amount: true,
-            paymentDate: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    
-    const history = applications.map(app => ({
-      id: app.id,
-      candidate: {
-        id: app.candidate.id,
-        name: `${app.candidate.firstName} ${app.candidate.lastName}`,
-        nationality: app.candidate.nationality,
-      },
-      status: app.status,
-      type: app.type,
-      startDate: app.createdAt,
-      endDate: app.status === 'CONTRACT_ENDED' ? app.updatedAt : null,
-      totalPaid: app.payments.reduce((sum, p) => sum + Number(p.amount), 0),
-    }));
-    
-    res.json(history);
-  } catch (error) {
-    console.error('Get client history error:', error);
-    res.status(500).json({ error: 'Failed to fetch client history' });
-  }
-};
-
-// Create new client
-export const createClient = async (req: Request, res: Response): Promise<void> => {
-  try {
+    const companyId = req.user!.companyId;
     const { name, phone, address, notes, referredByClient } = req.body;
+    
+    // Verify referrer belongs to the same company if provided
+    if (referredByClient) {
+      const referrer = await prisma.client.findFirst({
+        where: { id: referredByClient, companyId },
+      });
+      
+      if (!referrer) {
+        res.status(400).json({ error: 'Invalid referrer ID' });
+        return;
+      }
+    }
     
     const client = await prisma.client.create({
       data: {
@@ -143,14 +121,10 @@ export const createClient = async (req: Request, res: Response): Promise<void> =
         address,
         notes,
         referredByClient,
+        companyId, // Set company ID
       },
       include: {
-        referrer: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        referrer: true,
       },
     });
     
@@ -161,28 +135,41 @@ export const createClient = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-// Update client
-export const updateClient = async (req: Request, res: Response): Promise<void> => {
+// Update client (company-specific)
+export const updateClient = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, phone, address, notes, referredByClient } = req.body;
+    const companyId = req.user!.companyId;
+    const { referredByClient, ...updateData } = req.body;
+    
+    // Check client belongs to company
+    const existingClient = await prisma.client.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!existingClient) {
+      res.status(404).json({ error: 'Client not found' });
+      return;
+    }
+    
+    // Verify referrer belongs to the same company if provided
+    if (referredByClient) {
+      const referrer = await prisma.client.findFirst({
+        where: { id: referredByClient, companyId },
+      });
+      
+      if (!referrer) {
+        res.status(400).json({ error: 'Invalid referrer ID' });
+        return;
+      }
+      updateData.referredByClient = referredByClient;
+    }
     
     const client = await prisma.client.update({
       where: { id },
-      data: {
-        name,
-        phone,
-        address,
-        notes,
-        referredByClient,
-      },
+      data: updateData,
       include: {
-        referrer: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        referrer: true,
       },
     });
     
@@ -193,10 +180,21 @@ export const updateClient = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-// Delete client
-export const deleteClient = async (req: Request, res: Response): Promise<void> => {
+// Delete client (company-specific)
+export const deleteClient = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const companyId = req.user!.companyId;
+    
+    // Check client belongs to company
+    const client = await prisma.client.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!client) {
+      res.status(404).json({ error: 'Client not found' });
+      return;
+    }
     
     // Check if client has applications
     const applicationsCount = await prisma.application.count({
@@ -221,8 +219,60 @@ export const deleteClient = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-// Import clients from CSV
-export const importClients = async (req: Request, res: Response): Promise<void> => {
+// Get client history/lifeline (company-specific)
+export const getClientHistory = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const companyId = req.user!.companyId;
+    
+    const client = await prisma.client.findFirst({
+      where: { id, companyId },
+      include: {
+        applications: {
+          include: {
+            candidate: true,
+            payments: true,
+            costs: req.user?.role === 'SUPER_ADMIN',
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        payments: {
+          orderBy: { paymentDate: 'desc' },
+        },
+      },
+    });
+    
+    if (!client) {
+      res.status(404).json({ error: 'Client not found' });
+      return;
+    }
+    
+    // Calculate total spent by client
+    const totalSpent = client.payments.reduce((sum, payment) => {
+      return sum + Number(payment.amount);
+    }, 0);
+    
+    res.json({
+      client,
+      totalSpent,
+      applicationCount: client.applications.length,
+      lifeline: client.applications.map(app => ({
+        id: app.id,
+        candidate: `${app.candidate.firstName} ${app.candidate.lastName}`,
+        status: app.status,
+        type: app.type,
+        createdAt: app.createdAt,
+        permitExpiryDate: app.permitExpiryDate,
+      })),
+    });
+  } catch (error) {
+    console.error('Get client history error:', error);
+    res.status(500).json({ error: 'Failed to fetch client history' });
+  }
+};
+
+// Import clients from CSV (company-specific)
+export const importClients = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // This would handle CSV file upload and parsing
     // For now, returning a placeholder response
@@ -235,26 +285,23 @@ export const importClients = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-// Export clients to CSV
-export const exportClients = async (req: Request, res: Response): Promise<void> => {
+// Export clients to CSV (company-specific)
+export const exportClients = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const companyId = req.user!.companyId;
+    
     const clients = await prisma.client.findMany({
+      where: { companyId },
       include: {
-        referrer: {
-          select: {
-            name: true,
-          },
-        },
+        referrer: true,
         _count: {
-          select: {
-            applications: true,
-          },
+          select: { applications: true },
         },
       },
     });
     
     // Convert to CSV format
-    const headers = ['ID', 'Name', 'Phone', 'Address', 'Referred By', 'Total Applications'];
+    const headers = ['ID', 'Name', 'Phone', 'Address', 'Referred By', 'Applications Count'];
     const rows = clients.map(c => [
       c.id,
       c.name,

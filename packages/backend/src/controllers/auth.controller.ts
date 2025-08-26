@@ -6,57 +6,134 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { UserRole } from '@prisma/client';
 
 // Generate JWT token
-const generateToken = (user: { id: string; email: string; role: UserRole }): string => {
-  const payload = { id: user.id, email: user.email, role: user.role };
-  const secret = process.env.JWT_SECRET || 'default-secret-change-this';
-  
-  // Use any type to bypass TypeScript strict checking for expiresIn
-  return jwt.sign(payload, secret, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as any);
+const generateToken = (user: { id: string; email: string; role: UserRole; companyId: string }): string => {
+  const payload = { 
+    id: user.id, 
+    email: user.email, 
+    role: user.role,
+    companyId: user.companyId 
+  };
+  const secret = process.env.JWT_SECRET || 'jobline-secret-key-2025';
+  return jwt.sign(payload, secret, { expiresIn: '30d' });
 };
 
-// Register first super admin (only works if no users exist)
-export const registerFirst = async (req: Request, res: Response): Promise<void> => {
+// Register - creates a new company/office with Super Admin
+export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, email, password, setupKey } = req.body;
+    const { name, email, password, companyName } = req.body;
 
-    // Check setup key
-    const validSetupKey = process.env.SETUP_KEY || 'jobline-setup-2024';
-    if (setupKey !== validSetupKey) {
-      res.status(403).json({ error: 'Invalid setup key' });
+    // Validate required fields
+    if (!name || !email || !password || !companyName) {
+      res.status(400).json({ 
+        error: 'Missing required fields', 
+        details: 'Name, email, password, and company name are required' 
+      });
       return;
     }
 
-    // Check if any users exist
-    const userCount = await prisma.user.count();
-    if (userCount > 0) {
-      res.status(403).json({ error: 'Initial setup already completed' });
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      res.status(400).json({ error: 'User with this email already exists' });
       return;
     }
 
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Create first super admin
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        passwordHash,
-        role: UserRole.SUPER_ADMIN,
-      },
+    // Create company and user in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create the company/office
+      const company = await tx.company.create({
+        data: {
+          name: companyName,
+        },
+      });
+
+      // Create the super admin user
+      const user = await tx.user.create({
+        data: {
+          name,
+          email,
+          passwordHash,
+          role: UserRole.SUPER_ADMIN,
+          companyId: company.id,
+        },
+      });
+
+      // Create default document templates for this company
+      const defaultTemplates = [
+        // MoL Pre-Authorization documents
+        { stage: 'PENDING_MOL', name: 'Passport Copy', order: 1 },
+        { stage: 'PENDING_MOL', name: 'Medical Certificate', order: 2 },
+        { stage: 'PENDING_MOL', name: 'Criminal Record', order: 3 },
+        // Visa documents
+        { stage: 'VISA_PROCESSING', name: 'Visa Application Form', order: 1 },
+        { stage: 'VISA_PROCESSING', name: 'Sponsor ID', order: 2 },
+        // Post-arrival documents
+        { stage: 'LABOUR_PERMIT_PROCESSING', name: 'Work Permit Application', order: 1 },
+        { stage: 'RESIDENCY_PERMIT_PROCESSING', name: 'Residency Application', order: 1 },
+      ];
+
+      for (const template of defaultTemplates) {
+        await tx.documentTemplate.create({
+          data: {
+            ...template,
+            stage: template.stage as any,
+            required: true,
+            companyId: company.id,
+          },
+        });
+      }
+
+      // Create default settings
+      await tx.setting.create({
+        data: {
+          key: 'office_commission',
+          value: { amount: 1500, currency: 'USD' },
+          description: 'Default office commission fee',
+          companyId: company.id,
+        },
+      });
+
+      await tx.setting.create({
+        data: {
+          key: 'renewal_reminder_days',
+          value: 60,
+          description: 'Days before permit expiry to show renewal reminder',
+          companyId: company.id,
+        },
+      });
+
+      return { user, company };
+    });
+
+    // Generate token
+    const token = generateToken({
+      id: result.user.id,
+      email: result.user.email,
+      role: result.user.role,
+      companyId: result.company.id,
     });
 
     res.status(201).json({
-      message: 'Super Admin account created successfully',
+      token,
       user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
+        id: result.user.id,
+        name: result.user.name,
+        email: result.user.email,
+        role: result.user.role,
+        company: {
+          id: result.company.id,
+          name: result.company.name,
+        },
       },
     });
   } catch (error) {
-    console.error('Register first error:', error);
+    console.error('Register error:', error);
     res.status(500).json({ error: 'Registration failed' });
   }
 };
@@ -66,25 +143,31 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
 
-    // Find user
+    // Find user with company
     const user = await prisma.user.findUnique({
       where: { email },
+      include: { company: true },
     });
 
     if (!user) {
-      res.status(401).json({ error: 'Invalid credentials' });
+      res.status(401).json({ error: 'Invalid email or password' });
       return;
     }
 
     // Check password
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
-      res.status(401).json({ error: 'Invalid credentials' });
+      res.status(401).json({ error: 'Invalid email or password' });
       return;
     }
 
     // Generate token
-    const token = generateToken(user);
+    const token = generateToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      companyId: user.companyId,
+    });
 
     res.json({
       token,
@@ -93,6 +176,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         name: user.name,
         email: user.email,
         role: user.role,
+        company: {
+          id: user.company.id,
+          name: user.company.name,
+        },
       },
     });
   } catch (error) {
@@ -101,60 +188,18 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-// Register new user (Super Admin only)
-export const register = async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const { name, email, password, role } = req.body;
-
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (existingUser) {
-      res.status(400).json({ error: 'User already exists' });
-      return;
-    }
-
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        passwordHash,
-        role,
-      },
-    });
-
-    res.status(201).json({
-      message: 'User created successfully',
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    });
-  } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ error: 'Registration failed' });
-  }
-};
-
-// Get current user
+// Get current user - FIXED: Use include instead of both include and select
 export const getCurrentUser = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user!.id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        createdAt: true,
+      include: { 
+        company: {
+          select: {
+            id: true,
+            name: true,
+          }
+        }
       },
     });
 
@@ -163,7 +208,15 @@ export const getCurrentUser = async (req: AuthRequest, res: Response): Promise<v
       return;
     }
 
-    res.json(user);
+    // Return only the fields we need
+    res.json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      createdAt: user.createdAt,
+      company: user.company,
+    });
   } catch (error) {
     console.error('Get current user error:', error);
     res.status(500).json({ error: 'Failed to get user' });
@@ -174,6 +227,11 @@ export const getCurrentUser = async (req: AuthRequest, res: Response): Promise<v
 export const changePassword = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { currentPassword, newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      res.status(400).json({ error: 'New password must be at least 6 characters' });
+      return;
+    }
 
     // Get user with password
     const user = await prisma.user.findUnique({
@@ -205,5 +263,69 @@ export const changePassword = async (req: AuthRequest, res: Response): Promise<v
   } catch (error) {
     console.error('Change password error:', error);
     res.status(500).json({ error: 'Failed to change password' });
+  }
+};
+
+// Create new user (only SUPER_ADMIN can do this, within their company)
+export const createUser = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { name, email, password, role } = req.body;
+
+    // Get the super admin's company
+    const superAdmin = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { companyId: true },
+    });
+
+    if (!superAdmin) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      res.status(400).json({ error: 'User with this email already exists' });
+      return;
+    }
+
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Create user in the same company
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        passwordHash,
+        role: role || UserRole.ADMIN,
+        companyId: superAdmin.companyId,
+      },
+      include: { 
+        company: {
+          select: {
+            id: true,
+            name: true,
+          }
+        }
+      },
+    });
+
+    res.status(201).json({
+      message: 'User created successfully',
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        company: user.company,
+      },
+    });
+  } catch (error) {
+    console.error('Create user error:', error);
+    res.status(500).json({ error: 'Failed to create user' });
   }
 };

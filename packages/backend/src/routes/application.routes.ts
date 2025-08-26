@@ -11,12 +11,15 @@ const router = Router();
 router.use(authenticate);
 router.use(adminOnly);
 
-// Get all applications with filters
+// Get all applications with filters (company-specific)
 router.get('/', async (req: AuthRequest, res) => {
   try {
     const { status, type, clientId, candidateId, page = 1, limit = 20 } = req.query;
+    const companyId = req.user!.companyId;
     
-    const where: any = {};
+    const where: any = {
+      companyId, // Filter by company
+    };
     
     if (status) where.status = status;
     if (type) where.type = type;
@@ -62,13 +65,17 @@ router.get('/', async (req: AuthRequest, res) => {
   }
 });
 
-// Get application by ID
+// Get application by ID (company-specific)
 router.get('/:id', async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
+    const companyId = req.user!.companyId;
     
-    const application = await prisma.application.findUnique({
-      where: { id },
+    const application = await prisma.application.findFirst({
+      where: { 
+        id,
+        companyId, // Ensure application belongs to user's company
+      },
       include: {
         client: true,
         candidate: true,
@@ -93,17 +100,21 @@ router.get('/:id', async (req: AuthRequest, res) => {
   }
 });
 
-// Create new application
+// Create new application (company-specific)
 router.post('/', async (req: AuthRequest, res) => {
   try {
     const { clientId, candidateId, type } = req.body;
+    const companyId = req.user!.companyId;
     
     // Generate unique shareable link
     const shareableLink = uuidv4();
     
-    // Check if candidate is available
-    const candidate = await prisma.candidate.findUnique({
-      where: { id: candidateId },
+    // Check if candidate belongs to the same company and is available
+    const candidate = await prisma.candidate.findFirst({
+      where: { 
+        id: candidateId,
+        companyId, // Ensure candidate belongs to user's company
+      },
     });
     
     if (!candidate) {
@@ -116,6 +127,19 @@ router.post('/', async (req: AuthRequest, res) => {
       return;
     }
     
+    // Check if client belongs to the same company
+    const client = await prisma.client.findFirst({
+      where: { 
+        id: clientId,
+        companyId, // Ensure client belongs to user's company
+      },
+    });
+    
+    if (!client) {
+      res.status(404).json({ error: 'Client not found' });
+      return;
+    }
+    
     // Create application and update candidate status
     const [application] = await prisma.$transaction([
       prisma.application.create({
@@ -125,6 +149,7 @@ router.post('/', async (req: AuthRequest, res) => {
           type,
           status: 'PENDING_MOL',
           shareableLink,
+          companyId, // Set company ID
         },
         include: {
           client: true,
@@ -139,7 +164,10 @@ router.post('/', async (req: AuthRequest, res) => {
     
     // Create initial document checklist based on status
     const documentTemplates = await prisma.documentTemplate.findMany({
-      where: { stage: 'PENDING_MOL' },
+      where: { 
+        stage: 'PENDING_MOL',
+        companyId, // Use company-specific templates
+      },
       orderBy: { order: 'asc' },
     });
     
@@ -161,11 +189,22 @@ router.post('/', async (req: AuthRequest, res) => {
   }
 });
 
-// Update application status
+// Update application status (company-specific)
 router.patch('/:id/status', async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
+    const companyId = req.user!.companyId;
+    
+    // Check application belongs to company
+    const existingApplication = await prisma.application.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!existingApplication) {
+      res.status(404).json({ error: 'Application not found' });
+      return;
+    }
     
     const application = await prisma.application.update({
       where: { id },
@@ -191,7 +230,10 @@ router.patch('/:id/status', async (req: AuthRequest, res) => {
     
     // Create document checklist for new stage
     const documentTemplates = await prisma.documentTemplate.findMany({
-      where: { stage: status },
+      where: { 
+        stage: status,
+        companyId, // Use company-specific templates
+      },
       orderBy: { order: 'asc' },
     });
     
@@ -214,11 +256,22 @@ router.patch('/:id/status', async (req: AuthRequest, res) => {
   }
 });
 
-// Update document checklist item
+// Update document checklist item (company-specific)
 router.patch('/:id/documents/:itemId', async (req: AuthRequest, res) => {
   try {
     const { id, itemId } = req.params;
     const { status } = req.body;
+    const companyId = req.user!.companyId;
+    
+    // Verify application belongs to company
+    const application = await prisma.application.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!application) {
+      res.status(404).json({ error: 'Application not found' });
+      return;
+    }
     
     const item = await prisma.documentChecklistItem.update({
       where: { id: itemId },
@@ -232,7 +285,7 @@ router.patch('/:id/documents/:itemId', async (req: AuthRequest, res) => {
   }
 });
 
-// Assign broker (Super Admin only)
+// Assign broker (Super Admin only, company-specific)
 router.patch('/:id/broker', authenticate, async (req: AuthRequest, res) => {
   if (req.user?.role !== 'SUPER_ADMIN') {
     res.status(403).json({ error: 'Insufficient permissions' });
@@ -242,8 +295,31 @@ router.patch('/:id/broker', authenticate, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { brokerId } = req.body;
+    const companyId = req.user!.companyId;
     
-    const application = await prisma.application.update({
+    // Verify application belongs to company
+    const application = await prisma.application.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!application) {
+      res.status(404).json({ error: 'Application not found' });
+      return;
+    }
+    
+    // Verify broker belongs to company if provided
+    if (brokerId) {
+      const broker = await prisma.broker.findFirst({
+        where: { id: brokerId, companyId },
+      });
+      
+      if (!broker) {
+        res.status(400).json({ error: 'Invalid broker ID' });
+        return;
+      }
+    }
+    
+    const updatedApplication = await prisma.application.update({
       where: { id },
       data: { brokerId },
       include: {
@@ -251,20 +327,21 @@ router.patch('/:id/broker', authenticate, async (req: AuthRequest, res) => {
       },
     });
     
-    res.json(application);
+    res.json(updatedApplication);
   } catch (error) {
     console.error('Assign broker error:', error);
     res.status(500).json({ error: 'Failed to assign broker' });
   }
 });
 
-// Get shareable link
+// Get shareable link (company-specific)
 router.get('/:id/share-link', async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
+    const companyId = req.user!.companyId;
     
-    const application = await prisma.application.findUnique({
-      where: { id },
+    const application = await prisma.application.findFirst({
+      where: { id, companyId },
       select: { shareableLink: true },
     });
     
@@ -273,7 +350,7 @@ router.get('/:id/share-link', async (req: AuthRequest, res) => {
       return;
     }
     
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const fullLink = `${baseUrl}/status/${application.shareableLink}`;
     
     res.json({ link: fullLink });

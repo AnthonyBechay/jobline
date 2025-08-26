@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { User, LoginRequest, LoginResponse } from '@jobline/shared'
+import { User, LoginRequest, LoginResponse } from '../shared/types'
 import api from '../services/api'
 
 interface AuthContextType {

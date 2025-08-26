@@ -8,6 +8,7 @@ export interface AuthRequest extends Request {
     id: string;
     email: string;
     role: UserRole;
+    companyId: string;
   };
 }
 
@@ -15,6 +16,7 @@ interface JWTPayload {
   id: string;
   email: string;
   role: UserRole;
+  companyId: string;
 }
 
 export const authenticate = async (
@@ -30,12 +32,13 @@ export const authenticate = async (
       return;
     }
 
-    const secret = process.env.JWT_SECRET || 'default-secret-change-this';
+    const secret = process.env.JWT_SECRET || 'jobline-secret-key-2025';
     const decoded = jwt.verify(token, secret) as JWTPayload;
     req.user = {
       id: decoded.id,
       email: decoded.email,
       role: decoded.role,
+      companyId: decoded.companyId,
     };
 
     next();
