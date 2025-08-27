@@ -321,7 +321,6 @@ const Settings = () => {
           <Tab label="System Settings" />
           <Tab label="Nationalities" />
           <Tab label="Fee Templates" />
-          <Tab label="Notification Settings" />
         </Tabs>
       </Paper>
 
@@ -476,7 +475,12 @@ const Settings = () => {
       {tabValue === 3 && (
         <Box>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h6">Fee Templates</Typography>
+            <Box>
+              <Typography variant="h6">Fee Templates</Typography>
+              <Typography variant="body2" color="textSecondary">
+                Define standard fee structures that can be applied to applications
+              </Typography>
+            </Box>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
@@ -501,10 +505,13 @@ const Settings = () => {
                     )}
                     <Box sx={{ mt: 2 }}>
                       <Typography variant="body2">
-                        <strong>Default:</strong> {template.currency} {template.defaultPrice}
+                        <strong>Default Fee:</strong> {template.currency} {template.defaultPrice}
                       </Typography>
                       <Typography variant="body2">
-                        <strong>Range:</strong> {template.currency} {template.minPrice} - {template.maxPrice}
+                        <strong>Allowed Range:</strong> {template.currency} {template.minPrice} - {template.maxPrice}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 1 }}>
+                        This fee can be adjusted within the specified range when creating an application
                       </Typography>
                     </Box>
                     <Box display="flex" justifyContent="flex-end" gap={1} mt={2}>
@@ -530,66 +537,10 @@ const Settings = () => {
           {feeTemplates.length === 0 && (
             <Paper sx={{ p: 3, textAlign: 'center' }}>
               <Typography color="textSecondary">
-                No fee templates configured. Click "Add Fee Template" to create one.
+                No fee templates configured. Click "Add Fee Template" to create standardized fee structures for your applications.
               </Typography>
             </Paper>
           )}
-        </Box>
-      )}
-
-      {/* Notification Settings Tab */}
-      {tabValue === 4 && (
-        <Box>
-          <Typography variant="h6" gutterBottom>
-            Notification Settings
-          </Typography>
-          <Card>
-            <CardContent>
-              <Grid container spacing={3}>
-                <Grid item xs={12}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        defaultChecked={settings.find(s => s.key === 'email_notifications')?.value || false}
-                      />
-                    }
-                    label="Enable Email Notifications"
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        defaultChecked={settings.find(s => s.key === 'renewal_reminders')?.value || false}
-                      />
-                    }
-                    label="Enable Renewal Reminders"
-                  />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    type="number"
-                    label="Days Before Permit Expiry to Send Reminder"
-                    defaultValue={settings.find(s => s.key === 'renewal_reminder_days')?.value || 60}
-                  />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    type="number"
-                    label="Days Before Document Due to Send Reminder"
-                    defaultValue={settings.find(s => s.key === 'document_reminder_days')?.value || 7}
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <Button variant="contained" startIcon={<SaveIcon />}>
-                    Save Notification Settings
-                  </Button>
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
         </Box>
       )}
 
@@ -759,7 +710,7 @@ const Settings = () => {
                       type="number"
                       label="Default Price"
                       error={!!feeErrors.defaultPrice}
-                      helperText={feeErrors.defaultPrice?.message}
+                      helperText={feeErrors.defaultPrice?.message as string}
                     />
                   )}
                 />
@@ -779,7 +730,7 @@ const Settings = () => {
                       type="number"
                       label="Minimum Price"
                       error={!!feeErrors.minPrice}
-                      helperText={feeErrors.minPrice?.message}
+                      helperText={feeErrors.minPrice?.message as string}
                     />
                   )}
                 />
@@ -799,7 +750,7 @@ const Settings = () => {
                       type="number"
                       label="Maximum Price"
                       error={!!feeErrors.maxPrice}
-                      helperText={feeErrors.maxPrice?.message}
+                      helperText={feeErrors.maxPrice?.message as string}
                     />
                   )}
                 />

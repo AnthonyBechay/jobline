@@ -30,6 +30,7 @@ import {
   Support as SupportIcon,
   ExitToApp as LogoutIcon,
   AccountCircle as AccountIcon,
+  NotificationsActive as ReminderIcon,
 } from '@mui/icons-material'
 import { useAuth } from '../contexts/AuthContext'
 import { UserRole } from '@jobline/shared'
@@ -69,6 +70,7 @@ const Layout = () => {
     { text: 'Agents', icon: <BusinessIcon />, path: '/agents', roles: [UserRole.SUPER_ADMIN] },
     { text: 'Brokers', icon: <SupportIcon />, path: '/brokers', roles: [UserRole.SUPER_ADMIN] },
     { text: 'Users', icon: <GroupIcon />, path: '/users', roles: [UserRole.SUPER_ADMIN] },
+    { text: 'Reminders', icon: <ReminderIcon />, path: '/reminders', roles: [UserRole.SUPER_ADMIN] },
     { text: 'Settings', icon: <SettingsIcon />, path: '/settings', roles: [UserRole.SUPER_ADMIN] },
   ]
 

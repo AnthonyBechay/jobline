@@ -17,6 +17,7 @@ import Users from './pages/Users'
 import Agents from './pages/Agents'
 import Brokers from './pages/Brokers'
 import ClientStatus from './pages/ClientStatus'
+import Reminders from './pages/Reminders'
 
 function App() {
   const { user } = useAuth()
@@ -60,6 +61,11 @@ function App() {
           <Route path="/brokers" element={
             <ProtectedRoute requiredRole={UserRole.SUPER_ADMIN}>
               <Brokers />
+            </ProtectedRoute>
+          } />
+          <Route path="/reminders" element={
+            <ProtectedRoute requiredRole={UserRole.SUPER_ADMIN}>
+              <Reminders />
             </ProtectedRoute>
           } />
         </Route>

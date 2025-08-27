@@ -484,6 +484,122 @@ router.get('/:id/payments', async (req: AuthRequest, res) => {
   }
 });
 
+// Get application costs (Super Admin only)
+router.get('/:id/costs', async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.user!.companyId;
+    
+    // Only Super Admin can view costs
+    if (req.user?.role !== 'SUPER_ADMIN') {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
+    
+    // Verify application belongs to company
+    const application = await prisma.application.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!application) {
+      res.status(404).json({ error: 'Application not found' });
+      return;
+    }
+    
+    const costs = await prisma.cost.findMany({
+      where: { applicationId: id },
+      orderBy: { costDate: 'desc' },
+    });
+    
+    res.json(costs);
+  } catch (error) {
+    console.error('Get application costs error:', error);
+    res.status(500).json({ error: 'Failed to fetch application costs' });
+  }
+});
+
+// Update application (general update endpoint)
+router.patch('/:id', async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { status, ...updateData } = req.body;
+    const companyId = req.user!.companyId;
+    
+    // Check application belongs to company
+    const existingApplication = await prisma.application.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!existingApplication) {
+      res.status(404).json({ error: 'Application not found' });
+      return;
+    }
+    
+    // If status is being updated, handle special logic
+    if (status) {
+      const application = await prisma.application.update({
+        where: { id },
+        data: { status, ...updateData },
+        include: {
+          client: true,
+          candidate: true,
+        },
+      });
+      
+      // Update candidate status if application reaches certain states
+      if (status === 'ACTIVE_EMPLOYMENT') {
+        await prisma.candidate.update({
+          where: { id: application.candidateId },
+          data: { status: 'PLACED' },
+        });
+      } else if (status === 'CONTRACT_ENDED') {
+        await prisma.candidate.update({
+          where: { id: application.candidateId },
+          data: { status: 'AVAILABLE_IN_LEBANON' },
+        });
+      }
+      
+      // Create document checklist for new stage
+      const documentTemplates = await prisma.documentTemplate.findMany({
+        where: { 
+          stage: status,
+          companyId,
+        },
+        orderBy: { order: 'asc' },
+      });
+      
+      if (documentTemplates.length > 0) {
+        await prisma.documentChecklistItem.createMany({
+          data: documentTemplates.map(template => ({
+            applicationId: application.id,
+            documentName: template.name,
+            status: 'PENDING',
+            stage: template.stage,
+          })),
+          skipDuplicates: true,
+        });
+      }
+      
+      res.json(application);
+    } else {
+      // Regular update without status change
+      const application = await prisma.application.update({
+        where: { id },
+        data: updateData,
+        include: {
+          client: true,
+          candidate: true,
+        },
+      });
+      
+      res.json(application);
+    }
+  } catch (error) {
+    console.error('Update application error:', error);
+    res.status(500).json({ error: 'Failed to update application' });
+  }
+});
+
 // Get available fee templates for application creation (Admin can read, only Super Admin can modify)
 router.get('/fee-templates/available', async (req: AuthRequest, res) => {
   try {

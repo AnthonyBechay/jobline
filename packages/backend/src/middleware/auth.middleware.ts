@@ -6,6 +6,7 @@ import { UserRole } from '@prisma/client';
 export interface AuthRequest extends Request {
   user?: {
     id: string;
+    name: string;
     email: string;
     role: UserRole;
     companyId: string;
@@ -14,6 +15,7 @@ export interface AuthRequest extends Request {
 
 interface JWTPayload {
   id: string;
+  name: string;
   email: string;
   role: UserRole;
   companyId: string;
@@ -36,6 +38,7 @@ export const authenticate = async (
     const decoded = jwt.verify(token, secret) as JWTPayload;
     req.user = {
       id: decoded.id,
+      name: decoded.name,
       email: decoded.email,
       role: decoded.role,
       companyId: decoded.companyId,

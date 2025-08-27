@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Paper, TextField, Button, Typography, Alert, Container, Divider } from '@mui/material';
-import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import api from '../services/api';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -45,7 +43,7 @@ const Register = () => {
 
     try {
       // Register company and super admin
-      const response = await axios.post(`${API_URL}/api/auth/register`, {
+      const response = await api.post('/auth/register', {
         companyName: formData.companyName,
         name: formData.name,
         email: formData.email,

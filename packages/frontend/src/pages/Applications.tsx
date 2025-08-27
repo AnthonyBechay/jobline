@@ -166,9 +166,13 @@ const ApplicationList = () => {
       if (statusFilter) params.append('status', statusFilter)
       if (typeFilter) params.append('type', typeFilter)
 
-      const response = await api.get<PaginatedResponse<Application>>(`/applications?${params}`)
-      setApplications(response.data.data)
-      setTotalRows(response.data.pagination.total)
+      const response = await api.get<any>(`/applications?${params}`)
+      // Handle the response format from backend
+      const applications = response.data.applications || response.data.data || []
+      const pagination = response.data.pagination || { total: 0 }
+      
+      setApplications(applications)
+      setTotalRows(pagination.total)
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to fetch applications')
     } finally {
@@ -592,8 +596,9 @@ const ApplicationDetails = () => {
       await api.patch(`/applications/${id}`, { status: newStatus })
       setUpdateStatusDialog(false)
       await fetchApplicationDetails()
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to update application status:', err)
+      setError(err.response?.data?.error || 'Failed to update status')
     }
   }
 

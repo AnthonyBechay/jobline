@@ -6,9 +6,10 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { UserRole } from '@prisma/client';
 
 // Generate JWT token
-const generateToken = (user: { id: string; email: string; role: UserRole; companyId: string }): string => {
+const generateToken = (user: { id: string; name: string; email: string; role: UserRole; companyId: string }): string => {
   const payload = { 
-    id: user.id, 
+    id: user.id,
+    name: user.name, 
     email: user.email, 
     role: user.role,
     companyId: user.companyId 
@@ -114,6 +115,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     // Generate token
     const token = generateToken({
       id: result.user.id,
+      name: result.user.name,
       email: result.user.email,
       role: result.user.role,
       companyId: result.company.id,
@@ -164,6 +166,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     // Generate token
     const token = generateToken({
       id: user.id,
+      name: user.name,
       email: user.email,
       role: user.role,
       companyId: user.companyId,

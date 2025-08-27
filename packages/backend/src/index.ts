@@ -17,6 +17,8 @@ import settingRouter from './routes/setting.routes';
 import feeTemplateRouter from './routes/feeTemplate.routes';
 import dashboardRouter from './routes/dashboard.routes';
 import publicRouter from './routes/public.routes';
+import documentItemRouter from './routes/documentItem.routes';
+import fileRouter from './routes/file.routes';
 
 // Import middleware
 import { errorHandler } from './middleware/error.middleware';
@@ -87,6 +89,8 @@ app.use('/api/settings', settingRouter);
 app.use('/api/fee-templates', feeTemplateRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/public', publicRouter); // For client shareable links
+app.use('/api/document-items', documentItemRouter);
+app.use('/api/files', fileRouter);
 
 // Error handling middleware
 app.use(notFound);

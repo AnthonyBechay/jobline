@@ -29,6 +29,7 @@ model Company {
   settings      Setting[]
   templates     DocumentTemplate[]
   feeTemplates  FeeTemplate[]
+  files         File[]
 
   @@map("companies")
 }
@@ -44,6 +45,9 @@ model User {
   company      Company  @relation(fields: [companyId], references: [id])
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  uploadedFiles File[]
 
   @@index([companyId])
   @@map("users")
@@ -306,4 +310,27 @@ model FeeTemplate {
   @@unique([companyId, name])
   @@index([companyId])
   @@map("fee_templates")
+}
+
+// File model for managing uploaded files
+model File {
+  id            String   @id @default(uuid())
+  entityType    String   @map("entity_type") // 'application', 'client', 'candidate'
+  entityId      String   @map("entity_id")
+  fileName      String   @map("file_name")
+  originalName  String   @map("original_name")
+  mimeType      String   @map("mime_type")
+  size          BigInt
+  url           String
+  cloudinaryId  String?  @map("cloudinary_id") // For Cloudinary public ID
+  uploadedBy    String   @map("uploaded_by")
+  uploader      User     @relation(fields: [uploadedBy], references: [id])
+  companyId     String   @map("company_id")
+  company       Company  @relation(fields: [companyId], references: [id])
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([entityType, entityId])
+  @@index([companyId])
+  @@map("files")
 }
