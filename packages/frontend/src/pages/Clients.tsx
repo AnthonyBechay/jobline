@@ -345,7 +345,7 @@ const ClientForm = () => {
             </Grid>
             <Grid item xs={12} md={6}>
               <Controller
-                name="referredByClientId"
+                name="referredByClient"
                 control={control}
                 render={({ field }) => (
                   <TextField

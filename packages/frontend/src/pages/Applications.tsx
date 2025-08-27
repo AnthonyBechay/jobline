@@ -428,7 +428,7 @@ const ApplicationForm = () => {
                     select
                     label="Application Type"
                     error={!!errors.type}
-                    helperText={errors.type?.message}
+                    helperText={errors.type?.message as string}
                   >
                     {Object.values(ApplicationType).map((type) => (
                       <MenuItem key={type} value={type}>
@@ -451,7 +451,7 @@ const ApplicationForm = () => {
                     select
                     label="Client"
                     error={!!errors.clientId}
-                    helperText={errors.clientId?.message}
+                    helperText={errors.clientId?.message as string}
                   >
                     <MenuItem value="">Select a client</MenuItem>
                     {clients && clients.length > 0 && clients.map((client) => (
@@ -475,7 +475,7 @@ const ApplicationForm = () => {
                     select
                     label="Candidate"
                     error={!!errors.candidateId}
-                    helperText={errors.candidateId?.message}
+                    helperText={errors.candidateId?.message as string}
                   >
                     <MenuItem value="">Select a candidate</MenuItem>
                     {candidates && candidates.length > 0 && candidates.map((candidate) => (
