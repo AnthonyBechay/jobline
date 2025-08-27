@@ -7,6 +7,51 @@ const router = Router();
 
 router.use(authenticate);
 
+// Create new user (Super Admin only)
+router.post('/', superAdminOnly, async (req: AuthRequest, res) => {
+  try {
+    const { name, email, password, role } = req.body;
+    const companyId = req.user!.companyId;
+    
+    // Check if email already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+    
+    if (existingUser) {
+      res.status(400).json({ error: 'Email already exists' });
+      return;
+    }
+    
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 10);
+    
+    // Create user
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        passwordHash,
+        role,
+        companyId, // Same company as the super admin
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    
+    res.status(201).json(user);
+  } catch (error) {
+    console.error('Create user error:', error);
+    res.status(500).json({ error: 'Failed to create user' });
+  }
+});
+
 // Get all users (Super Admin only)
 router.get('/', superAdminOnly, async (req: AuthRequest, res) => {
   try {

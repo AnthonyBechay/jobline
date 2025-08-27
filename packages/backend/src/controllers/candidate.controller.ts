@@ -47,7 +47,7 @@ export const getAllCandidates = async (req: AuthRequest, res: Response): Promise
     ]);
     
     res.json({
-      candidates,
+      data: candidates,
       pagination: {
         page: Number(page),
         limit: Number(limit),

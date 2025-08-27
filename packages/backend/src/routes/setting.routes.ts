@@ -201,4 +201,64 @@ router.delete('/documents/templates/:id', async (req: AuthRequest, res) => {
   }
 });
 
+// Get nationalities (company-specific)
+router.get('/nationalities', async (req: AuthRequest, res) => {
+  try {
+    const companyId = req.user!.companyId;
+    
+    const nationalitiesSetting = await prisma.setting.findFirst({
+      where: { 
+        key: 'nationalities',
+        companyId,
+      },
+    });
+    
+    // Default nationalities list
+    const defaultNationalities = [
+      'Ethiopian', 'Filipino', 'Sri Lankan', 'Bangladeshi', 'Kenyan',
+      'Nigerian', 'Ugandan', 'Ghanaian', 'Nepalese', 'Indian'
+    ];
+    
+    const nationalities = nationalitiesSetting?.value || defaultNationalities;
+    res.json(nationalities);
+  } catch (error) {
+    console.error('Get nationalities error:', error);
+    res.status(500).json({ error: 'Failed to fetch nationalities' });
+  }
+});
+
+// Update nationalities (company-specific)
+router.put('/nationalities', async (req: AuthRequest, res) => {
+  try {
+    const { nationalities } = req.body;
+    const companyId = req.user!.companyId;
+    
+    if (!Array.isArray(nationalities)) {
+      res.status(400).json({ error: 'Nationalities must be an array' });
+      return;
+    }
+    
+    const setting = await prisma.setting.upsert({
+      where: { 
+        companyId_key: {
+          companyId,
+          key: 'nationalities',
+        },
+      },
+      update: { value: nationalities },
+      create: { 
+        key: 'nationalities', 
+        value: nationalities, 
+        description: 'List of available nationalities for candidates',
+        companyId 
+      },
+    });
+    
+    res.json(nationalities);
+  } catch (error) {
+    console.error('Update nationalities error:', error);
+    res.status(500).json({ error: 'Failed to update nationalities' });
+  }
+});
+
 export default router;

@@ -38,6 +38,7 @@ const Settings = () => {
   const [tabValue, setTabValue] = useState(0)
   const [documentTemplates, setDocumentTemplates] = useState<DocumentTemplate[]>([])
   const [settings, setSettings] = useState<Setting[]>([])
+  const [nationalities, setNationalities] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -56,11 +57,12 @@ const Settings = () => {
   useEffect(() => {
     fetchDocumentTemplates()
     fetchSettings()
+    fetchNationalities()
   }, [])
 
   const fetchDocumentTemplates = async () => {
     try {
-      const response = await api.get<DocumentTemplate[]>('/document-templates')
+      const response = await api.get<DocumentTemplate[]>('/settings/documents/templates')
       setDocumentTemplates(response.data || [])
     } catch (err: any) {
       console.log('Document templates endpoint not implemented yet')
@@ -78,13 +80,49 @@ const Settings = () => {
     }
   }
 
+  const fetchNationalities = async () => {
+    try {
+      const response = await api.get<string[]>('/settings/nationalities')
+      setNationalities(response.data || [])
+    } catch (err: any) {
+      console.log('Failed to fetch nationalities')
+      // Use default nationalities
+      setNationalities([
+        'Ethiopian', 'Filipino', 'Sri Lankan', 'Bangladeshi', 'Kenyan',
+        'Nigerian', 'Ugandan', 'Ghanaian', 'Nepalese', 'Indian'
+      ])
+    }
+  }
+
+  const handleAddNationality = async (nationality: string) => {
+    try {
+      const updatedNationalities = [...nationalities, nationality]
+      await api.put('/settings/nationalities', { nationalities: updatedNationalities })
+      setNationalities(updatedNationalities)
+      setSuccess('Nationality added successfully')
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to add nationality')
+    }
+  }
+
+  const handleDeleteNationality = async (nationality: string) => {
+    try {
+      const updatedNationalities = nationalities.filter(n => n !== nationality)
+      await api.put('/settings/nationalities', { nationalities: updatedNationalities })
+      setNationalities(updatedNationalities)
+      setSuccess('Nationality removed successfully')
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to remove nationality')
+    }
+  }
+
   const handleSaveDocumentTemplate = async (data: any) => {
     try {
       setLoading(true)
       if (documentDialog.template) {
-        await api.patch(`/document-templates/${documentDialog.template.id}`, data)
+        await api.put(`/settings/documents/templates/${documentDialog.template.id}`, data)
       } else {
-        await api.post('/document-templates', data)
+        await api.post('/settings/documents/templates', data)
       }
       setSuccess('Document template saved successfully')
       setDocumentDialog({ open: false, template: null })
@@ -99,7 +137,7 @@ const Settings = () => {
 
   const handleDeleteDocumentTemplate = async (id: string) => {
     try {
-      await api.delete(`/document-templates/${id}`)
+      await api.delete(`/settings/documents/templates/${id}`)
       setSuccess('Document template deleted successfully')
       fetchDocumentTemplates()
     } catch (err: any) {
@@ -191,6 +229,7 @@ const Settings = () => {
         <Tabs value={tabValue} onChange={(_, value) => setTabValue(value)}>
           <Tab label="Document Templates" />
           <Tab label="System Settings" />
+          <Tab label="Nationalities" />
           <Tab label="Fee Configuration" />
           <Tab label="Notification Settings" />
         </Tabs>
@@ -302,8 +341,49 @@ const Settings = () => {
         </Box>
       )}
 
-      {/* Fee Configuration Tab */}
+      {/* Nationalities Tab */}
       {tabValue === 2 && (
+        <Box>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h6">Nationality Management</Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                const newNationality = prompt('Enter new nationality:')
+                if (newNationality) {
+                  handleAddNationality(newNationality)
+                }
+              }}
+            >
+              Add Nationality
+            </Button>
+          </Box>
+
+          <Card>
+            <CardContent>
+              <List>
+                {nationalities.map((nationality, index) => (
+                  <ListItem key={index}>
+                    <ListItemText primary={nationality} />
+                    <ListItemSecondaryAction>
+                      <IconButton
+                        edge="end"
+                        onClick={() => handleDeleteNationality(nationality)}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                ))}
+              </List>
+            </CardContent>
+          </Card>
+        </Box>
+      )}
+
+      {/* Fee Configuration Tab */}
+      {tabValue === 3 && (
         <Box>
           <Typography variant="h6" gutterBottom>
             Fee Configuration
@@ -379,7 +459,7 @@ const Settings = () => {
       )}
 
       {/* Notification Settings Tab */}
-      {tabValue === 3 && (
+      {tabValue === 4 && (
         <Box>
           <Typography variant="h6" gutterBottom>
             Notification Settings

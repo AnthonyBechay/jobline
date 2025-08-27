@@ -43,7 +43,7 @@ export const getAllClients = async (req: AuthRequest, res: Response): Promise<vo
     ]);
     
     res.json({
-      clients,
+      data: clients,
       pagination: {
         page: Number(page),
         limit: Number(limit),

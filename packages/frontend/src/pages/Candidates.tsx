@@ -305,9 +305,11 @@ const CandidateForm = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [agents, setAgents] = useState<Agent[]>([])
+  const [nationalities, setNationalities] = useState<string[]>([])
   const { control, handleSubmit, formState: { errors } } = useForm<Candidate>()
 
   useEffect(() => {
+    fetchNationalities()
     if (user?.role === 'SUPER_ADMIN') {
       fetchAgents()
     }
@@ -320,6 +322,20 @@ const CandidateForm = () => {
     } catch (err) {
       console.error('Failed to fetch agents:', err)
       setAgents([])
+    }
+  }
+
+  const fetchNationalities = async () => {
+    try {
+      const response = await api.get<string[]>('/settings/nationalities')
+      setNationalities(response.data || [])
+    } catch (err) {
+      console.error('Failed to fetch nationalities:', err)
+      // Use default nationalities if fetch fails
+      setNationalities([
+        'Ethiopian', 'Filipino', 'Sri Lankan', 'Bangladeshi', 'Kenyan',
+        'Nigerian', 'Ugandan', 'Ghanaian', 'Nepalese', 'Indian'
+      ])
     }
   }
 
@@ -394,10 +410,18 @@ const CandidateForm = () => {
                   <TextField
                     {...field}
                     fullWidth
+                    select
                     label="Nationality"
                     error={!!errors.nationality}
                     helperText={errors.nationality?.message}
-                  />
+                  >
+                    <MenuItem value="">Select nationality</MenuItem>
+                    {nationalities.map((nationality) => (
+                      <MenuItem key={nationality} value={nationality}>
+                        {nationality}
+                      </MenuItem>
+                    ))}
+                  </TextField>
                 )}
               />
             </Grid>
