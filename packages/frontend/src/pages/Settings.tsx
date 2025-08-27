@@ -34,11 +34,22 @@ import { useForm, Controller } from 'react-hook-form'
 import { DocumentTemplate, Setting, ApplicationStatus } from '../shared/types'
 import api from '../services/api'
 
+interface FeeTemplate {
+  id: string
+  name: string
+  defaultPrice: number
+  minPrice: number
+  maxPrice: number
+  currency: string
+  description?: string
+}
+
 const Settings = () => {
   const [tabValue, setTabValue] = useState(0)
   const [documentTemplates, setDocumentTemplates] = useState<DocumentTemplate[]>([])
   const [settings, setSettings] = useState<Setting[]>([])
   const [nationalities, setNationalities] = useState<string[]>([])
+  const [feeTemplates, setFeeTemplates] = useState<FeeTemplate[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -50,14 +61,20 @@ const Settings = () => {
     open: boolean
     setting: Setting | null
   }>({ open: false, setting: null })
+  const [feeDialog, setFeeDialog] = useState<{
+    open: boolean
+    template: FeeTemplate | null
+  }>({ open: false, template: null })
 
   const { control: docControl, handleSubmit: handleDocSubmit, reset: resetDoc, setValue: setDocValue } = useForm()
   const { control: settingControl, handleSubmit: handleSettingSubmit, reset: resetSetting, setValue: setSettingValue } = useForm()
+  const { control: feeControl, handleSubmit: handleFeeSubmit, reset: resetFee, setValue: setFeeValue, formState: { errors: feeErrors } } = useForm()
 
   useEffect(() => {
     fetchDocumentTemplates()
     fetchSettings()
     fetchNationalities()
+    fetchFeeTemplates()
   }, [])
 
   const fetchDocumentTemplates = async () => {
@@ -86,11 +103,20 @@ const Settings = () => {
       setNationalities(response.data || [])
     } catch (err: any) {
       console.log('Failed to fetch nationalities')
-      // Use default nationalities
       setNationalities([
         'Ethiopian', 'Filipino', 'Sri Lankan', 'Bangladeshi', 'Kenyan',
         'Nigerian', 'Ugandan', 'Ghanaian', 'Nepalese', 'Indian'
       ])
+    }
+  }
+
+  const fetchFeeTemplates = async () => {
+    try {
+      const response = await api.get<FeeTemplate[]>('/fee-templates')
+      setFeeTemplates(response.data || [])
+    } catch (err: any) {
+      console.log('Failed to fetch fee templates')
+      setFeeTemplates([])
     }
   }
 
@@ -149,9 +175,9 @@ const Settings = () => {
     try {
       setLoading(true)
       if (settingDialog.setting) {
-        await api.patch(`/settings/${settingDialog.setting.id}`, data)
+        await api.put(`/settings/${settingDialog.setting.key}`, data)
       } else {
-        await api.post('/settings', data)
+        await api.put(`/settings/${data.key}`, data)
       }
       setSuccess('Setting saved successfully')
       setSettingDialog({ open: false, setting: null })
@@ -164,13 +190,63 @@ const Settings = () => {
     }
   }
 
-  const handleDeleteSetting = async (id: string) => {
+  const handleDeleteSetting = async (key: string) => {
     try {
-      await api.delete(`/settings/${id}`)
+      await api.delete(`/settings/${key}`)
       setSuccess('Setting deleted successfully')
       fetchSettings()
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to delete setting')
+    }
+  }
+
+  const handleSaveFeeTemplate = async (data: any) => {
+    try {
+      setLoading(true)
+      
+      // Convert string values to numbers
+      data.defaultPrice = parseFloat(data.defaultPrice)
+      data.minPrice = parseFloat(data.minPrice)
+      data.maxPrice = parseFloat(data.maxPrice)
+      
+      // Validate price range
+      if (data.minPrice > data.maxPrice) {
+        setError('Minimum price cannot be greater than maximum price')
+        return
+      }
+      
+      if (data.defaultPrice < data.minPrice || data.defaultPrice > data.maxPrice) {
+        setError('Default price must be between minimum and maximum price')
+        return
+      }
+      
+      if (feeDialog.template) {
+        await api.put(`/fee-templates/${feeDialog.template.id}`, data)
+      } else {
+        await api.post('/fee-templates', data)
+      }
+      setSuccess('Fee template saved successfully')
+      setFeeDialog({ open: false, template: null })
+      resetFee()
+      fetchFeeTemplates()
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to save fee template')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteFeeTemplate = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this fee template?')) {
+      return
+    }
+    
+    try {
+      await api.delete(`/fee-templates/${id}`)
+      setSuccess('Fee template deleted successfully')
+      fetchFeeTemplates()
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to delete fee template')
     }
   }
 
@@ -208,6 +284,20 @@ const Settings = () => {
     setSettingDialog({ open: true, setting })
   }
 
+  const openFeeDialog = (template: FeeTemplate | null) => {
+    if (template) {
+      setFeeValue('name', template.name)
+      setFeeValue('defaultPrice', template.defaultPrice)
+      setFeeValue('minPrice', template.minPrice)
+      setFeeValue('maxPrice', template.maxPrice)
+      setFeeValue('currency', template.currency)
+      setFeeValue('description', template.description || '')
+    } else {
+      resetFee()
+    }
+    setFeeDialog({ open: true, template })
+  }
+
   return (
     <Box>
       <Typography variant="h4" gutterBottom>
@@ -230,7 +320,7 @@ const Settings = () => {
           <Tab label="Document Templates" />
           <Tab label="System Settings" />
           <Tab label="Nationalities" />
-          <Tab label="Fee Configuration" />
+          <Tab label="Fee Templates" />
           <Tab label="Notification Settings" />
         </Tabs>
       </Paper>
@@ -328,7 +418,7 @@ const Settings = () => {
                       </IconButton>
                       <IconButton
                         size="small"
-                        onClick={() => handleDeleteSetting(setting.id)}
+                        onClick={() => handleDeleteSetting(setting.key)}
                       >
                         <DeleteIcon />
                       </IconButton>
@@ -382,79 +472,68 @@ const Settings = () => {
         </Box>
       )}
 
-      {/* Fee Configuration Tab */}
+      {/* Fee Templates Tab */}
       {tabValue === 3 && (
         <Box>
-          <Typography variant="h6" gutterBottom>
-            Fee Configuration
-          </Typography>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Office Commission
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    type="number"
-                    defaultValue={settings.find(s => s.key === 'office_commission')?.value || 0}
-                    InputProps={{ startAdornment: '$' }}
-                  />
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Expedited Visa Fee
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    type="number"
-                    defaultValue={settings.find(s => s.key === 'expedited_visa_fee')?.value || 0}
-                    InputProps={{ startAdornment: '$' }}
-                  />
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Attorney Processing Fee
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    type="number"
-                    defaultValue={settings.find(s => s.key === 'attorney_fee')?.value || 0}
-                    InputProps={{ startAdornment: '$' }}
-                  />
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Government Processing Fee
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    type="number"
-                    defaultValue={settings.find(s => s.key === 'government_fee')?.value || 0}
-                    InputProps={{ startAdornment: '$' }}
-                  />
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12}>
-              <Button variant="contained" startIcon={<SaveIcon />}>
-                Save Fee Configuration
-              </Button>
-            </Grid>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h6">Fee Templates</Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => openFeeDialog(null)}
+            >
+              Add Fee Template
+            </Button>
+          </Box>
+
+          <Grid container spacing={2}>
+            {feeTemplates.map((template) => (
+              <Grid item xs={12} md={6} lg={4} key={template.id}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                      {template.name}
+                    </Typography>
+                    {template.description && (
+                      <Typography variant="body2" color="textSecondary" gutterBottom>
+                        {template.description}
+                      </Typography>
+                    )}
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="body2">
+                        <strong>Default:</strong> {template.currency} {template.defaultPrice}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Range:</strong> {template.currency} {template.minPrice} - {template.maxPrice}
+                      </Typography>
+                    </Box>
+                    <Box display="flex" justifyContent="flex-end" gap={1} mt={2}>
+                      <IconButton
+                        size="small"
+                        onClick={() => openFeeDialog(template)}
+                      >
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDeleteFeeTemplate(template.id)}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
           </Grid>
+
+          {feeTemplates.length === 0 && (
+            <Paper sx={{ p: 3, textAlign: 'center' }}>
+              <Typography color="textSecondary">
+                No fee templates configured. Click "Add Fee Template" to create one.
+              </Typography>
+            </Paper>
+          )}
         </Box>
       )}
 
@@ -592,6 +671,143 @@ const Settings = () => {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setDocumentDialog({ open: false, template: null })}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="contained" disabled={loading}>
+              {loading ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      {/* Fee Template Dialog */}
+      <Dialog
+        open={feeDialog.open}
+        onClose={() => setFeeDialog({ open: false, template: null })}
+        maxWidth="sm"
+        fullWidth
+      >
+        <form onSubmit={handleFeeSubmit(handleSaveFeeTemplate)}>
+          <DialogTitle>
+            {feeDialog.template ? 'Edit' : 'Add'} Fee Template
+          </DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <Controller
+                  name="name"
+                  control={feeControl}
+                  rules={{ required: 'Name is required' }}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      label="Template Name"
+                      error={!!feeErrors.name}
+                      helperText={feeErrors.name?.message as string}
+                    />
+                  )}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Controller
+                  name="description"
+                  control={feeControl}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      label="Description (Optional)"
+                      multiline
+                      rows={2}
+                    />
+                  )}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Controller
+                  name="currency"
+                  control={feeControl}
+                  defaultValue="USD"
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      label="Currency"
+                      select
+                      SelectProps={{ native: true }}
+                    >
+                      <option value="USD">USD</option>
+                      <option value="LBP">LBP</option>
+                      <option value="EUR">EUR</option>
+                    </TextField>
+                  )}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Controller
+                  name="defaultPrice"
+                  control={feeControl}
+                  rules={{ 
+                    required: 'Default price is required',
+                    min: { value: 0, message: 'Price must be positive' }
+                  }}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      type="number"
+                      label="Default Price"
+                      error={!!feeErrors.defaultPrice}
+                      helperText={feeErrors.defaultPrice?.message as string}
+                    />
+                  )}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Controller
+                  name="minPrice"
+                  control={feeControl}
+                  rules={{ 
+                    required: 'Minimum price is required',
+                    min: { value: 0, message: 'Price must be positive' }
+                  }}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      type="number"
+                      label="Minimum Price"
+                      error={!!feeErrors.minPrice}
+                      helperText={feeErrors.minPrice?.message as string}
+                    />
+                  )}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Controller
+                  name="maxPrice"
+                  control={feeControl}
+                  rules={{ 
+                    required: 'Maximum price is required',
+                    min: { value: 0, message: 'Price must be positive' }
+                  }}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      type="number"
+                      label="Maximum Price"
+                      error={!!feeErrors.maxPrice}
+                      helperText={feeErrors.maxPrice?.message as string}
+                    />
+                  )}
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setFeeDialog({ open: false, template: null })}>
               Cancel
             </Button>
             <Button type="submit" variant="contained" disabled={loading}>

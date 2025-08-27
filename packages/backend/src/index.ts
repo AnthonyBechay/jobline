@@ -14,6 +14,7 @@ import costRouter from './routes/cost.routes';
 import agentRouter from './routes/agent.routes';
 import brokerRouter from './routes/broker.routes';
 import settingRouter from './routes/setting.routes';
+import feeTemplateRouter from './routes/feeTemplate.routes';
 import dashboardRouter from './routes/dashboard.routes';
 import publicRouter from './routes/public.routes';
 
@@ -83,6 +84,7 @@ app.use('/api/costs', costRouter);
 app.use('/api/agents', agentRouter);
 app.use('/api/brokers', brokerRouter);
 app.use('/api/settings', settingRouter);
+app.use('/api/fee-templates', feeTemplateRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/public', publicRouter); // For client shareable links
 

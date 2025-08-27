@@ -28,6 +28,7 @@ model Company {
   applications  Application[]
   settings      Setting[]
   templates     DocumentTemplate[]
+  feeTemplates  FeeTemplate[]
 
   @@map("companies")
 }
@@ -151,6 +152,9 @@ model Application {
   broker           Broker?                 @relation(fields: [brokerId], references: [id])
   permitExpiryDate DateTime?               @map("permit_expiry_date")
   shareableLink    String                  @unique @map("shareable_link")
+  feeTemplateId    String?                 @map("fee_template_id")
+  feeTemplate      FeeTemplate?            @relation(fields: [feeTemplateId], references: [id])
+  finalFeeAmount   Decimal?                @map("final_fee_amount") @db.Decimal(10, 2)
   companyId        String                  @map("company_id")
   company          Company                 @relation(fields: [companyId], references: [id])
   createdAt        DateTime                @default(now()) @map("created_at")
@@ -282,4 +286,24 @@ model DocumentTemplate {
   @@unique([companyId, stage, name])
   @@index([companyId])
   @@map("document_templates")
+}
+
+// FeeTemplate model for managing customizable fee structures
+model FeeTemplate {
+  id           String        @id @default(uuid())
+  name         String
+  defaultPrice Decimal       @map("default_price") @db.Decimal(10, 2)
+  minPrice     Decimal       @map("min_price") @db.Decimal(10, 2)
+  maxPrice     Decimal       @map("max_price") @db.Decimal(10, 2)
+  currency     String        @default("USD")
+  description  String?
+  companyId    String        @map("company_id")
+  company      Company       @relation(fields: [companyId], references: [id])
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  applications Application[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("fee_templates")
 }

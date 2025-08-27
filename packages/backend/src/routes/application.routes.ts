@@ -103,7 +103,7 @@ router.get('/:id', async (req: AuthRequest, res) => {
 // Create new application (company-specific)
 router.post('/', async (req: AuthRequest, res) => {
   try {
-    const { clientId, candidateId, type } = req.body;
+    const { clientId, candidateId, type, feeTemplateId, finalFeeAmount } = req.body;
     const companyId = req.user!.companyId;
     
     // Generate unique shareable link
@@ -140,6 +140,35 @@ router.post('/', async (req: AuthRequest, res) => {
       return;
     }
     
+    // Validate fee template if provided
+    if (feeTemplateId) {
+      const feeTemplate = await prisma.feeTemplate.findFirst({
+        where: { 
+          id: feeTemplateId,
+          companyId, // Ensure fee template belongs to user's company
+        },
+      });
+      
+      if (!feeTemplate) {
+        res.status(404).json({ error: 'Fee template not found' });
+        return;
+      }
+      
+      // Validate final fee amount is within the template's range
+      if (finalFeeAmount !== undefined && finalFeeAmount !== null) {
+        const amount = parseFloat(finalFeeAmount.toString());
+        const minPrice = parseFloat(feeTemplate.minPrice.toString());
+        const maxPrice = parseFloat(feeTemplate.maxPrice.toString());
+        
+        if (amount < minPrice || amount > maxPrice) {
+          res.status(400).json({ 
+            error: `Final fee amount must be between ${minPrice} and ${maxPrice}` 
+          });
+          return;
+        }
+      }
+    }
+    
     // Create application and update candidate status
     const [application] = await prisma.$transaction([
       prisma.application.create({
@@ -149,6 +178,8 @@ router.post('/', async (req: AuthRequest, res) => {
           type,
           status: 'PENDING_MOL',
           shareableLink,
+          feeTemplateId,
+          finalFeeAmount,
           companyId, // Set company ID
         },
         include: {
@@ -256,6 +287,39 @@ router.patch('/:id/status', async (req: AuthRequest, res) => {
   }
 });
 
+// Create document checklist item (company-specific)
+router.post('/:id/documents', async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { documentName, status = 'PENDING', stage } = req.body;
+    const companyId = req.user!.companyId;
+    
+    // Verify application belongs to company
+    const application = await prisma.application.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!application) {
+      res.status(404).json({ error: 'Application not found' });
+      return;
+    }
+    
+    const document = await prisma.documentChecklistItem.create({
+      data: {
+        applicationId: id,
+        documentName,
+        status,
+        stage: stage || application.status,
+      },
+    });
+    
+    res.status(201).json(document);
+  } catch (error) {
+    console.error('Create document item error:', error);
+    res.status(500).json({ error: 'Failed to create document item' });
+  }
+});
+
 // Update document checklist item (company-specific)
 router.patch('/:id/documents/:itemId', async (req: AuthRequest, res) => {
   try {
@@ -282,6 +346,33 @@ router.patch('/:id/documents/:itemId', async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('Update document item error:', error);
     res.status(500).json({ error: 'Failed to update document item' });
+  }
+});
+
+// Delete document checklist item (company-specific)
+router.delete('/:id/documents/:itemId', async (req: AuthRequest, res) => {
+  try {
+    const { id, itemId } = req.params;
+    const companyId = req.user!.companyId;
+    
+    // Verify application belongs to company
+    const application = await prisma.application.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!application) {
+      res.status(404).json({ error: 'Application not found' });
+      return;
+    }
+    
+    await prisma.documentChecklistItem.delete({
+      where: { id: itemId },
+    });
+    
+    res.json({ message: 'Document item deleted successfully' });
+  } catch (error) {
+    console.error('Delete document item error:', error);
+    res.status(500).json({ error: 'Failed to delete document item' });
   }
 });
 
@@ -331,6 +422,91 @@ router.patch('/:id/broker', authenticate, async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('Assign broker error:', error);
     res.status(500).json({ error: 'Failed to assign broker' });
+  }
+});
+
+// Get application documents (company-specific)
+router.get('/:id/documents', async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.user!.companyId;
+    
+    // Verify application belongs to company
+    const application = await prisma.application.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!application) {
+      res.status(404).json({ error: 'Application not found' });
+      return;
+    }
+    
+    const documents = await prisma.documentChecklistItem.findMany({
+      where: { applicationId: id },
+      orderBy: [{ stage: 'asc' }, { createdAt: 'asc' }],
+    });
+    
+    res.json(documents);
+  } catch (error) {
+    console.error('Get application documents error:', error);
+    res.status(500).json({ error: 'Failed to fetch application documents' });
+  }
+});
+
+// Get application payments (company-specific)
+router.get('/:id/payments', async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.user!.companyId;
+    
+    // Verify application belongs to company
+    const application = await prisma.application.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!application) {
+      res.status(404).json({ error: 'Application not found' });
+      return;
+    }
+    
+    const payments = await prisma.payment.findMany({
+      where: { applicationId: id },
+      include: {
+        client: true,
+      },
+      orderBy: { paymentDate: 'desc' },
+    });
+    
+    res.json(payments);
+  } catch (error) {
+    console.error('Get application payments error:', error);
+    res.status(500).json({ error: 'Failed to fetch application payments' });
+  }
+});
+
+// Get available fee templates for application creation (Admin can read, only Super Admin can modify)
+router.get('/fee-templates/available', async (req: AuthRequest, res) => {
+  try {
+    const companyId = req.user!.companyId;
+    
+    const feeTemplates = await prisma.feeTemplate.findMany({
+      where: { companyId },
+      select: {
+        id: true,
+        name: true,
+        defaultPrice: true,
+        minPrice: true,
+        maxPrice: true,
+        currency: true,
+        description: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+    
+    res.json(feeTemplates);
+  } catch (error) {
+    console.error('Get fee templates error:', error);
+    res.status(500).json({ error: 'Failed to fetch fee templates' });
   }
 });
 

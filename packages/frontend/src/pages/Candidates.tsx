@@ -306,14 +306,44 @@ const CandidateForm = () => {
   const [error, setError] = useState('')
   const [agents, setAgents] = useState<Agent[]>([])
   const [nationalities, setNationalities] = useState<string[]>([])
-  const { control, handleSubmit, formState: { errors } } = useForm<Candidate>()
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [candidateId, setCandidateId] = useState<string | null>(null)
+  const { control, handleSubmit, reset, formState: { errors } } = useForm<Candidate>()
 
   useEffect(() => {
+    // Check if we're in edit mode by checking the URL
+    const pathSegments = window.location.pathname.split('/')
+    if (pathSegments.includes('edit') && pathSegments.length > 3) {
+      const id = pathSegments[pathSegments.length - 1]
+      setIsEditMode(true)
+      setCandidateId(id)
+      fetchCandidate(id)
+    }
+    
     fetchNationalities()
     if (user?.role === 'SUPER_ADMIN') {
       fetchAgents()
     }
   }, [user])
+  
+  const fetchCandidate = async (id: string) => {
+    try {
+      const response = await api.get<Candidate>(`/candidates/${id}`)
+      const candidate = response.data
+      
+      // Format the data for the form
+      const formData = {
+        ...candidate,
+        skills: candidate.skills ? candidate.skills.join(', ') : '',
+        dateOfBirth: candidate.dateOfBirth ? new Date(candidate.dateOfBirth).toISOString().split('T')[0] : '',
+      }
+      
+      // Reset the form with the fetched data
+      reset(formData as any)
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to fetch candidate')
+    }
+  }
 
   const fetchAgents = async () => {
     try {
@@ -346,10 +376,18 @@ const CandidateForm = () => {
       if (data.skills && typeof data.skills === 'string') {
         data.skills = data.skills.split(',').map((s: string) => s.trim()).filter(Boolean)
       }
-      await api.post('/candidates', data)
+      
+      if (isEditMode && candidateId) {
+        // Update existing candidate
+        await api.put(`/candidates/${candidateId}`, data)
+      } else {
+        // Create new candidate
+        await api.post('/candidates', data)
+      }
+      
       navigate('/candidates')
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create candidate')
+      setError(err.response?.data?.error || `Failed to ${isEditMode ? 'update' : 'create'} candidate`)
     } finally {
       setLoading(false)
     }
@@ -358,7 +396,7 @@ const CandidateForm = () => {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">New Candidate</Typography>
+        <Typography variant="h4">{isEditMode ? 'Edit' : 'New'} Candidate</Typography>
         <Button variant="outlined" onClick={() => navigate('/candidates')}>
           Back to List
         </Button>
@@ -549,13 +587,172 @@ const CandidateForm = () => {
                   Cancel
                 </Button>
                 <Button type="submit" variant="contained" disabled={loading}>
-                  {loading ? 'Creating...' : 'Create Candidate'}
+                  {loading ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update Candidate' : 'Create Candidate')}
                 </Button>
               </Box>
             </Grid>
           </Grid>
         </form>
       </Paper>
+    </Box>
+  )
+}
+
+// Candidate Details Component
+const CandidateDetails = () => {
+  const navigate = useNavigate()
+  const [candidate, setCandidate] = useState<Candidate | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  
+  useEffect(() => {
+    // Get ID from URL
+    const pathSegments = window.location.pathname.split('/')
+    const id = pathSegments[pathSegments.length - 1]
+    if (id) {
+      fetchCandidate(id)
+    }
+  }, [])
+  
+  const fetchCandidate = async (id: string) => {
+    try {
+      setLoading(true)
+      const response = await api.get<Candidate>(`/candidates/${id}`)
+      setCandidate(response.data)
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to fetch candidate details')
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <Typography>Loading...</Typography>
+      </Box>
+    )
+  }
+  
+  if (error) {
+    return (
+      <Box>
+        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+        <Button variant="outlined" onClick={() => navigate('/candidates')}>Back to List</Button>
+      </Box>
+    )
+  }
+  
+  if (!candidate) {
+    return null
+  }
+  
+  const getStatusColor = (status: CandidateStatus) => {
+    const colors = {
+      [CandidateStatus.AVAILABLE_ABROAD]: 'info',
+      [CandidateStatus.AVAILABLE_IN_LEBANON]: 'success',
+      [CandidateStatus.RESERVED]: 'warning',
+      [CandidateStatus.IN_PROCESS]: 'default',
+      [CandidateStatus.PLACED]: 'secondary',
+    }
+    return colors[status] as any
+  }
+  
+  return (
+    <Box>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4">Candidate Details</Typography>
+        <Box display="flex" gap={2}>
+          <Button variant="outlined" onClick={() => navigate('/candidates')}>Back to List</Button>
+          <Button variant="contained" startIcon={<EditIcon />} onClick={() => navigate(`/candidates/edit/${candidate.id}`)}>Edit</Button>
+        </Box>
+      </Box>
+      
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardMedia
+              component="img"
+              height="300"
+              image={candidate.photoUrl || '/placeholder-avatar.jpg'}
+              alt={`${candidate.firstName} ${candidate.lastName}`}
+            />
+            <CardContent>
+              <Typography variant="h5" gutterBottom>
+                {candidate.firstName} {candidate.lastName}
+              </Typography>
+              <Chip
+                label={candidate.status.replace(/_/g, ' ')}
+                color={getStatusColor(candidate.status)}
+                sx={{ mb: 2 }}
+              />
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        <Grid item xs={12} md={8}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>Personal Information</Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={6}>
+                <Typography color="textSecondary">Nationality:</Typography>
+                <Typography>{candidate.nationality}</Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography color="textSecondary">Date of Birth:</Typography>
+                <Typography>
+                  {candidate.dateOfBirth ? new Date(candidate.dateOfBirth).toLocaleDateString() : 'N/A'}
+                </Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography color="textSecondary">Education:</Typography>
+                <Typography>{candidate.education || 'N/A'}</Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography color="textSecondary">Agent:</Typography>
+                <Typography>{candidate.agent?.name || 'N/A'}</Typography>
+              </Grid>
+            </Grid>
+            
+            <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>Skills</Typography>
+            <Box display="flex" gap={1} flexWrap="wrap">
+              {candidate.skills && candidate.skills.length > 0 ? (
+                candidate.skills.map((skill, index) => (
+                  <Chip key={index} label={skill} variant="outlined" />
+                ))
+              ) : (
+                <Typography color="textSecondary">No skills listed</Typography>
+              )}
+            </Box>
+            
+            <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>Experience Summary</Typography>
+            <Typography>{candidate.experienceSummary || 'No experience summary provided'}</Typography>
+            
+            {candidate.applications && candidate.applications.length > 0 && (
+              <>
+                <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>Application History</Typography>
+                <Box sx={{ mt: 2 }}>
+                  {candidate.applications.map((app: any) => (
+                    <Card key={app.id} sx={{ mb: 1 }}>
+                      <CardContent>
+                        <Typography variant="subtitle1">
+                          Client: {app.client?.name || 'N/A'}
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary">
+                          Status: {app.status.replace(/_/g, ' ')}
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary">
+                          Date: {new Date(app.createdAt).toLocaleDateString()}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Box>
+              </>
+            )}
+          </Paper>
+        </Grid>
+      </Grid>
     </Box>
   )
 }
@@ -567,7 +764,7 @@ const Candidates = () => {
       <Route index element={<CandidateList />} />
       <Route path="new" element={<CandidateForm />} />
       <Route path="edit/:id" element={<CandidateForm />} />
-      <Route path=":id" element={<div>Candidate Details View</div>} />
+      <Route path=":id" element={<CandidateDetails />} />
     </Routes>
   )
 }

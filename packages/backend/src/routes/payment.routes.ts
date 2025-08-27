@@ -5,7 +5,9 @@ import { prisma } from '../index';
 const router = Router();
 
 router.use(authenticate);
-router.use(adminOnly);
+// Note: Both Admin and Super Admin can manage payments (revenue)
+// However, only Super Admin can see costs (handled in cost.routes.ts)
+router.use(adminOnly); // This already allows both ADMIN and SUPER_ADMIN
 
 // Get all payments
 router.get('/', async (req: AuthRequest, res) => {
