@@ -49,7 +49,9 @@ router.post('/upload', upload.array('files', 10), async (req: AuthRequest, res) 
   try {
     const { entityType, entityId } = req.body;
     const companyId = req.user!.companyId;
-    const files = Array.isArray(req.files) ? req.files : [];
+    // Cast req to any to access files property safely
+    const reqFiles = (req as any).files;
+    const files = Array.isArray(reqFiles) ? reqFiles : [];
     
     if (!files || files.length === 0) {
       res.status(400).json({ error: 'No files provided' });
