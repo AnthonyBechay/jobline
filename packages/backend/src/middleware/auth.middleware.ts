@@ -2,16 +2,23 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { UserRole } from '@prisma/client';
 
-// Extend Express Request interface
-export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    name: string;
-    email: string;
-    role: UserRole;
-    companyId: string;
-  };
+// Extend Express Request interface using declaration merging
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        name: string;
+        email: string;
+        role: UserRole;
+        companyId: string;
+      };
+    }
+  }
 }
+
+// Use the extended Express Request
+export interface AuthRequest extends Request {}
 
 interface JWTPayload {
   id: string;

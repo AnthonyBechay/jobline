@@ -1,3 +1,13 @@
+// Company types
+export interface Company {
+  id: string;
+  name: string;
+  phone?: string;
+  address?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // User types
 export enum UserRole {
   SUPER_ADMIN = 'SUPER_ADMIN',
@@ -9,6 +19,8 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
+  companyId: string;
+  company?: Company;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,6 +47,8 @@ export interface Candidate {
   status: CandidateStatus;
   agentId?: string;
   agent?: Agent;
+  applications?: Application[];
+  companyId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -48,6 +62,7 @@ export interface Client {
   notes?: string;
   referredByClient?: string;
   referrer?: Client;
+  companyId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -83,6 +98,7 @@ export interface Application {
   broker?: Broker;
   permitExpiryDate?: Date;
   shareableLink: string;
+  companyId: string;
   createdAt: Date;
   updatedAt: Date;
   payments?: Payment[];
@@ -101,6 +117,7 @@ export interface Payment {
   currency: string;
   paymentDate: Date;
   notes?: string;
+  companyId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -125,6 +142,7 @@ export interface Cost {
   costDate: Date;
   costType: CostType;
   description?: string;
+  companyId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -143,6 +161,7 @@ export interface DocumentChecklistItem {
   documentName: string;
   status: DocumentStatus;
   stage: ApplicationStatus;
+  companyId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -152,6 +171,7 @@ export interface Agent {
   id: string;
   name: string;
   contactDetails: any;
+  companyId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -161,6 +181,7 @@ export interface Broker {
   id: string;
   name: string;
   contactDetails: any;
+  companyId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -171,6 +192,7 @@ export interface Setting {
   key: string;
   value: any;
   description?: string;
+  companyId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -182,6 +204,7 @@ export interface DocumentTemplate {
   name: string;
   required: boolean;
   order: number;
+  companyId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -229,8 +252,8 @@ export interface LoginResponse {
 }
 
 export interface RegisterRequest {
+  companyName: string;
   name: string;
   email: string;
   password: string;
-  role: UserRole;
 }

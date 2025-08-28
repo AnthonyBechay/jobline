@@ -655,7 +655,7 @@ const Settings = () => {
                       fullWidth
                       label="Template Name"
                       error={!!feeErrors.name}
-                      helperText={feeErrors.name?.message}
+                      helperText={feeErrors.name?.message as string || ''}
                     />
                   )}
                 />
@@ -710,7 +710,7 @@ const Settings = () => {
                       type="number"
                       label="Default Price"
                       error={!!feeErrors.defaultPrice}
-                      helperText={feeErrors.defaultPrice?.message as string}
+                      helperText={feeErrors.defaultPrice?.message as string || ''}
                     />
                   )}
                 />
@@ -730,7 +730,7 @@ const Settings = () => {
                       type="number"
                       label="Minimum Price"
                       error={!!feeErrors.minPrice}
-                      helperText={feeErrors.minPrice?.message as string}
+                      helperText={feeErrors.minPrice?.message as string || ''}
                     />
                   )}
                 />
@@ -750,7 +750,7 @@ const Settings = () => {
                       type="number"
                       label="Maximum Price"
                       error={!!feeErrors.maxPrice}
-                      helperText={feeErrors.maxPrice?.message as string}
+                      helperText={feeErrors.maxPrice?.message as string || ''}
                     />
                   )}
                 />

@@ -49,7 +49,7 @@ router.post('/upload', upload.array('files', 10), async (req: AuthRequest, res) 
   try {
     const { entityType, entityId } = req.body;
     const companyId = req.user!.companyId;
-    const files = req.files as Express.Multer.File[];
+    const files = Array.isArray(req.files) ? req.files : [];
     
     if (!files || files.length === 0) {
       res.status(400).json({ error: 'No files provided' });

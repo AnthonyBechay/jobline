@@ -47,6 +47,7 @@ export interface Candidate {
   status: CandidateStatus;
   agentId?: string;
   agent?: Agent;
+  applications?: Application[];
   companyId: string;
   createdAt: Date;
   updatedAt: Date;
