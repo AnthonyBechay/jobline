@@ -69,6 +69,17 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Root endpoint
+app.get('/', (req: Request, res: Response) => {
+  res.json({
+    message: 'Jobline API Server',
+    version: '1.0.0',
+    status: 'running',
+    environment: process.env.NODE_ENV,
+    health: '/api/health'
+  });
+});
+
 // Health check endpoint
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({

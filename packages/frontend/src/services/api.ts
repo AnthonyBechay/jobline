@@ -2,9 +2,16 @@ import axios from 'axios'
 
 // In production, use the environment variable if available
 // In development, use direct backend URL
-const baseURL = import.meta.env.PROD 
-  ? import.meta.env.VITE_API_URL || 'https://your-backend.onrender.com/api'
-  : 'http://localhost:5000/api'
+// Always append /api to the base URL
+const getBaseURL = () => {
+  if (import.meta.env.PROD) {
+    const url = import.meta.env.VITE_API_URL || 'https://jobline-in2v.onrender.com'
+    return `${url}/api`
+  }
+  return 'http://localhost:5000/api'
+}
+
+const baseURL = getBaseURL()
 
 const api = axios.create({
   baseURL,
