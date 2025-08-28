@@ -426,8 +426,11 @@ const ClientDetails = () => {
 
   const fetchClientApplications = async () => {
     try {
-      const response = await api.get<Application[]>(`/applications?clientId=${clientId}`)
-      setApplications(response.data || [])
+      const response = await api.get<any>(`/applications?clientId=${clientId}`)
+      // Handle both paginated and non-paginated responses
+      const applications = response.data?.applications || response.data?.data || response.data || []
+      // Ensure it's an array
+      setApplications(Array.isArray(applications) ? applications : [])
     } catch (err) {
       console.error('Failed to fetch applications:', err)
       setApplications([])

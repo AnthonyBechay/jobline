@@ -345,6 +345,15 @@ const ApplicationList = () => {
           rowCount={totalRows}
           paginationMode="server"
           disableRowSelectionOnClick
+          onRowClick={(params) => navigate(`/applications/${params.row.id}`)}
+          sx={{
+            '& .MuiDataGrid-row': {
+              cursor: 'pointer',
+            },
+            '& .MuiDataGrid-row:hover': {
+              backgroundColor: 'rgba(0, 0, 0, 0.04)',
+            },
+          }}
         />
       </Paper>
     </Box>

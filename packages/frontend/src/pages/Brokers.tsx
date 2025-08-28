@@ -70,7 +70,7 @@ const Brokers = () => {
       }
       
       if (dialog.broker) {
-        await api.patch(`/brokers/${dialog.broker.id}`, brokerData)
+        await api.put(`/brokers/${dialog.broker.id}`, brokerData)
         setSuccess('Broker updated successfully')
       } else {
         await api.post('/brokers', brokerData)

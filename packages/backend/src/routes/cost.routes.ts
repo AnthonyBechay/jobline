@@ -55,15 +55,26 @@ router.get('/', async (req: AuthRequest, res) => {
 // Create cost
 router.post('/', async (req: AuthRequest, res) => {
   try {
-    const { applicationId, amount, currency = 'USD', costType, description } = req.body;
+    const { applicationId, amount, currency = 'USD', costType, description, costDate } = req.body;
+    
+    // Verify the application exists
+    const application = await prisma.application.findUnique({
+      where: { id: applicationId },
+    });
+    
+    if (!application) {
+      res.status(404).json({ error: 'Application not found' });
+      return;
+    }
     
     const cost = await prisma.cost.create({
       data: {
         applicationId,
-        amount,
+        amount: parseFloat(amount),
         currency,
         costType,
         description,
+        costDate: costDate ? new Date(costDate) : new Date(),
       },
       include: {
         application: true,

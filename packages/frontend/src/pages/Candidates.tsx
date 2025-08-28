@@ -116,20 +116,24 @@ const CandidateList = () => {
     {
       field: 'photo',
       headerName: 'Photo',
-      width: 80,
+      width: 60,
       renderCell: (params) => (
-        <Avatar src={params.row.photoUrl} alt={`${params.row.firstName} ${params.row.lastName}`}>
-          {params.row.firstName[0]}{params.row.lastName[0]}
+        <Avatar 
+          src={params.row.photoUrl} 
+          alt={`${params.row.firstName} ${params.row.lastName}`}
+          sx={{ width: 32, height: 32 }}
+        >
+          {params.row.firstName?.[0]}{params.row.lastName?.[0]}
         </Avatar>
       ),
     },
-    { field: 'firstName', headerName: 'First Name', flex: 1, minWidth: 120 },
-    { field: 'lastName', headerName: 'Last Name', flex: 1, minWidth: 120 },
-    { field: 'nationality', headerName: 'Nationality', width: 120 },
+    { field: 'firstName', headerName: 'First Name', width: 120 },
+    { field: 'lastName', headerName: 'Last Name', width: 120 },
+    { field: 'nationality', headerName: 'Nationality', width: 100 },
     {
       field: 'status',
       headerName: 'Status',
-      width: 180,
+      width: 150,
       renderCell: (params) => (
         <Chip
           label={params.value.replace(/_/g, ' ')}
@@ -141,41 +145,42 @@ const CandidateList = () => {
     {
       field: 'skills',
       headerName: 'Skills',
-      flex: 1,
-      minWidth: 200,
+      width: 180,
       renderCell: (params) => (
-        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-          {params.value?.slice(0, 3).map((skill: string, index: number) => (
-            <Chip key={index} label={skill} size="small" variant="outlined" />
-          ))}
-          {params.value?.length > 3 && <Typography variant="caption">+{params.value.length - 3}</Typography>}
-        </Box>
+        <Tooltip title={params.value?.join(', ') || 'No skills'}>
+          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+            {params.value?.slice(0, 2).map((skill: string, index: number) => (
+              <Chip key={index} label={skill} size="small" variant="outlined" />
+            ))}
+            {params.value?.length > 2 && <Typography variant="caption">+{params.value.length - 2}</Typography>}
+          </Box>
+        </Tooltip>
       ),
     },
     {
       field: 'agent',
       headerName: 'Agent',
-      width: 150,
+      width: 120,
       renderCell: (params) => params.row.agent?.name || '-',
     },
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 120,
+      width: 100,
       sortable: false,
       renderCell: (params) => (
         <Box>
           <IconButton size="small" onClick={() => navigate(`/candidates/${params.row.id}`)}>
-            <ViewIcon />
+            <ViewIcon fontSize="small" />
           </IconButton>
           <IconButton size="small" onClick={() => navigate(`/candidates/edit/${params.row.id}`)}>
-            <EditIcon />
+            <EditIcon fontSize="small" />
           </IconButton>
           <IconButton
             size="small"
             onClick={() => setDeleteDialog({ open: true, candidate: params.row })}
           >
-            <DeleteIcon />
+            <DeleteIcon fontSize="small" />
           </IconButton>
         </Box>
       ),

@@ -70,7 +70,7 @@ const Agents = () => {
       }
       
       if (dialog.agent) {
-        await api.patch(`/agents/${dialog.agent.id}`, agentData)
+        await api.put(`/agents/${dialog.agent.id}`, agentData)
         setSuccess('Agent updated successfully')
       } else {
         await api.post('/agents', agentData)

@@ -44,8 +44,111 @@ const upload = multer({
 router.use(authenticate);
 router.use(adminOnly);
 
-// Upload files
-router.post('/upload', upload.array('files', 10), async (req: AuthRequest, res) => {
+// Upload single file (simplified for photos)
+router.post('/upload', upload.single('file'), async (req: AuthRequest, res) => {
+  try {
+    const { entityType, entityId } = req.body;
+    const companyId = req.user!.companyId;
+    const file = (req as any).file;
+    
+    if (!file) {
+      res.status(400).json({ error: 'No file provided' });
+      return;
+    }
+    
+    // For candidate photos, we can use a temporary entityId if creating new candidate
+    if (entityType === 'candidate' && entityId === 'temp') {
+      // Generate a temporary ID for new candidates
+      const tempId = uuidv4();
+      
+      // Upload to Backblaze B2
+      const folder = `${companyId}/${entityType}/temp`;
+      const b2Result = await uploadToB2(file.buffer, file.originalname, {
+        folder,
+        contentType: file.mimetype,
+      });
+      
+      res.json({
+        url: b2Result.url,
+        key: b2Result.key,
+        tempId,
+      });
+      return;
+    }
+    
+    if (!entityType || !entityId) {
+      res.status(400).json({ error: 'Entity type and ID are required' });
+      return;
+    }
+    
+    // Verify entity belongs to company
+    let validEntity = false;
+    switch (entityType) {
+      case 'application':
+        const application = await prisma.application.findFirst({
+          where: { id: entityId, companyId },
+        });
+        validEntity = !!application;
+        break;
+      case 'client':
+        const client = await prisma.client.findFirst({
+          where: { id: entityId, companyId },
+        });
+        validEntity = !!client;
+        break;
+      case 'candidate':
+        const candidate = await prisma.candidate.findFirst({
+          where: { id: entityId, companyId },
+        });
+        validEntity = !!candidate;
+        break;
+      default:
+        res.status(400).json({ error: 'Invalid entity type' });
+        return;
+    }
+    
+    if (!validEntity) {
+      res.status(404).json({ error: `${entityType} not found` });
+      return;
+    }
+    
+    // Upload to Backblaze B2
+    const folder = `${companyId}/${entityType}/${entityId}`;
+    const b2Result = await uploadToB2(file.buffer, file.originalname, {
+      folder,
+      contentType: file.mimetype,
+    });
+    
+    // Save file record to database
+    const fileRecord = await prisma.file.create({
+      data: {
+        entityType,
+        entityId,
+        fileName: b2Result.key,
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+        url: b2Result.url,
+        cloudinaryId: b2Result.key, // Store B2 key in same field
+        uploadedBy: req.user!.id,
+        companyId,
+      },
+    });
+    
+    res.json({
+      id: fileRecord.id,
+      fileName: fileRecord.fileName,
+      originalName: fileRecord.originalName,
+      url: fileRecord.url,
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ error: 'Failed to upload file' });
+  }
+});
+
+// Upload multiple files
+router.post('/upload-multiple', upload.array('files', 10), async (req: AuthRequest, res) => {
   try {
     const { entityType, entityId } = req.body;
     const companyId = req.user!.companyId;
