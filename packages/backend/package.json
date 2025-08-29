@@ -13,7 +13,10 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:reset": "prisma migrate reset --force",
     "db:generate": "prisma generate",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "render-build": "npm install && prisma generate && tsc",
+    "render-start": "node dist/index.js",
+    "render-migrate": "prisma migrate deploy"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.876.0",
