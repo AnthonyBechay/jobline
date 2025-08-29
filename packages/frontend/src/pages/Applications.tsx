@@ -1186,6 +1186,7 @@ const ApplicationDetails = () => {
                         <ListItemSecondaryAction>
                           <IconButton
                             size="small"
+                            component="a"
                             href={file.url}
                             target="_blank"
                             rel="noopener noreferrer"
