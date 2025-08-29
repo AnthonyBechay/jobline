@@ -1012,7 +1012,7 @@ const ApplicationDetails = () => {
                   variant="contained"
                   size="small"
                   onClick={() => setFeeDialog(true)}
-                  disabled={!user || (user.role !== UserRole.SUPER_ADMIN && application.feeTemplate)}
+                  disabled={!user || (user.role !== UserRole.SUPER_ADMIN && !!application.feeTemplate)}
                 >
                   {application.feeTemplate ? 'Update Fee' : 'Set Fee'}
                 </Button>
