@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import {
   Box,
@@ -26,6 +26,9 @@ import {
   CardMedia,
   Fab,
   Tooltip,
+  Stack,
+  Divider,
+  CardHeader,
 } from '@mui/material'
 import { DataGrid, GridColDef } from '@mui/x-data-grid'
 import {
@@ -36,13 +39,136 @@ import {
   Upload as UploadIcon,
   Download as DownloadIcon,
   Visibility as ViewIcon,
+  PhotoCamera as PhotoCameraIcon,
+  PictureAsPdf as PdfIcon,
+  FilterList as FilterIcon,
+  Person as PersonIcon,
+  Work as WorkIcon,
+  Language as LanguageIcon,
 } from '@mui/icons-material'
 import { useForm, Controller } from 'react-hook-form'
 import { Candidate, CandidateStatus, Agent, PaginatedResponse } from '../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../services/api'
 
-// Candidate List Component
+// Status color mapping
+const getStatusColor = (status: CandidateStatus) => {
+  const colors = {
+    [CandidateStatus.AVAILABLE_ABROAD]: 'info',
+    [CandidateStatus.AVAILABLE_IN_LEBANON]: 'success',
+    [CandidateStatus.RESERVED]: 'warning',
+    [CandidateStatus.IN_PROCESS]: 'default',
+    [CandidateStatus.PLACED]: 'secondary',
+  }
+  return colors[status] as any
+}
+
+// Candidate Card Component
+const CandidateCard = ({ candidate, onView, onEdit, onDelete, onExportPdf }: any) => {
+  const calculateAge = (dob: string) => {
+    if (!dob) return 'N/A'
+    const birthDate = new Date(dob)
+    const today = new Date()
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const monthDiff = today.getMonth() - birthDate.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--
+    }
+    return age
+  }
+
+  return (
+    <Card 
+      sx={{ 
+        height: '100%', 
+        display: 'flex', 
+        flexDirection: 'column',
+        transition: 'transform 0.2s, box-shadow 0.2s',
+        '&:hover': {
+          transform: 'translateY(-4px)',
+          boxShadow: 4,
+        }
+      }}
+    >
+      <CardHeader
+        avatar={
+          <Avatar
+            src={candidate.photoUrl}
+            sx={{ width: 56, height: 56 }}
+          >
+            {candidate.firstName?.[0]}{candidate.lastName?.[0]}
+          </Avatar>
+        }
+        title={`${candidate.firstName} ${candidate.lastName}`}
+        subheader={
+          <Box>
+            <Typography variant="body2" color="text.secondary">
+              <LanguageIcon sx={{ fontSize: 14, mr: 0.5, verticalAlign: 'middle' }} />
+              {candidate.nationality}
+            </Typography>
+            <Chip
+              label={candidate.status.replace(/_/g, ' ')}
+              color={getStatusColor(candidate.status)}
+              size="small"
+              sx={{ mt: 0.5 }}
+            />
+          </Box>
+        }
+      />
+      
+      <CardContent sx={{ flexGrow: 1 }}>
+        <Grid container spacing={1}>
+          <Grid item xs={6}>
+            <Typography variant="caption" color="text.secondary">Age</Typography>
+            <Typography variant="body2">{calculateAge(candidate.dateOfBirth)} years</Typography>
+          </Grid>
+          <Grid item xs={6}>
+            <Typography variant="caption" color="text.secondary">Education</Typography>
+            <Typography variant="body2">{candidate.education || 'N/A'}</Typography>
+          </Grid>
+          <Grid item xs={12}>
+            <Typography variant="caption" color="text.secondary">Skills</Typography>
+            <Box sx={{ mt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+              {candidate.skills?.slice(0, 3).map((skill: string, index: number) => (
+                <Chip key={index} label={skill} size="small" variant="outlined" />
+              ))}
+              {candidate.skills?.length > 3 && (
+                <Chip label={`+${candidate.skills.length - 3}`} size="small" />
+              )}
+            </Box>
+          </Grid>
+          {candidate.agent && (
+            <Grid item xs={12}>
+              <Typography variant="caption" color="text.secondary">Agent</Typography>
+              <Typography variant="body2">{candidate.agent.name}</Typography>
+            </Grid>
+          )}
+        </Grid>
+      </CardContent>
+      
+      <Divider />
+      
+      <CardActions sx={{ justifyContent: 'space-between', px: 2 }}>
+        <Box>
+          <IconButton size="small" onClick={() => onView(candidate)} color="primary">
+            <ViewIcon />
+          </IconButton>
+          <IconButton size="small" onClick={() => onEdit(candidate)} color="primary">
+            <EditIcon />
+          </IconButton>
+          <IconButton size="small" onClick={() => onExportPdf(candidate)} color="primary">
+            <PdfIcon />
+          </IconButton>
+        </Box>
+        <IconButton size="small" onClick={() => onDelete(candidate)} color="error">
+          <DeleteIcon />
+        </IconButton>
+      </CardActions>
+    </Card>
+  )
+}
+
+// Enhanced Candidate List Component
 const CandidateList = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -52,9 +178,11 @@ const CandidateList = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<CandidateStatus | ''>('')
   const [nationalityFilter, setNationalityFilter] = useState('')
+  const [nationalities, setNationalities] = useState<string[]>([])
   const [page, setPage] = useState(0)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(12)
   const [totalRows, setTotalRows] = useState(0)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; candidate: Candidate | null }>({
     open: false,
     candidate: null,
@@ -62,6 +190,7 @@ const CandidateList = () => {
 
   useEffect(() => {
     fetchCandidates()
+    fetchNationalities()
   }, [page, pageSize, statusFilter, nationalityFilter])
 
   const fetchCandidates = async () => {
@@ -84,6 +213,23 @@ const CandidateList = () => {
     }
   }
 
+  const fetchNationalities = async () => {
+    try {
+      // Extract unique nationalities from candidates
+      const response = await api.get<PaginatedResponse<Candidate>>('/candidates?limit=100')
+      const uniqueNationalities = Array.from(
+        new Set(response.data.data.map(c => c.nationality).filter(Boolean))
+      ).sort()
+      setNationalities(uniqueNationalities)
+    } catch (err) {
+      console.error('Failed to fetch nationalities:', err)
+      setNationalities([
+        'Ethiopian', 'Filipino', 'Sri Lankan', 'Bangladeshi', 'Kenyan',
+        'Nigerian', 'Ugandan', 'Ghanaian', 'Nepalese', 'Indian'
+      ])
+    }
+  }
+
   const handleDelete = async () => {
     if (!deleteDialog.candidate) return
 
@@ -101,16 +247,54 @@ const CandidateList = () => {
     fetchCandidates()
   }
 
-  const getStatusColor = (status: CandidateStatus) => {
-    const colors = {
-      [CandidateStatus.AVAILABLE_ABROAD]: 'info',
-      [CandidateStatus.AVAILABLE_IN_LEBANON]: 'success',
-      [CandidateStatus.RESERVED]: 'warning',
-      [CandidateStatus.IN_PROCESS]: 'default',
-      [CandidateStatus.PLACED]: 'secondary',
+  const handleExportPdf = async (candidate: Candidate) => {
+    try {
+      const response = await api.get(`/candidates/${candidate.id}/export-pdf`, {
+        responseType: 'blob'
+      })
+      
+      // Create a download link
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `${candidate.firstName}_${candidate.lastName}_profile.pdf`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Failed to export PDF:', err)
+      setError('Failed to export candidate as PDF')
     }
-    return colors[status] as any
   }
+
+  const handleExportAllCsv = async () => {
+    try {
+      const response = await api.get('/candidates/export', {
+        responseType: 'blob'
+      })
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', 'candidates.csv')
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Failed to export CSV:', err)
+      setError('Failed to export candidates as CSV')
+    }
+  }
+
+  // Group candidates by nationality for grid view
+  const candidatesByNationality = candidates.reduce((acc, candidate) => {
+    const nationality = candidate.nationality || 'Other'
+    if (!acc[nationality]) acc[nationality] = []
+    acc[nationality].push(candidate)
+    return acc
+  }, {} as Record<string, Candidate[]>)
 
   const columns: GridColDef[] = [
     {
@@ -166,7 +350,7 @@ const CandidateList = () => {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 100,
+      width: 150,
       sortable: false,
       renderCell: (params) => (
         <Box>
@@ -175,6 +359,9 @@ const CandidateList = () => {
           </IconButton>
           <IconButton size="small" onClick={() => navigate(`/candidates/edit/${params.row.id}`)}>
             <EditIcon fontSize="small" />
+          </IconButton>
+          <IconButton size="small" onClick={() => handleExportPdf(params.row)}>
+            <PdfIcon fontSize="small" />
           </IconButton>
           <IconButton
             size="small"
@@ -192,14 +379,26 @@ const CandidateList = () => {
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4">Candidates</Typography>
         <Box display="flex" gap={2}>
+          <Button
+            variant={viewMode === 'grid' ? 'contained' : 'outlined'}
+            onClick={() => setViewMode('grid')}
+          >
+            Card View
+          </Button>
+          <Button
+            variant={viewMode === 'list' ? 'contained' : 'outlined'}
+            onClick={() => setViewMode('list')}
+          >
+            List View
+          </Button>
+          <Tooltip title="Export all as CSV">
+            <IconButton color="primary" onClick={handleExportAllCsv}>
+              <DownloadIcon />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Import from CSV">
             <IconButton color="primary">
               <UploadIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Export to CSV">
-            <IconButton color="primary">
-              <DownloadIcon />
             </IconButton>
           </Tooltip>
           <Button
@@ -253,13 +452,21 @@ const CandidateList = () => {
             </FormControl>
           </Grid>
           <Grid item xs={12} md={3}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Nationality"
-              value={nationalityFilter}
-              onChange={(e) => setNationalityFilter(e.target.value)}
-            />
+            <FormControl fullWidth size="small">
+              <InputLabel>Nationality</InputLabel>
+              <Select
+                value={nationalityFilter}
+                label="Nationality"
+                onChange={(e) => setNationalityFilter(e.target.value)}
+              >
+                <MenuItem value="">All</MenuItem>
+                {nationalities.map((nationality) => (
+                  <MenuItem key={nationality} value={nationality}>
+                    {nationality}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Grid>
           <Grid item xs={12} md={2}>
             <Button fullWidth variant="contained" onClick={handleSearch}>
@@ -269,23 +476,53 @@ const CandidateList = () => {
         </Grid>
       </Paper>
 
-      <Paper sx={{ height: 600, width: '100%' }}>
-        <DataGrid
-          rows={candidates || []}
-          columns={columns}
-          paginationModel={{ page, pageSize }}
-          pageSizeOptions={[5, 10, 25, 50]}
-          onPaginationModelChange={(model) => {
-            setPage(model.page)
-            setPageSize(model.pageSize)
-          }}
-          loading={loading}
-          rowCount={totalRows}
-          paginationMode="server"
-          checkboxSelection
-          disableRowSelectionOnClick
-        />
-      </Paper>
+      {viewMode === 'grid' ? (
+        <Box>
+          {Object.entries(candidatesByNationality).map(([nationality, nationalityCandidates]) => (
+            <Box key={nationality} mb={4}>
+              <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', mb: 2 }}>
+                {nationality} ({nationalityCandidates.length})
+              </Typography>
+              <Grid container spacing={2}>
+                {nationalityCandidates.map((candidate) => (
+                  <Grid item xs={12} sm={6} md={4} lg={3} key={candidate.id}>
+                    <CandidateCard
+                      candidate={candidate}
+                      onView={(c: Candidate) => navigate(`/candidates/${c.id}`)}
+                      onEdit={(c: Candidate) => navigate(`/candidates/edit/${c.id}`)}
+                      onDelete={(c: Candidate) => setDeleteDialog({ open: true, candidate: c })}
+                      onExportPdf={handleExportPdf}
+                    />
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          ))}
+          {candidates.length === 0 && !loading && (
+            <Box textAlign="center" py={4}>
+              <Typography color="textSecondary">No candidates found</Typography>
+            </Box>
+          )}
+        </Box>
+      ) : (
+        <Paper sx={{ height: 600, width: '100%' }}>
+          <DataGrid
+            rows={candidates || []}
+            columns={columns}
+            paginationModel={{ page, pageSize }}
+            pageSizeOptions={[5, 10, 25, 50]}
+            onPaginationModelChange={(model) => {
+              setPage(model.page)
+              setPageSize(model.pageSize)
+            }}
+            loading={loading}
+            rowCount={totalRows}
+            paginationMode="server"
+            checkboxSelection
+            disableRowSelectionOnClick
+          />
+        </Paper>
+      )}
 
       <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, candidate: null })}>
         <DialogTitle>Confirm Delete</DialogTitle>
@@ -303,17 +540,20 @@ const CandidateList = () => {
   )
 }
 
-// Candidate Form Component
+// Enhanced Candidate Form Component with Photo Upload
 const CandidateForm = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [agents, setAgents] = useState<Agent[]>([])
   const [nationalities, setNationalities] = useState<string[]>([])
   const [isEditMode, setIsEditMode] = useState(false)
   const [candidateId, setCandidateId] = useState<string | null>(null)
-  const { control, handleSubmit, reset, formState: { errors } } = useForm<Candidate>()
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const { control, handleSubmit, reset, setValue, formState: { errors } } = useForm<Candidate>()
 
   useEffect(() => {
     // Check if we're in edit mode by checking the URL
@@ -341,6 +581,11 @@ const CandidateForm = () => {
         ...candidate,
         skills: candidate.skills ? candidate.skills.join(', ') : '',
         dateOfBirth: candidate.dateOfBirth ? new Date(candidate.dateOfBirth).toISOString().split('T')[0] : '',
+      }
+      
+      // Set photo preview if exists
+      if (candidate.photoUrl) {
+        setPhotoPreview(candidate.photoUrl)
       }
       
       // Reset the form with the fetched data
@@ -371,6 +616,55 @@ const CandidateForm = () => {
         'Ethiopian', 'Filipino', 'Sri Lankan', 'Bangladeshi', 'Kenyan',
         'Nigerian', 'Ugandan', 'Ghanaian', 'Nepalese', 'Indian'
       ])
+    }
+  }
+
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file')
+      return
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image size should be less than 5MB')
+      return
+    }
+
+    try {
+      setUploadingPhoto(true)
+      
+      // Create form data
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('entityType', 'candidate')
+      formData.append('entityId', candidateId || 'temp')
+
+      // Upload the photo
+      const response = await api.post('/files/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+
+      // Set the photo URL in the form and preview
+      const photoUrl = response.data.url
+      setValue('photoUrl', photoUrl)
+      setPhotoPreview(photoUrl)
+      
+      // Create a local preview URL
+      const previewUrl = URL.createObjectURL(file)
+      setPhotoPreview(previewUrl)
+      
+    } catch (err: any) {
+      console.error('Photo upload error:', err)
+      setError('Failed to upload photo')
+    } finally {
+      setUploadingPhoto(false)
     }
   }
 
@@ -412,180 +706,211 @@ const CandidateForm = () => {
       <Paper sx={{ p: 3 }}>
         <form onSubmit={handleSubmit(onSubmit)}>
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <Controller
-                name="firstName"
-                control={control}
-                rules={{ required: 'First name is required' }}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    label="First Name"
-                    error={!!errors.firstName}
-                    helperText={errors.firstName?.message}
-                  />
-                )}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Controller
-                name="lastName"
-                control={control}
-                rules={{ required: 'Last name is required' }}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    label="Last Name"
-                    error={!!errors.lastName}
-                    helperText={errors.lastName?.message}
-                  />
-                )}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Controller
-                name="nationality"
-                control={control}
-                rules={{ required: 'Nationality is required' }}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    select
-                    label="Nationality"
-                    error={!!errors.nationality}
-                    helperText={errors.nationality?.message}
-                  >
-                    <MenuItem value="">Select nationality</MenuItem>
-                    {nationalities.map((nationality) => (
-                      <MenuItem key={nationality} value={nationality}>
-                        {nationality}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                )}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Controller
-                name="dateOfBirth"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    label="Date of Birth"
-                    type="date"
-                    InputLabelProps={{ shrink: true }}
-                  />
-                )}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Controller
-                name="status"
-                control={control}
-                defaultValue={CandidateStatus.AVAILABLE_ABROAD}
-                rules={{ required: 'Status is required' }}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    select
-                    label="Status"
-                    error={!!errors.status}
-                    helperText={errors.status?.message}
-                  >
-                    {Object.values(CandidateStatus).map((status) => (
-                      <MenuItem key={status} value={status}>
-                        {status.replace(/_/g, ' ')}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                )}
-              />
-            </Grid>
-            {user?.role === 'SUPER_ADMIN' && (
-              <Grid item xs={12} md={6}>
+            {/* Photo Upload Section */}
+            <Grid item xs={12} md={3}>
+              <Box textAlign="center">
+                <Avatar
+                  src={photoPreview || ''}
+                  sx={{ width: 150, height: 150, mx: 'auto', mb: 2 }}
+                >
+                  {!photoPreview && <PhotoCameraIcon sx={{ fontSize: 60 }} />}
+                </Avatar>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                />
+                <Button
+                  variant="outlined"
+                  startIcon={<PhotoCameraIcon />}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  fullWidth
+                >
+                  {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
+                </Button>
                 <Controller
-                  name="agentId"
+                  name="photoUrl"
                   control={control}
                   render={({ field }) => (
                     <TextField
                       {...field}
-                      fullWidth
-                      select
-                      label="Agent"
-                    >
-                      <MenuItem value="">None</MenuItem>
-                      {agents && agents.length > 0 && agents.map((agent) => (
-                        <MenuItem key={agent.id} value={agent.id}>
-                          {agent.name}
-                        </MenuItem>
-                      ))}
-                    </TextField>
+                      type="hidden"
+                    />
                   )}
                 />
+              </Box>
+            </Grid>
+
+            {/* Form Fields */}
+            <Grid item xs={12} md={9}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <Controller
+                    name="firstName"
+                    control={control}
+                    rules={{ required: 'First name is required' }}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        label="First Name"
+                        error={!!errors.firstName}
+                        helperText={errors.firstName?.message}
+                      />
+                    )}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Controller
+                    name="lastName"
+                    control={control}
+                    rules={{ required: 'Last name is required' }}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        label="Last Name"
+                        error={!!errors.lastName}
+                        helperText={errors.lastName?.message}
+                      />
+                    )}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Controller
+                    name="nationality"
+                    control={control}
+                    rules={{ required: 'Nationality is required' }}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        select
+                        label="Nationality"
+                        error={!!errors.nationality}
+                        helperText={errors.nationality?.message}
+                      >
+                        <MenuItem value="">Select nationality</MenuItem>
+                        {nationalities.map((nationality) => (
+                          <MenuItem key={nationality} value={nationality}>
+                            {nationality}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    )}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Controller
+                    name="dateOfBirth"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        label="Date of Birth"
+                        type="date"
+                        InputLabelProps={{ shrink: true }}
+                      />
+                    )}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Controller
+                    name="status"
+                    control={control}
+                    defaultValue={CandidateStatus.AVAILABLE_ABROAD}
+                    rules={{ required: 'Status is required' }}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        select
+                        label="Status"
+                        error={!!errors.status}
+                        helperText={errors.status?.message}
+                      >
+                        {Object.values(CandidateStatus).map((status) => (
+                          <MenuItem key={status} value={status}>
+                            {status.replace(/_/g, ' ')}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    )}
+                  />
+                </Grid>
+                {user?.role === 'SUPER_ADMIN' && (
+                  <Grid item xs={12} md={6}>
+                    <Controller
+                      name="agentId"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          {...field}
+                          fullWidth
+                          select
+                          label="Agent"
+                        >
+                          <MenuItem value="">None</MenuItem>
+                          {agents && agents.length > 0 && agents.map((agent) => (
+                            <MenuItem key={agent.id} value={agent.id}>
+                              {agent.name}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      )}
+                    />
+                  </Grid>
+                )}
+                <Grid item xs={12} md={6}>
+                  <Controller
+                    name="education"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        label="Education"
+                      />
+                    )}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <Controller
+                    name="skills"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        label="Skills"
+                        placeholder="Enter skills separated by commas (e.g., Cooking, Cleaning, Childcare)"
+                        helperText="Separate skills with commas"
+                      />
+                    )}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <Controller
+                    name="experienceSummary"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        label="Experience Summary"
+                        multiline
+                        rows={4}
+                      />
+                    )}
+                  />
+                </Grid>
               </Grid>
-            )}
-            <Grid item xs={12} md={6}>
-              <Controller
-                name="education"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    label="Education"
-                  />
-                )}
-              />
             </Grid>
-            <Grid item xs={12} md={6}>
-              <Controller
-                name="photoUrl"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    label="Photo URL"
-                  />
-                )}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Controller
-                name="skills"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    label="Skills"
-                    placeholder="Enter skills separated by commas (e.g., Cooking, Cleaning, Childcare)"
-                    helperText="Separate skills with commas"
-                  />
-                )}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Controller
-                name="experienceSummary"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    label="Experience Summary"
-                    multiline
-                    rows={4}
-                  />
-                )}
-              />
-            </Grid>
+
             <Grid item xs={12}>
               <Box display="flex" gap={2} justifyContent="flex-end">
                 <Button variant="outlined" onClick={() => navigate('/candidates')}>
@@ -603,7 +928,7 @@ const CandidateForm = () => {
   )
 }
 
-// Candidate Details Component
+// Enhanced Candidate Details Component
 const CandidateDetails = () => {
   const navigate = useNavigate()
   const [candidate, setCandidate] = useState<Candidate | null>(null)
@@ -630,6 +955,28 @@ const CandidateDetails = () => {
       setLoading(false)
     }
   }
+
+  const handleExportPdf = async () => {
+    if (!candidate) return
+    
+    try {
+      const response = await api.get(`/candidates/${candidate.id}/export-pdf`, {
+        responseType: 'blob'
+      })
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `${candidate.firstName}_${candidate.lastName}_profile.pdf`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Failed to export PDF:', err)
+      setError('Failed to export candidate as PDF')
+    }
+  }
   
   if (loading) {
     return (
@@ -652,15 +999,16 @@ const CandidateDetails = () => {
     return null
   }
   
-  const getStatusColor = (status: CandidateStatus) => {
-    const colors = {
-      [CandidateStatus.AVAILABLE_ABROAD]: 'info',
-      [CandidateStatus.AVAILABLE_IN_LEBANON]: 'success',
-      [CandidateStatus.RESERVED]: 'warning',
-      [CandidateStatus.IN_PROCESS]: 'default',
-      [CandidateStatus.PLACED]: 'secondary',
+  const calculateAge = (dob: string | Date | null) => {
+    if (!dob) return 'N/A'
+    const birthDate = new Date(dob)
+    const today = new Date()
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const monthDiff = today.getMonth() - birthDate.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--
     }
-    return colors[status] as any
+    return age
   }
   
   return (
@@ -669,6 +1017,7 @@ const CandidateDetails = () => {
         <Typography variant="h4">Candidate Details</Typography>
         <Box display="flex" gap={2}>
           <Button variant="outlined" onClick={() => navigate('/candidates')}>Back to List</Button>
+          <Button variant="outlined" startIcon={<PdfIcon />} onClick={handleExportPdf}>Export PDF</Button>
           <Button variant="contained" startIcon={<EditIcon />} onClick={() => navigate(`/candidates/edit/${candidate.id}`)}>Edit</Button>
         </Box>
       </Box>
@@ -681,6 +1030,7 @@ const CandidateDetails = () => {
               height="300"
               image={candidate.photoUrl || '/placeholder-avatar.jpg'}
               alt={`${candidate.firstName} ${candidate.lastName}`}
+              sx={{ objectFit: 'cover' }}
             />
             <CardContent>
               <Typography variant="h5" gutterBottom>
@@ -708,6 +1058,10 @@ const CandidateDetails = () => {
                 <Typography>
                   {candidate.dateOfBirth ? new Date(candidate.dateOfBirth).toLocaleDateString() : 'N/A'}
                 </Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography color="textSecondary">Age:</Typography>
+                <Typography>{calculateAge(candidate.dateOfBirth)} years</Typography>
               </Grid>
               <Grid item xs={6}>
                 <Typography color="textSecondary">Education:</Typography>

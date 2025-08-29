@@ -98,6 +98,9 @@ export interface Application {
   broker?: Broker;
   permitExpiryDate?: Date;
   shareableLink: string;
+  feeTemplateId?: string;
+  feeTemplate?: FeeTemplate;
+  finalFeeAmount?: number;
   companyId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -222,6 +225,21 @@ export interface DashboardStats {
     costs: number;
     profit: number;
   };
+}
+
+// Fee Template types
+export interface FeeTemplate {
+  id: string;
+  name: string;
+  defaultPrice: number;
+  minPrice: number;
+  maxPrice: number;
+  currency: string;
+  nationality?: string;
+  description?: string;
+  companyId: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // API Response types

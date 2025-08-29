@@ -39,6 +39,9 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Tabs,
+  Tab,
+  Badge,
 } from '@mui/material'
 import { DataGrid, GridColDef } from '@mui/x-data-grid'
 import {
@@ -55,6 +58,10 @@ import {
   Warning as WarningIcon,
   Flight as FlightIcon,
   Home as HomeIcon,
+  Person as PersonIcon,
+  Business as BusinessIcon,
+  Receipt as ReceiptIcon,
+  AccountBalance as AccountBalanceIcon,
 } from '@mui/icons-material'
 import { useForm, Controller } from 'react-hook-form'
 import { 
@@ -167,7 +174,6 @@ const ApplicationList = () => {
       if (typeFilter) params.append('type', typeFilter)
 
       const response = await api.get<any>(`/applications?${params}`)
-      // Handle the response format from backend
       const applications = response.data.applications || response.data.data || []
       const pagination = response.data.pagination || { total: 0 }
       
@@ -183,7 +189,6 @@ const ApplicationList = () => {
   const handleCopyLink = (shareableLink: string) => {
     const fullUrl = `${window.location.origin}/status/${shareableLink}`
     navigator.clipboard.writeText(fullUrl)
-    // You might want to show a snackbar here
   }
 
   const columns: GridColDef[] = [
@@ -369,13 +374,25 @@ const ApplicationForm = () => {
   const [clients, setClients] = useState<Client[]>([])
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [brokers, setBrokers] = useState<Broker[]>([])
-  const { control, handleSubmit, watch, formState: { errors } } = useForm<any>()
+  const [feeTemplates, setFeeTemplates] = useState<any[]>([])
+  const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<any>()
 
   const selectedType = watch('type')
+  const selectedCandidateId = watch('candidateId')
 
   useEffect(() => {
     fetchData()
   }, [])
+
+  useEffect(() => {
+    // Auto-select fee template based on candidate nationality
+    if (selectedCandidateId && candidates.length > 0) {
+      const candidate = candidates.find(c => c.id === selectedCandidateId)
+      if (candidate?.nationality) {
+        fetchFeeTemplates(candidate.nationality)
+      }
+    }
+  }, [selectedCandidateId, candidates])
 
   const fetchData = async () => {
     try {
@@ -399,6 +416,26 @@ const ApplicationForm = () => {
       setClients([])
       setCandidates([])
       setBrokers([])
+    }
+  }
+
+  const fetchFeeTemplates = async (nationality?: string) => {
+    try {
+      const params = nationality ? `?nationality=${nationality}` : ''
+      const response = await api.get(`/applications/fee-templates/available${params}`)
+      setFeeTemplates(response.data || [])
+      
+      // Auto-select nationality-specific template if available
+      if (nationality && response.data?.length > 0) {
+        const nationalityTemplate = response.data.find((t: any) => t.nationality === nationality)
+        if (nationalityTemplate) {
+          setValue('feeTemplateId', nationalityTemplate.id)
+          setValue('finalFeeAmount', nationalityTemplate.defaultPrice)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch fee templates:', err)
+      setFeeTemplates([])
     }
   }
 
@@ -523,6 +560,55 @@ const ApplicationForm = () => {
                 />
               </Grid>
             )}
+            
+            {/* Fee Template Selection */}
+            {feeTemplates.length > 0 && (
+              <>
+                <Grid item xs={12} md={6}>
+                  <Controller
+                    name="feeTemplateId"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        select
+                        label="Fee Template"
+                        helperText="Auto-selected based on nationality when available"
+                      >
+                        <MenuItem value="">No template</MenuItem>
+                        {feeTemplates.map((template) => (
+                          <MenuItem key={template.id} value={template.id}>
+                            {template.name} 
+                            {template.nationality && ` (${template.nationality})`}
+                            - ${template.defaultPrice}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    )}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Controller
+                    name="finalFeeAmount"
+                    control={control}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        type="number"
+                        label="Final Fee Amount"
+                        helperText="Adjust the fee within template limits"
+                        InputProps={{
+                          startAdornment: '$',
+                        }}
+                      />
+                    )}
+                  />
+                </Grid>
+              </>
+            )}
+            
             <Grid item xs={12}>
               <Box display="flex" gap={2} justifyContent="flex-end">
                 <Button variant="outlined" onClick={() => navigate('/applications')}>
@@ -540,24 +626,41 @@ const ApplicationForm = () => {
   )
 }
 
-// Application Details Component
+// Enhanced Application Details Component
 const ApplicationDetails = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
   const [application, setApplication] = useState<Application | null>(null)
-  const [documents, setDocuments] = useState<DocumentChecklistItem[]>([])
+  const [documents, setDocuments] = useState<any[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [costs, setCosts] = useState<Cost[]>([])
+  const [feeTemplates, setFeeTemplates] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [updateStatusDialog, setUpdateStatusDialog] = useState(false)
   const [paymentDialog, setPaymentDialog] = useState(false)
   const [costDialog, setCostDialog] = useState(false)
+  const [feeDialog, setFeeDialog] = useState(false)
+  const [documentTab, setDocumentTab] = useState(0)
+  const [selectedFeeTemplate, setSelectedFeeTemplate] = useState<any>(null)
+  const [finalFeeAmount, setFinalFeeAmount] = useState('')
+  const [paymentForm, setPaymentForm] = useState({
+    amount: '',
+    currency: 'USD',
+    notes: '',
+  })
+  const [costForm, setCostForm] = useState({
+    amount: '',
+    currency: 'USD',
+    costType: CostType.OTHER,
+    description: '',
+  })
 
   useEffect(() => {
     if (id) {
       fetchApplicationDetails()
+      fetchFeeTemplates()
     }
   }, [id])
 
@@ -565,13 +668,19 @@ const ApplicationDetails = () => {
     try {
       const [appRes, docsRes, paymentsRes] = await Promise.all([
         api.get<Application>(`/applications/${id}`),
-        api.get<DocumentChecklistItem[]>(`/applications/${id}/documents`),
+        api.get<any[]>(`/applications/${id}/documents`),
         api.get<Payment[]>(`/applications/${id}/payments`),
       ])
       
       setApplication(appRes.data)
       setDocuments(docsRes.data || [])
       setPayments(paymentsRes.data || [])
+      
+      // Set initial fee values if available
+      if (appRes.data.feeTemplate) {
+        setSelectedFeeTemplate(appRes.data.feeTemplate)
+        setFinalFeeAmount(appRes.data.finalFeeAmount?.toString() || appRes.data.feeTemplate.defaultPrice?.toString() || '')
+      }
       
       if (user?.role === UserRole.SUPER_ADMIN) {
         try {
@@ -588,6 +697,16 @@ const ApplicationDetails = () => {
       setCosts([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchFeeTemplates = async () => {
+    try {
+      const response = await api.get('/applications/fee-templates/available')
+      setFeeTemplates(response.data || [])
+    } catch (err) {
+      console.error('Failed to fetch fee templates:', err)
+      setFeeTemplates([])
     }
   }
 
@@ -608,6 +727,69 @@ const ApplicationDetails = () => {
     } catch (err: any) {
       console.error('Failed to update application status:', err)
       setError(err.response?.data?.error || 'Failed to update status')
+    }
+  }
+
+  const handleAddPayment = async () => {
+    try {
+      await api.post(`/payments`, {
+        ...paymentForm,
+        applicationId: id,
+        clientId: application?.clientId,
+        amount: parseFloat(paymentForm.amount),
+      })
+      setPaymentDialog(false)
+      setPaymentForm({ amount: '', currency: 'USD', notes: '' })
+      await fetchApplicationDetails()
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to add payment')
+    }
+  }
+
+  const handleAddCost = async () => {
+    try {
+      await api.post(`/costs`, {
+        ...costForm,
+        applicationId: id,
+        amount: parseFloat(costForm.amount),
+      })
+      setCostDialog(false)
+      setCostForm({ amount: '', currency: 'USD', costType: CostType.OTHER, description: '' })
+      await fetchApplicationDetails()
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to add cost')
+    }
+  }
+
+  const handleSetFee = async () => {
+    try {
+      await api.patch(`/applications/${id}`, {
+        feeTemplateId: selectedFeeTemplate?.id,
+        finalFeeAmount: parseFloat(finalFeeAmount),
+      })
+      setFeeDialog(false)
+      await fetchApplicationDetails()
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to set fee')
+    }
+  }
+
+  const handleCopyShareableLink = () => {
+    if (application) {
+      const fullUrl = `${window.location.origin}/status/${application.shareableLink}`
+      navigator.clipboard.writeText(fullUrl)
+    }
+  }
+
+  const handleEditClient = () => {
+    if (application?.client) {
+      navigate(`/clients/edit/${application.client.id}`)
+    }
+  }
+
+  const handleEditCandidate = () => {
+    if (application?.candidate) {
+      navigate(`/candidates/edit/${application.candidate.id}`)
     }
   }
 
@@ -633,6 +815,10 @@ const ApplicationDetails = () => {
   const steps = getStatusSteps()
   const activeStep = steps.indexOf(application.status)
 
+  // Separate documents by type
+  const officeDocuments = documents.filter(d => d.requiredFrom === 'office')
+  const clientDocuments = documents.filter(d => d.requiredFrom === 'client')
+  
   const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0)
   const totalCosts = costs.reduce((sum, c) => sum + c.amount, 0)
   const profit = totalRevenue - totalCosts
@@ -644,16 +830,15 @@ const ApplicationDetails = () => {
           Application #{application.id.substring(0, 8)}
         </Typography>
         <Box display="flex" gap={2}>
-          <Button
-            variant="outlined"
-            startIcon={<LinkIcon />}
-            onClick={() => {
-              const fullUrl = `${window.location.origin}/status/${application.shareableLink}`
-              navigator.clipboard.writeText(fullUrl)
-            }}
-          >
-            Copy Client Link
-          </Button>
+          <Tooltip title="Copy shareable link for client">
+            <Button
+              variant="outlined"
+              startIcon={<LinkIcon />}
+              onClick={handleCopyShareableLink}
+            >
+              Copy Client Link
+            </Button>
+          </Tooltip>
           <Button variant="outlined" onClick={() => navigate('/applications')}>
             Back to List
           </Button>
@@ -690,48 +875,66 @@ const ApplicationDetails = () => {
       </Paper>
 
       <Grid container spacing={3}>
-        {/* Application Info */}
+        {/* Client & Candidate Info with Edit Buttons */}
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom>Application Details</Typography>
-              <List>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6">
+                  <PersonIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+                  Client Details
+                </Typography>
+                <IconButton size="small" onClick={handleEditClient} color="primary">
+                  <EditIcon />
+                </IconButton>
+              </Box>
+              <List dense>
                 <ListItem>
-                  <ListItemText
-                    primary="Type"
-                    secondary={application.type.replace(/_/g, ' ')}
+                  <ListItemText primary="Name" secondary={application.client?.name} />
+                </ListItem>
+                <ListItem>
+                  <ListItemText primary="Phone" secondary={application.client?.phone} />
+                </ListItem>
+                <ListItem>
+                  <ListItemText primary="Address" secondary={application.client?.address || 'N/A'} />
+                </ListItem>
+              </List>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6">
+                  <BusinessIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+                  Candidate Details
+                </Typography>
+                <IconButton size="small" onClick={handleEditCandidate} color="primary">
+                  <EditIcon />
+                </IconButton>
+              </Box>
+              <List dense>
+                <ListItem>
+                  <ListItemText 
+                    primary="Name" 
+                    secondary={`${application.candidate?.firstName} ${application.candidate?.lastName}`} 
                   />
                 </ListItem>
-                <Divider />
                 <ListItem>
-                  <ListItemText
-                    primary="Client"
-                    secondary={application.client?.name}
-                  />
+                  <ListItemText primary="Nationality" secondary={application.candidate?.nationality} />
                 </ListItem>
-                <Divider />
                 <ListItem>
-                  <ListItemText
-                    primary="Candidate"
-                    secondary={`${application.candidate?.firstName} ${application.candidate?.lastName}`}
-                  />
-                </ListItem>
-                {application.broker && (
-                  <>
-                    <Divider />
-                    <ListItem>
-                      <ListItemText
-                        primary="Broker"
-                        secondary={application.broker.name}
+                  <ListItemText 
+                    primary="Status" 
+                    secondary={
+                      <Chip 
+                        label={application.candidate?.status.replace(/_/g, ' ')} 
+                        size="small" 
+                        color="primary" 
                       />
-                    </ListItem>
-                  </>
-                )}
-                <Divider />
-                <ListItem>
-                  <ListItemText
-                    primary="Created"
-                    secondary={new Date(application.createdAt).toLocaleDateString()}
+                    } 
                   />
                 </ListItem>
               </List>
@@ -739,16 +942,68 @@ const ApplicationDetails = () => {
           </Card>
         </Grid>
 
-        {/* Document Checklist */}
-        <Grid item xs={12} md={6}>
+        {/* Fee Management Section */}
+        <Grid item xs={12}>
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom>Document Checklist</Typography>
-              {documents.length === 0 ? (
-                <Typography color="textSecondary">No documents required yet</Typography>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6">
+                  <ReceiptIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+                  Application Fee
+                </Typography>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={() => setFeeDialog(true)}
+                  disabled={!user || (user.role !== UserRole.SUPER_ADMIN && application.feeTemplate)}
+                >
+                  {application.feeTemplate ? 'Update Fee' : 'Set Fee'}
+                </Button>
+              </Box>
+              {application.feeTemplate ? (
+                <Box>
+                  <Typography variant="body2" color="textSecondary">
+                    Template: {application.feeTemplate.name}
+                  </Typography>
+                  <Typography variant="h6" color="primary">
+                    Agreed Fee: ${application.finalFeeAmount || application.feeTemplate.defaultPrice}
+                  </Typography>
+                </Box>
               ) : (
-                <List dense>
-                  {documents.map((doc) => (
+                <Typography color="textSecondary">No fee set for this application</Typography>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Document Checklist with Tabs */}
+        <Grid item xs={12}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                <DocumentIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+                Document Checklist
+              </Typography>
+              <Tabs value={documentTab} onChange={(e, v) => setDocumentTab(v)} sx={{ mb: 2 }}>
+                <Tab 
+                  label={
+                    <Badge badgeContent={officeDocuments.filter(d => d.status === 'PENDING').length} color="error">
+                      Office Documents
+                    </Badge>
+                  } 
+                />
+                <Tab 
+                  label={
+                    <Badge badgeContent={clientDocuments.filter(d => d.status === 'PENDING').length} color="warning">
+                      Client Requirements
+                    </Badge>
+                  } 
+                />
+              </Tabs>
+              
+              {documentTab === 0 ? (
+                <List>
+                  {officeDocuments.map((doc) => (
                     <ListItem key={doc.id}>
                       <ListItemText
                         primary={doc.documentName}
@@ -768,18 +1023,45 @@ const ApplicationDetails = () => {
                       </ListItemSecondaryAction>
                     </ListItem>
                   ))}
+                  {officeDocuments.length === 0 && (
+                    <Typography color="textSecondary" align="center">No office documents required</Typography>
+                  )}
+                </List>
+              ) : (
+                <List>
+                  {clientDocuments.map((doc) => (
+                    <ListItem key={doc.id}>
+                      <ListItemText
+                        primary={doc.documentName}
+                        secondary={`Stage: ${doc.stage.replace(/_/g, ' ')}`}
+                      />
+                      <ListItemSecondaryAction>
+                        <Chip
+                          label={doc.status}
+                          size="small"
+                          color={doc.status === DocumentStatus.PENDING ? 'warning' : 'success'}
+                        />
+                      </ListItemSecondaryAction>
+                    </ListItem>
+                  ))}
+                  {clientDocuments.length === 0 && (
+                    <Typography color="textSecondary" align="center">No client documents required</Typography>
+                  )}
                 </List>
               )}
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Financial Summary */}
+        {/* Enhanced Financial Summary */}
         <Grid item xs={12}>
           <Card>
             <CardContent>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">Financial Summary</Typography>
+                <Typography variant="h6">
+                  <AccountBalanceIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+                  Financial Summary
+                </Typography>
                 <Box>
                   <Button
                     variant="contained"
@@ -803,14 +1085,14 @@ const ApplicationDetails = () => {
               </Box>
 
               <Grid container spacing={3}>
-                <Grid item xs={12} md={user?.role === UserRole.SUPER_ADMIN ? 6 : 12}>
+                <Grid item xs={12} md={user?.role === UserRole.SUPER_ADMIN ? 4 : 12}>
                   <Typography variant="subtitle1" gutterBottom>Payments (Revenue)</Typography>
                   <TableContainer>
                     <Table size="small">
                       <TableHead>
                         <TableRow>
                           <TableCell>Date</TableCell>
-                          <TableCell>Amount</TableCell>
+                          <TableCell align="right">Amount</TableCell>
                           <TableCell>Notes</TableCell>
                         </TableRow>
                       </TableHead>
@@ -818,13 +1100,18 @@ const ApplicationDetails = () => {
                         {payments.map((payment) => (
                           <TableRow key={payment.id}>
                             <TableCell>{new Date(payment.paymentDate).toLocaleDateString()}</TableCell>
-                            <TableCell>${payment.amount}</TableCell>
+                            <TableCell align="right">${payment.amount}</TableCell>
                             <TableCell>{payment.notes || '-'}</TableCell>
                           </TableRow>
                         ))}
+                        {payments.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={3} align="center">No payments recorded</TableCell>
+                          </TableRow>
+                        )}
                         <TableRow>
                           <TableCell><strong>Total</strong></TableCell>
-                          <TableCell><strong>${totalRevenue}</strong></TableCell>
+                          <TableCell align="right"><strong>${totalRevenue}</strong></TableCell>
                           <TableCell></TableCell>
                         </TableRow>
                       </TableBody>
@@ -833,47 +1120,197 @@ const ApplicationDetails = () => {
                 </Grid>
 
                 {user?.role === UserRole.SUPER_ADMIN && (
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="subtitle1" gutterBottom>Costs</Typography>
-                    <TableContainer>
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Date</TableCell>
-                            <TableCell>Type</TableCell>
-                            <TableCell>Amount</TableCell>
-                            <TableCell>Description</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {costs.map((cost) => (
-                            <TableRow key={cost.id}>
-                              <TableCell>{new Date(cost.costDate).toLocaleDateString()}</TableCell>
-                              <TableCell>{cost.costType.replace(/_/g, ' ')}</TableCell>
-                              <TableCell>${cost.amount}</TableCell>
-                              <TableCell>{cost.description || '-'}</TableCell>
+                  <>
+                    <Grid item xs={12} md={4}>
+                      <Typography variant="subtitle1" gutterBottom>Costs</Typography>
+                      <TableContainer>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Type</TableCell>
+                              <TableCell align="right">Amount</TableCell>
+                              <TableCell>Description</TableCell>
                             </TableRow>
-                          ))}
-                          <TableRow>
-                            <TableCell colSpan={2}><strong>Total</strong></TableCell>
-                            <TableCell><strong>${totalCosts}</strong></TableCell>
-                            <TableCell></TableCell>
-                          </TableRow>
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                    <Box mt={2}>
-                      <Typography variant="h6" color={profit >= 0 ? 'success.main' : 'error.main'}>
-                        Net Profit: ${profit}
-                      </Typography>
-                    </Box>
-                  </Grid>
+                          </TableHead>
+                          <TableBody>
+                            {costs.map((cost) => (
+                              <TableRow key={cost.id}>
+                                <TableCell>{cost.costType.replace(/_/g, ' ')}</TableCell>
+                                <TableCell align="right">${cost.amount}</TableCell>
+                                <TableCell>{cost.description || '-'}</TableCell>
+                              </TableRow>
+                            ))}
+                            {costs.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={3} align="center">No costs recorded</TableCell>
+                              </TableRow>
+                            )}
+                            <TableRow>
+                              <TableCell><strong>Total</strong></TableCell>
+                              <TableCell align="right"><strong>${totalCosts}</strong></TableCell>
+                              <TableCell></TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </Grid>
+
+                    <Grid item xs={12} md={4}>
+                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: profit >= 0 ? 'success.light' : 'error.light' }}>
+                        <Typography variant="subtitle1" gutterBottom>Net Profit</Typography>
+                        <Typography variant="h4" color={profit >= 0 ? 'success.dark' : 'error.dark'}>
+                          ${profit}
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                          Revenue: ${totalRevenue} - Costs: ${totalCosts}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  </>
                 )}
               </Grid>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
+
+      {/* Fee Dialog */}
+      <Dialog open={feeDialog} onClose={() => setFeeDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Set Application Fee</DialogTitle>
+        <DialogContent>
+          <FormControl fullWidth sx={{ mt: 2, mb: 2 }}>
+            <InputLabel>Fee Template</InputLabel>
+            <Select
+              value={selectedFeeTemplate?.id || ''}
+              onChange={(e) => {
+                const template = feeTemplates.find((t: any) => t.id === e.target.value)
+                setSelectedFeeTemplate(template)
+                setFinalFeeAmount(template?.defaultPrice?.toString() || '')
+              }}
+            >
+              <MenuItem value="">Select template</MenuItem>
+              {feeTemplates.map((template) => (
+                <MenuItem key={template.id} value={template.id}>
+                  {template.name} 
+                  {template.nationality && ` (${template.nationality})`}
+                  - ${template.defaultPrice}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          {selectedFeeTemplate && (
+            <>
+              <Typography variant="body2" color="textSecondary" gutterBottom>
+                Range: ${selectedFeeTemplate.minPrice} - ${selectedFeeTemplate.maxPrice}
+              </Typography>
+              <TextField
+                fullWidth
+                label="Final Fee Amount"
+                type="number"
+                value={finalFeeAmount}
+                onChange={(e) => setFinalFeeAmount(e.target.value)}
+                InputProps={{
+                  startAdornment: '$',
+                }}
+                helperText={`Must be between $${selectedFeeTemplate.minPrice} and $${selectedFeeTemplate.maxPrice}`}
+              />
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setFeeDialog(false)}>Cancel</Button>
+          <Button onClick={handleSetFee} variant="contained" disabled={!selectedFeeTemplate || !finalFeeAmount}>
+            Set Fee
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Payment Dialog */}
+      <Dialog open={paymentDialog} onClose={() => setPaymentDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Add Payment</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="Amount"
+            type="number"
+            value={paymentForm.amount}
+            onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+            sx={{ mt: 2, mb: 2 }}
+            InputProps={{
+              startAdornment: '$',
+            }}
+          />
+          <TextField
+            fullWidth
+            label="Notes"
+            multiline
+            rows={2}
+            value={paymentForm.notes}
+            onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPaymentDialog(false)}>Cancel</Button>
+          <Button 
+            onClick={handleAddPayment} 
+            variant="contained"
+            disabled={!paymentForm.amount || parseFloat(paymentForm.amount) <= 0}
+          >
+            Add Payment
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Cost Dialog (Super Admin Only) */}
+      {user?.role === UserRole.SUPER_ADMIN && (
+        <Dialog open={costDialog} onClose={() => setCostDialog(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Add Cost</DialogTitle>
+          <DialogContent>
+            <FormControl fullWidth sx={{ mt: 2, mb: 2 }}>
+              <InputLabel>Cost Type</InputLabel>
+              <Select
+                value={costForm.costType}
+                onChange={(e) => setCostForm({ ...costForm, costType: e.target.value as CostType })}
+              >
+                {Object.values(CostType).map((type) => (
+                  <MenuItem key={type} value={type}>
+                    {type.replace(/_/g, ' ')}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              fullWidth
+              label="Amount"
+              type="number"
+              value={costForm.amount}
+              onChange={(e) => setCostForm({ ...costForm, amount: e.target.value })}
+              sx={{ mb: 2 }}
+              InputProps={{
+                startAdornment: '$',
+              }}
+            />
+            <TextField
+              fullWidth
+              label="Description"
+              multiline
+              rows={2}
+              value={costForm.description}
+              onChange={(e) => setCostForm({ ...costForm, description: e.target.value })}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setCostDialog(false)}>Cancel</Button>
+            <Button 
+              onClick={handleAddCost} 
+              variant="contained"
+              disabled={!costForm.amount || parseFloat(costForm.amount) <= 0}
+            >
+              Add Cost
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
 
       {/* Update Status Dialog */}
       <Dialog open={updateStatusDialog} onClose={() => setUpdateStatusDialog(false)}>

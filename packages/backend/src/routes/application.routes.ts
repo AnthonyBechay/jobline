@@ -80,6 +80,7 @@ router.get('/:id', async (req: AuthRequest, res) => {
         client: true,
         candidate: true,
         broker: true,
+        feeTemplate: true,
         payments: true,
         costs: req.user?.role === 'SUPER_ADMIN' ? true : false,
         documentItems: {
@@ -103,7 +104,7 @@ router.get('/:id', async (req: AuthRequest, res) => {
 // Create new application (company-specific)
 router.post('/', async (req: AuthRequest, res) => {
   try {
-    const { clientId, candidateId, type, feeTemplateId, finalFeeAmount } = req.body;
+    const { clientId, candidateId, type, feeTemplateId, finalFeeAmount, brokerId } = req.body;
     const companyId = req.user!.companyId;
     
     // Generate unique shareable link
@@ -140,12 +141,31 @@ router.post('/', async (req: AuthRequest, res) => {
       return;
     }
     
-    // Validate fee template if provided
-    if (feeTemplateId) {
+    // Auto-select fee template based on nationality if not provided
+    let selectedFeeTemplateId = feeTemplateId;
+    let selectedFinalFeeAmount = finalFeeAmount;
+    
+    if (!feeTemplateId && candidate.nationality) {
+      // Try to find nationality-specific fee template
+      const nationalityFeeTemplate = await prisma.feeTemplate.findFirst({
+        where: { 
+          nationality: candidate.nationality,
+          companyId,
+        },
+      });
+      
+      if (nationalityFeeTemplate) {
+        selectedFeeTemplateId = nationalityFeeTemplate.id;
+        selectedFinalFeeAmount = selectedFinalFeeAmount || nationalityFeeTemplate.defaultPrice;
+      }
+    }
+    
+    // Validate fee template if provided or auto-selected
+    if (selectedFeeTemplateId) {
       const feeTemplate = await prisma.feeTemplate.findFirst({
         where: { 
-          id: feeTemplateId,
-          companyId, // Ensure fee template belongs to user's company
+          id: selectedFeeTemplateId,
+          companyId,
         },
       });
       
@@ -155,8 +175,8 @@ router.post('/', async (req: AuthRequest, res) => {
       }
       
       // Validate final fee amount is within the template's range
-      if (finalFeeAmount !== undefined && finalFeeAmount !== null) {
-        const amount = parseFloat(finalFeeAmount.toString());
+      if (selectedFinalFeeAmount !== undefined && selectedFinalFeeAmount !== null) {
+        const amount = parseFloat(selectedFinalFeeAmount.toString());
         const minPrice = parseFloat(feeTemplate.minPrice.toString());
         const maxPrice = parseFloat(feeTemplate.maxPrice.toString());
         
@@ -178,13 +198,16 @@ router.post('/', async (req: AuthRequest, res) => {
           type,
           status: 'PENDING_MOL',
           shareableLink,
-          feeTemplateId,
-          finalFeeAmount,
+          feeTemplateId: selectedFeeTemplateId,
+          finalFeeAmount: selectedFinalFeeAmount,
+          brokerId,
           companyId, // Set company ID
         },
         include: {
           client: true,
           candidate: true,
+          feeTemplate: true,
+          broker: true,
         },
       }),
       prisma.candidate.update({
@@ -429,6 +452,7 @@ router.patch('/:id/broker', authenticate, async (req: AuthRequest, res) => {
 router.get('/:id/documents', async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
+    const { type } = req.query; // 'office' or 'client' or undefined for all
     const companyId = req.user!.companyId;
     
     // Verify application belongs to company
@@ -441,12 +465,40 @@ router.get('/:id/documents', async (req: AuthRequest, res) => {
       return;
     }
     
-    const documents = await prisma.documentChecklistItem.findMany({
+    // Get document checklist items
+    const documentItems = await prisma.documentChecklistItem.findMany({
       where: { applicationId: id },
       orderBy: [{ stage: 'asc' }, { createdAt: 'asc' }],
     });
     
-    res.json(documents);
+    // Get templates to know which documents are for office vs client
+    const templates = await prisma.documentTemplate.findMany({
+      where: { 
+        companyId,
+        stage: { in: documentItems.map(d => d.stage) },
+      },
+    });
+    
+    // Map document items with requiredFrom information
+    const documentsWithType = documentItems.map(item => {
+      const template = templates.find(t => 
+        t.name === item.documentName && t.stage === item.stage
+      );
+      return {
+        ...item,
+        requiredFrom: template?.requiredFrom || 'office',
+      };
+    });
+    
+    // Filter by type if requested
+    let filteredDocuments = documentsWithType;
+    if (type === 'office') {
+      filteredDocuments = documentsWithType.filter(d => d.requiredFrom === 'office');
+    } else if (type === 'client') {
+      filteredDocuments = documentsWithType.filter(d => d.requiredFrom === 'client');
+    }
+    
+    res.json(filteredDocuments);
   } catch (error) {
     console.error('Get application documents error:', error);
     res.status(500).json({ error: 'Failed to fetch application documents' });
@@ -604,9 +656,21 @@ router.patch('/:id', async (req: AuthRequest, res) => {
 router.get('/fee-templates/available', async (req: AuthRequest, res) => {
   try {
     const companyId = req.user!.companyId;
+    const { nationality } = req.query;
+    
+    // Build query conditions
+    const where: any = { companyId };
+    
+    // If nationality is provided, get templates for that nationality or generic ones
+    if (nationality) {
+      where.OR = [
+        { nationality: nationality as string },
+        { nationality: null }
+      ];
+    }
     
     const feeTemplates = await prisma.feeTemplate.findMany({
-      where: { companyId },
+      where,
       select: {
         id: true,
         name: true,
@@ -614,9 +678,10 @@ router.get('/fee-templates/available', async (req: AuthRequest, res) => {
         minPrice: true,
         maxPrice: true,
         currency: true,
+        nationality: true,
         description: true,
       },
-      orderBy: { name: 'asc' },
+      orderBy: [{ nationality: 'desc' }, { name: 'asc' }], // Prioritize nationality-specific templates
     });
     
     res.json(feeTemplates);

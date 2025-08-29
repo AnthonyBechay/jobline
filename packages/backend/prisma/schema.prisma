@@ -277,15 +277,16 @@ model Setting {
 
 // DocumentTemplate model for managing required documents per stage
 model DocumentTemplate {
-  id        String            @id @default(uuid())
-  stage     ApplicationStatus
-  name      String
-  required  Boolean           @default(true)
-  order     Int               @default(0)
-  companyId String            @map("company_id")
-  company   Company           @relation(fields: [companyId], references: [id])
-  createdAt DateTime          @default(now()) @map("created_at")
-  updatedAt DateTime          @updatedAt @map("updated_at")
+  id           String            @id @default(uuid())
+  stage        ApplicationStatus
+  name         String
+  required     Boolean           @default(true)
+  requiredFrom String            @default("office") // "office" or "client"  
+  order        Int               @default(0)
+  companyId    String            @map("company_id")
+  company      Company           @relation(fields: [companyId], references: [id])
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
 
   @@unique([companyId, stage, name])
   @@index([companyId])
@@ -300,6 +301,7 @@ model FeeTemplate {
   minPrice     Decimal       @map("min_price") @db.Decimal(10, 2)
   maxPrice     Decimal       @map("max_price") @db.Decimal(10, 2)
   currency     String        @default("USD")
+  nationality  String?       // Optional nationality for nationality-specific fees
   description  String?
   companyId    String        @map("company_id")
   company      Company       @relation(fields: [companyId], references: [id])
@@ -309,6 +311,7 @@ model FeeTemplate {
 
   @@unique([companyId, name])
   @@index([companyId])
+  @@index([nationality])
   @@map("fee_templates")
 }
 

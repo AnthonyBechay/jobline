@@ -61,12 +61,13 @@ router.post(
     body('minPrice').isFloat({ min: 0 }).withMessage('Minimum price must be a positive number'),
     body('maxPrice').isFloat({ min: 0 }).withMessage('Maximum price must be a positive number'),
     body('currency').optional().isString(),
+    body('nationality').optional().isString(),
     body('description').optional().trim(),
   ],
   validate,
   async (req: AuthRequest, res) => {
     try {
-      const { name, defaultPrice, minPrice, maxPrice, currency = 'USD', description } = req.body;
+      const { name, defaultPrice, minPrice, maxPrice, currency = 'USD', nationality, description } = req.body;
       const companyId = req.user!.companyId;
       
       // Validate price range
@@ -100,6 +101,7 @@ router.post(
           minPrice,
           maxPrice,
           currency,
+          nationality,
           description,
           companyId,
         },
@@ -123,6 +125,7 @@ router.put(
     body('minPrice').optional().isFloat({ min: 0 }),
     body('maxPrice').optional().isFloat({ min: 0 }),
     body('currency').optional().isString(),
+    body('nationality').optional().isString(),
     body('description').optional().trim(),
   ],
   validate,
