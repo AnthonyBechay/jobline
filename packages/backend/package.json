@@ -14,7 +14,7 @@
     "db:reset": "prisma migrate reset --force",
     "db:generate": "prisma generate",
     "postinstall": "prisma generate",
-    "render-build": "npm install && prisma generate && tsc",
+    "render-build": "npm install && npx @puppeteer/browsers install chrome-headless-shell && prisma generate && tsc",
     "render-start": "node dist/index.js",
     "render-migrate": "prisma migrate deploy"
   },
@@ -36,11 +36,12 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "prisma": "^5.7.0",
-    "puppeteer": "^21.11.0",
+    "puppeteer-core": "^22.13.0",
     "typescript": "^5.3.2",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
+    "@puppeteer/browsers": "^2.0.0",
     "@types/multer": "^1.4.11",
     "@types/uuid": "^9.0.7",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
