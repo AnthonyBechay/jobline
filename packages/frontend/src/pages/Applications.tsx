@@ -24,6 +24,8 @@ import {
   ListItem,
   ListItemText,
   ListItemSecondaryAction,
+  ListItemIcon,
+  CircularProgress,
   Divider,
   FormControl,
   InputLabel,
@@ -62,6 +64,9 @@ import {
   Business as BusinessIcon,
   Receipt as ReceiptIcon,
   AccountBalance as AccountBalanceIcon,
+  Upload as UploadIcon,
+  Download as DownloadIcon,
+  InsertDriveFile as FileIcon,
 } from '@mui/icons-material'
 import { useForm, Controller } from 'react-hook-form'
 import { 
@@ -633,6 +638,7 @@ const ApplicationDetails = () => {
   const { user } = useAuth()
   const [application, setApplication] = useState<Application | null>(null)
   const [documents, setDocuments] = useState<any[]>([])
+  const [uploadedFiles, setUploadedFiles] = useState<any[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [costs, setCosts] = useState<Cost[]>([])
   const [feeTemplates, setFeeTemplates] = useState<any[]>([])
@@ -645,6 +651,7 @@ const ApplicationDetails = () => {
   const [documentTab, setDocumentTab] = useState(0)
   const [selectedFeeTemplate, setSelectedFeeTemplate] = useState<any>(null)
   const [finalFeeAmount, setFinalFeeAmount] = useState('')
+  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null)
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
     currency: 'USD',
@@ -661,6 +668,7 @@ const ApplicationDetails = () => {
     if (id) {
       fetchApplicationDetails()
       fetchFeeTemplates()
+      fetchUploadedFiles()
     }
   }, [id])
 
@@ -707,6 +715,55 @@ const ApplicationDetails = () => {
     } catch (err) {
       console.error('Failed to fetch fee templates:', err)
       setFeeTemplates([])
+    }
+  }
+
+  const fetchUploadedFiles = async () => {
+    try {
+      const response = await api.get(`/files?entityType=application&entityId=${id}`)
+      setUploadedFiles(response.data || [])
+    } catch (err) {
+      console.error('Failed to fetch uploaded files:', err)
+      setUploadedFiles([])
+    }
+  }
+
+  const handleFileUpload = async (documentId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setError('File size should be less than 10MB')
+      return
+    }
+
+    try {
+      setUploadingDoc(documentId)
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('entityType', 'application')
+      formData.append('entityId', id || '')
+
+      const response = await api.post('/files/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+
+      // Update document status to received
+      await handleUpdateDocumentStatus(documentId, DocumentStatus.RECEIVED)
+      
+      // Refresh uploaded files list
+      await fetchUploadedFiles()
+      
+      // Reset the file input
+      event.target.value = ''
+    } catch (err: any) {
+      console.error('File upload error:', err)
+      setError('Failed to upload document')
+    } finally {
+      setUploadingDoc(null)
     }
   }
 
@@ -1004,22 +1061,52 @@ const ApplicationDetails = () => {
               {documentTab === 0 ? (
                 <List>
                   {officeDocuments.map((doc) => (
-                    <ListItem key={doc.id}>
+                    <ListItem key={doc.id} divider>
                       <ListItemText
-                        primary={doc.documentName}
+                        primary={
+                          <Box display="flex" alignItems="center" gap={1}>
+                            {doc.documentName}
+                            {doc.required && (
+                              <Chip label="Required" size="small" color="error" variant="outlined" />
+                            )}
+                          </Box>
+                        }
                         secondary={`Stage: ${doc.stage.replace(/_/g, ' ')}`}
                       />
                       <ListItemSecondaryAction>
-                        <FormControl size="small">
-                          <Select
-                            value={doc.status}
-                            onChange={(e) => handleUpdateDocumentStatus(doc.id, e.target.value as DocumentStatus)}
-                          >
-                            <MenuItem value={DocumentStatus.PENDING}>Pending</MenuItem>
-                            <MenuItem value={DocumentStatus.RECEIVED}>Received</MenuItem>
-                            <MenuItem value={DocumentStatus.SUBMITTED}>Submitted</MenuItem>
-                          </Select>
-                        </FormControl>
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <input
+                            type="file"
+                            id={`file-upload-${doc.id}`}
+                            style={{ display: 'none' }}
+                            onChange={(e) => handleFileUpload(doc.id, e)}
+                            accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+                          />
+                          <label htmlFor={`file-upload-${doc.id}`}>
+                            <IconButton
+                              component="span"
+                              size="small"
+                              color="primary"
+                              disabled={uploadingDoc === doc.id}
+                            >
+                              {uploadingDoc === doc.id ? (
+                                <CircularProgress size={20} />
+                              ) : (
+                                <UploadIcon />
+                              )}
+                            </IconButton>
+                          </label>
+                          <FormControl size="small" sx={{ minWidth: 120 }}>
+                            <Select
+                              value={doc.status}
+                              onChange={(e) => handleUpdateDocumentStatus(doc.id, e.target.value as DocumentStatus)}
+                            >
+                              <MenuItem value={DocumentStatus.PENDING}>Pending</MenuItem>
+                              <MenuItem value={DocumentStatus.RECEIVED}>Received</MenuItem>
+                              <MenuItem value={DocumentStatus.SUBMITTED}>Submitted</MenuItem>
+                            </Select>
+                          </FormControl>
+                        </Box>
                       </ListItemSecondaryAction>
                     </ListItem>
                   ))}
@@ -1030,17 +1117,47 @@ const ApplicationDetails = () => {
               ) : (
                 <List>
                   {clientDocuments.map((doc) => (
-                    <ListItem key={doc.id}>
+                    <ListItem key={doc.id} divider>
                       <ListItemText
-                        primary={doc.documentName}
+                        primary={
+                          <Box display="flex" alignItems="center" gap={1}>
+                            {doc.documentName}
+                            {doc.required && (
+                              <Chip label="Required" size="small" color="error" variant="outlined" />
+                            )}
+                          </Box>
+                        }
                         secondary={`Stage: ${doc.stage.replace(/_/g, ' ')}`}
                       />
                       <ListItemSecondaryAction>
-                        <Chip
-                          label={doc.status}
-                          size="small"
-                          color={doc.status === DocumentStatus.PENDING ? 'warning' : 'success'}
-                        />
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <input
+                            type="file"
+                            id={`file-upload-client-${doc.id}`}
+                            style={{ display: 'none' }}
+                            onChange={(e) => handleFileUpload(doc.id, e)}
+                            accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+                          />
+                          <label htmlFor={`file-upload-client-${doc.id}`}>
+                            <IconButton
+                              component="span"
+                              size="small"
+                              color="primary"
+                              disabled={uploadingDoc === doc.id}
+                            >
+                              {uploadingDoc === doc.id ? (
+                                <CircularProgress size={20} />
+                              ) : (
+                                <UploadIcon />
+                              )}
+                            </IconButton>
+                          </label>
+                          <Chip
+                            label={doc.status}
+                            size="small"
+                            color={doc.status === DocumentStatus.PENDING ? 'warning' : 'success'}
+                          />
+                        </Box>
                       </ListItemSecondaryAction>
                     </ListItem>
                   ))}
@@ -1048,6 +1165,38 @@ const ApplicationDetails = () => {
                     <Typography color="textSecondary" align="center">No client documents required</Typography>
                   )}
                 </List>
+              )}
+              
+              {/* Uploaded Files Section */}
+              {uploadedFiles.length > 0 && (
+                <Box mt={3}>
+                  <Typography variant="subtitle1" gutterBottom>
+                    Uploaded Files
+                  </Typography>
+                  <List dense>
+                    {uploadedFiles.map((file) => (
+                      <ListItem key={file.id}>
+                        <ListItemIcon>
+                          <FileIcon />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={file.originalName}
+                          secondary={`Uploaded on ${new Date(file.uploadedAt).toLocaleDateString()} by ${file.uploadedBy}`}
+                        />
+                        <ListItemSecondaryAction>
+                          <IconButton
+                            size="small"
+                            href={file.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <DownloadIcon />
+                          </IconButton>
+                        </ListItemSecondaryAction>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
               )}
             </CardContent>
           </Card>

@@ -38,8 +38,14 @@ router.get('/', async (req: AuthRequest, res) => {
       prisma.payment.count({ where }),
     ]);
     
+    // Convert Decimal to number for frontend
+    const formattedPayments = payments.map(payment => ({
+      ...payment,
+      amount: Number(payment.amount),
+    }));
+    
     res.json({
-      payments,
+      payments: formattedPayments,
       pagination: {
         page: Number(page),
         limit: Number(limit),
@@ -84,7 +90,13 @@ router.post('/', async (req: AuthRequest, res) => {
       },
     });
     
-    res.status(201).json(payment);
+    // Convert Decimal to number for frontend
+    const formattedPayment = {
+      ...payment,
+      amount: Number(payment.amount),
+    };
+    
+    res.status(201).json(formattedPayment);
   } catch (error) {
     console.error('Create payment error:', error);
     res.status(500).json({ error: 'Failed to create payment' });

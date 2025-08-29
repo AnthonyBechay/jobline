@@ -37,8 +37,14 @@ router.get('/', async (req: AuthRequest, res) => {
       prisma.cost.count({ where }),
     ]);
     
+    // Convert Decimal to number for frontend
+    const formattedCosts = costs.map(cost => ({
+      ...cost,
+      amount: Number(cost.amount),
+    }));
+    
     res.json({
-      costs,
+      costs: formattedCosts,
       pagination: {
         page: Number(page),
         limit: Number(limit),
@@ -81,7 +87,13 @@ router.post('/', async (req: AuthRequest, res) => {
       },
     });
     
-    res.status(201).json(cost);
+    // Convert Decimal to number for frontend
+    const formattedCost = {
+      ...cost,
+      amount: Number(cost.amount),
+    };
+    
+    res.status(201).json(formattedCost);
   } catch (error) {
     console.error('Create cost error:', error);
     res.status(500).json({ error: 'Failed to create cost' });

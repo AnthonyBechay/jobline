@@ -21,6 +21,7 @@ import feeTemplateRouter from './routes/feeTemplate.routes';
 import dashboardRouter from './routes/dashboard.routes';
 import publicRouter from './routes/public.routes';
 import documentItemRouter from './routes/documentItem.routes';
+import documentTemplateRouter from './routes/documentTemplate.routes';
 import fileRouter from './routes/file.routes';
 
 // Import middleware
@@ -104,6 +105,7 @@ app.use('/api/fee-templates', feeTemplateRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/public', publicRouter); // For client shareable links
 app.use('/api/document-items', documentItemRouter);
+app.use('/api/document-templates', documentTemplateRouter);
 app.use('/api/files', fileRouter);
 
 // Error handling middleware

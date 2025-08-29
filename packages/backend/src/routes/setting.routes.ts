@@ -5,6 +5,34 @@ import { prisma } from '../index';
 const router = Router();
 
 router.use(authenticate);
+
+// Get nationalities (accessible by all authenticated users)
+router.get('/nationalities', async (req: AuthRequest, res) => {
+  try {
+    const companyId = req.user!.companyId;
+    
+    const nationalitiesSetting = await prisma.setting.findFirst({
+      where: { 
+        key: 'nationalities',
+        companyId,
+      },
+    });
+    
+    // Default nationalities list
+    const defaultNationalities = [
+      'Ethiopian', 'Filipino', 'Sri Lankan', 'Bangladeshi', 'Kenyan',
+      'Nigerian', 'Ugandan', 'Ghanaian', 'Nepalese', 'Indian'
+    ];
+    
+    const nationalities = nationalitiesSetting?.value || defaultNationalities;
+    res.json(nationalities);
+  } catch (error) {
+    console.error('Get nationalities error:', error);
+    res.status(500).json({ error: 'Failed to fetch nationalities' });
+  }
+});
+
+// Apply superAdminOnly middleware for remaining routes
 router.use(superAdminOnly);
 
 // Get all settings (company-specific)
@@ -201,31 +229,7 @@ router.delete('/documents/templates/:id', async (req: AuthRequest, res) => {
   }
 });
 
-// Get nationalities (company-specific)
-router.get('/nationalities', async (req: AuthRequest, res) => {
-  try {
-    const companyId = req.user!.companyId;
-    
-    const nationalitiesSetting = await prisma.setting.findFirst({
-      where: { 
-        key: 'nationalities',
-        companyId,
-      },
-    });
-    
-    // Default nationalities list
-    const defaultNationalities = [
-      'Ethiopian', 'Filipino', 'Sri Lankan', 'Bangladeshi', 'Kenyan',
-      'Nigerian', 'Ugandan', 'Ghanaian', 'Nepalese', 'Indian'
-    ];
-    
-    const nationalities = nationalitiesSetting?.value || defaultNationalities;
-    res.json(nationalities);
-  } catch (error) {
-    console.error('Get nationalities error:', error);
-    res.status(500).json({ error: 'Failed to fetch nationalities' });
-  }
-});
+
 
 // Update nationalities (company-specific)
 router.put('/nationalities', async (req: AuthRequest, res) => {

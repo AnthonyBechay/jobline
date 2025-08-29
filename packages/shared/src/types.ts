@@ -164,6 +164,7 @@ export interface DocumentChecklistItem {
   documentName: string;
   status: DocumentStatus;
   stage: ApplicationStatus;
+  requiredFrom?: string; // 'office' or 'client'
   companyId: string;
   createdAt: Date;
   updatedAt: Date;

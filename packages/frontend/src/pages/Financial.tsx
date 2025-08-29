@@ -135,8 +135,8 @@ const Financial = () => {
       
       try {
         // Get all applications first
-        const applicationsRes = await api.get<PaginatedResponse<Application>>('/applications?limit=100')
-        const applications = applicationsRes.data?.data || []
+        const applicationsRes = await api.get<any>('/applications?limit=100')
+        const applications = applicationsRes.data?.applications || applicationsRes.data?.data || []
         
         // Fetch payments and costs for each application
         if (applications.length > 0) {
@@ -200,8 +200,12 @@ const Financial = () => {
 
   const fetchApplications = async () => {
     try {
-      const response = await api.get<PaginatedResponse<Application>>('/applications?limit=100')
-      setApplications(response.data?.data || [])
+      const response = await api.get<any>('/applications?limit=100')
+      // Handle both response formats
+      const apps = response.data?.applications || response.data?.data || []
+      // Ensure each application has the needed fields populated
+      const populatedApps = apps.filter((app: any) => app && app.id)
+      setApplications(populatedApps)
     } catch (err) {
       console.error('Failed to fetch applications:', err)
       setApplications([])
@@ -579,7 +583,7 @@ const Financial = () => {
                       {applications && applications.length > 0 ? (
                         applications.map((app) => (
                           <MenuItem key={app.id} value={app.id}>
-                            #{app.id.substring(0, 8)} - {app.client?.name} - {app.candidate?.firstName} {app.candidate?.lastName}
+                            #{app.id.substring(0, 8)} - {app.client?.name || 'Unknown Client'} - {app.candidate?.firstName || ''} {app.candidate?.lastName || 'Unknown Candidate'}
                           </MenuItem>
                         ))
                       ) : (
@@ -666,7 +670,7 @@ const Financial = () => {
                       {applications && applications.length > 0 ? (
                         applications.map((app) => (
                           <MenuItem key={app.id} value={app.id}>
-                            #{app.id.substring(0, 8)} - {app.client?.name} - {app.candidate?.firstName} {app.candidate?.lastName}
+                            #{app.id.substring(0, 8)} - {app.client?.name || 'Unknown Client'} - {app.candidate?.firstName || ''} {app.candidate?.lastName || 'Unknown Candidate'}
                           </MenuItem>
                         ))
                       ) : (

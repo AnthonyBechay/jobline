@@ -529,7 +529,13 @@ router.get('/:id/payments', async (req: AuthRequest, res) => {
       orderBy: { paymentDate: 'desc' },
     });
     
-    res.json(payments);
+    // Convert Decimal to number for frontend
+    const formattedPayments = payments.map(payment => ({
+      ...payment,
+      amount: Number(payment.amount),
+    }));
+    
+    res.json(formattedPayments);
   } catch (error) {
     console.error('Get application payments error:', error);
     res.status(500).json({ error: 'Failed to fetch application payments' });
@@ -563,7 +569,13 @@ router.get('/:id/costs', async (req: AuthRequest, res) => {
       orderBy: { costDate: 'desc' },
     });
     
-    res.json(costs);
+    // Convert Decimal to number for frontend
+    const formattedCosts = costs.map(cost => ({
+      ...cost,
+      amount: Number(cost.amount),
+    }));
+    
+    res.json(formattedCosts);
   } catch (error) {
     console.error('Get application costs error:', error);
     res.status(500).json({ error: 'Failed to fetch application costs' });
