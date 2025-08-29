@@ -999,7 +999,7 @@ const CandidateDetails = () => {
     return null
   }
   
-  const calculateAge = (dob: string | Date | null) => {
+  const calculateAge = (dob: string | Date | null | undefined) => {
     if (!dob) return 'N/A'
     const birthDate = new Date(dob)
     const today = new Date()

@@ -276,38 +276,7 @@ const theme = createTheme({
         },
       },
     },
-    MuiDataGrid: {
-      styleOverrides: {
-        root: {
-          border: 'none',
-          borderRadius: 12,
-          '& .MuiDataGrid-columnHeaders': {
-            backgroundColor: '#f8fafc',
-            borderBottom: '2px solid #e2e8f0',
-            borderTopLeftRadius: 12,
-            borderTopRightRadius: 12,
-          },
-          '& .MuiDataGrid-columnHeader': {
-            fontWeight: 600,
-            color: '#1a202c',
-          },
-          '& .MuiDataGrid-row': {
-            '&:hover': {
-              backgroundColor: '#f7fafc',
-            },
-            '&.Mui-selected': {
-              backgroundColor: '#edf2f7',
-              '&:hover': {
-                backgroundColor: '#e2e8f0',
-              },
-            },
-          },
-          '& .MuiDataGrid-cell': {
-            borderBottom: '1px solid #e2e8f0',
-          },
-        },
-      },
-    },
+
     MuiTableHead: {
       styleOverrides: {
         root: {

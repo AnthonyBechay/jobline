@@ -104,6 +104,9 @@ export interface Application {
   payments?: Payment[];
   costs?: Cost[];
   documentItems?: DocumentChecklistItem[];
+  feeTemplate?: FeeTemplate;
+  feeTemplateId?: string;
+  finalFeeAmount?: number;
 }
 
 // Payment types
@@ -159,6 +162,8 @@ export interface DocumentChecklistItem {
   documentName: string;
   status: DocumentStatus;
   stage: ApplicationStatus;
+  required?: boolean;
+  requiredFrom?: 'office' | 'client';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -189,6 +194,20 @@ export interface Setting {
   key: string;
   value: any;
   description?: string;
+  companyId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Fee Template types
+export interface FeeTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  defaultPrice: number;
+  minPrice: number;
+  maxPrice: number;
+  nationality?: string;
   companyId: string;
   createdAt: Date;
   updatedAt: Date;

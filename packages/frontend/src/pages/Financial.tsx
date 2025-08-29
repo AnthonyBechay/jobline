@@ -140,7 +140,7 @@ const Financial = () => {
         
         // Fetch payments and costs for each application
         if (applications.length > 0) {
-          const promises = applications.map(async (app) => {
+          const promises = applications.map(async (app: any) => {
             try {
               const [paymentsRes, costsRes] = await Promise.all([
                 api.get<Payment[]>(`/applications/${app.id}/payments`).catch(() => ({ data: [] })),
