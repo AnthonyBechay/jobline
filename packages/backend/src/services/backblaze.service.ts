@@ -20,6 +20,7 @@ interface UploadOptions {
   folder?: string;
   fileName?: string;
   contentType?: string;
+  metadata?: Record<string, string>;
 }
 
 interface UploadResult {
@@ -30,7 +31,115 @@ interface UploadResult {
 }
 
 /**
- * Upload a file to Backblaze B2
+ * Generate organized file path based on entity type and metadata
+ * Structure:
+ * - /company-{companyId}/
+ *   - /clients/{clientName}-{clientId}/
+ *     - /documents/{year}/{month}/{docType}/{filename}
+ *   - /candidates/{candidateName}-{candidateId}/
+ *     - /profile/photo.jpg
+ *     - /documents/{year}/{month}/{docType}/{filename}
+ *   - /applications/{appNumber}-{clientName}-{candidateName}/
+ *     - /documents/{stage}/{docType}/{filename}
+ *     - /payments/{year}/{month}/receipt-{date}.pdf
+ *     - /costs/{year}/{month}/invoice-{date}.pdf
+ */
+const generateOrganizedPath = (
+  entityType: string,
+  entityId: string,
+  originalName: string,
+  metadata?: Record<string, string>
+): string => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const timestamp = date.toISOString().split('T')[0]; // YYYY-MM-DD
+  
+  // Clean filename: remove special characters, keep extension
+  const fileExt = path.extname(originalName).toLowerCase();
+  const baseName = path.basename(originalName, fileExt)
+    .replace(/[^a-z0-9]/gi, '-')
+    .replace(/-+/g, '-')
+    .substring(0, 50); // Limit filename length
+  
+  // Generate unique but readable filename
+  const uniqueId = uuidv4().split('-')[0]; // Just first 8 chars for readability
+  
+  const companyId = metadata?.companyId || 'unknown';
+  const companyFolder = `company-${companyId}`;
+  
+  let filePath = '';
+  
+  switch (entityType) {
+    case 'candidate': {
+      const candidateName = metadata?.candidateName || 'unnamed';
+      const cleanCandidateName = candidateName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      const candidateFolder = `candidates/${cleanCandidateName}-${entityId.substring(0, 8)}`;
+      
+      // Check if it's a profile photo
+      if (metadata?.documentType === 'photo' || originalName.match(/photo|profile|picture/i)) {
+        filePath = `${companyFolder}/${candidateFolder}/profile/photo-${timestamp}${fileExt}`;
+      } else {
+        const docType = metadata?.documentType || 'general';
+        filePath = `${companyFolder}/${candidateFolder}/documents/${year}/${month}/${docType}/${baseName}-${uniqueId}${fileExt}`;
+      }
+      break;
+    }
+    
+    case 'client': {
+      const clientName = metadata?.clientName || 'unnamed';
+      const cleanClientName = clientName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      const clientFolder = `clients/${cleanClientName}-${entityId.substring(0, 8)}`;
+      
+      const docType = metadata?.documentType || 'general';
+      filePath = `${companyFolder}/${clientFolder}/documents/${year}/${month}/${docType}/${baseName}-${uniqueId}${fileExt}`;
+      break;
+    }
+    
+    case 'application': {
+      const appNumber = metadata?.applicationNumber || entityId.substring(0, 8);
+      const clientName = metadata?.clientName || 'client';
+      const candidateName = metadata?.candidateName || 'candidate';
+      const cleanClientName = clientName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      const cleanCandidateName = candidateName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      
+      const appFolder = `applications/${appNumber}-${cleanClientName}-${cleanCandidateName}`;
+      
+      // Organize by document category
+      if (metadata?.documentCategory === 'payment') {
+        filePath = `${companyFolder}/${appFolder}/payments/${year}/${month}/receipt-${timestamp}-${uniqueId}${fileExt}`;
+      } else if (metadata?.documentCategory === 'cost') {
+        filePath = `${companyFolder}/${appFolder}/costs/${year}/${month}/invoice-${timestamp}-${uniqueId}${fileExt}`;
+      } else {
+        const stage = metadata?.stage || 'general';
+        const docType = metadata?.documentType || 'document';
+        filePath = `${companyFolder}/${appFolder}/documents/${stage}/${docType}/${baseName}-${uniqueId}${fileExt}`;
+      }
+      break;
+    }
+    
+    case 'company': {
+      // Company documents like logo, certificates, etc.
+      const docType = metadata?.documentType || 'general';
+      if (docType === 'logo') {
+        filePath = `${companyFolder}/branding/logo-${timestamp}${fileExt}`;
+      } else {
+        filePath = `${companyFolder}/documents/${year}/${month}/${docType}/${baseName}-${uniqueId}${fileExt}`;
+      }
+      break;
+    }
+    
+    default:
+      // Fallback for any other entity types
+      filePath = `${companyFolder}/misc/${entityType}/${year}/${month}/${baseName}-${uniqueId}${fileExt}`;
+  }
+  
+  return filePath;
+};
+
+/**
+ * Upload a file to Backblaze B2 with organized folder structure
  */
 export const uploadToB2 = async (
   buffer: Buffer,
@@ -44,17 +153,43 @@ export const uploadToB2 = async (
       throw new Error('Storage service not configured. Please contact administrator.');
     }
 
-    // Generate unique file name
-    const fileExt = path.extname(originalName);
-    const fileName = options.fileName || `${uuidv4()}${fileExt}`;
-    const folder = options.folder || 'uploads';
-    const key = `${folder}/${fileName}`;
+    // Log credentials (partially, for debugging)
+    console.log('B2 Configuration Check:', {
+      keyIdLength: process.env.B2_KEY_ID?.length,
+      keyIdPrefix: process.env.B2_KEY_ID?.substring(0, 4),
+      hasAppKey: !!process.env.B2_APPLICATION_KEY,
+      endpoint: process.env.B2_ENDPOINT,
+      bucket: BUCKET_NAME
+    });
     
-    console.log('Uploading to B2:', {
+    // Generate organized file path
+    let key: string;
+    if (options.metadata) {
+      // Use new organized structure if metadata is provided
+      const [entityType, entityId] = (options.folder || 'misc/unknown').split('/');
+      key = generateOrganizedPath(
+        options.metadata.entityType || entityType,
+        options.metadata.entityId || entityId,
+        originalName,
+        options.metadata
+      );
+    } else if (options.folder) {
+      // Fallback to provided folder structure
+      const fileExt = path.extname(originalName);
+      const fileName = options.fileName || `${uuidv4()}${fileExt}`;
+      key = `${options.folder}/${fileName}`;
+    } else {
+      // Ultimate fallback
+      const fileExt = path.extname(originalName);
+      key = `uploads/${uuidv4()}${fileExt}`;
+    }
+    
+    console.log('Uploading to B2 with organized path:', {
       bucket: BUCKET_NAME,
       key,
       contentType: options.contentType || getMimeType(originalName),
-      size: buffer.length
+      size: buffer.length,
+      metadata: options.metadata
     });
     
     // Prepare upload parameters
@@ -66,6 +201,7 @@ export const uploadToB2 = async (
       Metadata: {
         originalName: originalName,
         uploadDate: new Date().toISOString(),
+        ...options.metadata,
       },
     });
     
@@ -90,16 +226,20 @@ export const uploadToB2 = async (
       statusCode: error.$metadata?.httpStatusCode,
       requestId: error.$metadata?.requestId,
       bucket: BUCKET_NAME,
-      endpoint: process.env.B2_ENDPOINT
+      endpoint: process.env.B2_ENDPOINT,
+      keyIdConfigured: !!process.env.B2_KEY_ID,
+      appKeyConfigured: !!process.env.B2_APPLICATION_KEY
     });
     
     // Provide more specific error messages
     if (error.code === 'NoSuchBucket') {
       throw new Error('Storage bucket not found. Please check configuration.');
-    } else if (error.code === 'InvalidAccessKeyId' || error.code === 'SignatureDoesNotMatch') {
-      throw new Error('Invalid storage credentials. Please check configuration.');
+    } else if (error.code === 'InvalidAccessKeyId' || error.message?.includes('Malformed Access Key')) {
+      throw new Error('Invalid storage credentials. Please verify B2_KEY_ID in environment settings.');
+    } else if (error.code === 'SignatureDoesNotMatch') {
+      throw new Error('Invalid storage secret key. Please verify B2_APPLICATION_KEY in environment settings.');
     } else if (error.code === 'AccessDenied') {
-      throw new Error('Access denied to storage service. Please check permissions.');
+      throw new Error('Access denied to storage service. Please check bucket permissions.');
     } else {
       throw new Error(`Failed to upload file: ${error.message || 'Unknown error'}`);
     }

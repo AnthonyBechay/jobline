@@ -47,7 +47,7 @@ router.use(adminOnly);
 // Upload single file (simplified for photos)
 router.post('/upload', upload.single('file'), async (req: AuthRequest, res) => {
   try {
-    const { entityType, entityId } = req.body;
+    const { entityType, entityId, documentType, documentName } = req.body;
     const companyId = req.user!.companyId;
     const file = (req as any).file;
     
@@ -56,16 +56,78 @@ router.post('/upload', upload.single('file'), async (req: AuthRequest, res) => {
       return;
     }
     
+    // Get entity details for better folder organization
+    let metadata: Record<string, string> = {
+      companyId,
+      entityType,
+      entityId,
+      documentType: documentType || 'general',
+      uploadedBy: req.user!.id,
+      uploadedByName: req.user!.name || 'Unknown',
+    };
+    
+    // Fetch entity details for naming
+    switch (entityType) {
+      case 'candidate': {
+        if (entityId !== 'temp') {
+          const candidate = await prisma.candidate.findFirst({
+            where: { id: entityId, companyId },
+          });
+          if (candidate) {
+            metadata.candidateName = `${candidate.firstName} ${candidate.lastName}`;
+            metadata.candidateId = candidate.id;
+          }
+        }
+        break;
+      }
+      case 'client': {
+        const client = await prisma.client.findFirst({
+          where: { id: entityId, companyId },
+        });
+        if (client) {
+          metadata.clientName = client.name;
+          metadata.clientId = client.id;
+        }
+        break;
+      }
+      case 'application': {
+        const application = await prisma.application.findFirst({
+          where: { id: entityId, companyId },
+          include: {
+            client: true,
+            candidate: true,
+          },
+        });
+        if (application) {
+          metadata.applicationId = application.id;
+          metadata.applicationNumber = application.id.substring(0, 8).toUpperCase();
+          metadata.stage = application.status;
+          if (application.client) {
+            metadata.clientName = application.client.name;
+          }
+          if (application.candidate) {
+            metadata.candidateName = `${application.candidate.firstName} ${application.candidate.lastName}`;
+          }
+        }
+        break;
+      }
+      case 'company': {
+        metadata.documentType = documentType || 'logo';
+        break;
+      }
+    }
+    
     // For candidate photos, we can use a temporary entityId if creating new candidate
     if (entityType === 'candidate' && entityId === 'temp') {
       // Generate a temporary ID for new candidates
       const tempId = uuidv4();
+      metadata.candidateName = 'temp-candidate';
       
-      // Upload to Backblaze B2
-      const folder = `${companyId}/${entityType}/temp`;
+      // Upload to Backblaze B2 with organized structure
       const b2Result = await uploadToB2(file.buffer, file.originalname, {
-        folder,
+        folder: `${companyId}/${entityType}/temp`,
         contentType: file.mimetype,
+        metadata,
       });
       
       res.json({
@@ -102,6 +164,9 @@ router.post('/upload', upload.single('file'), async (req: AuthRequest, res) => {
         });
         validEntity = !!candidate;
         break;
+      case 'company':
+        validEntity = true; // Company uploads are always valid for the user's company
+        break;
       default:
         res.status(400).json({ error: 'Invalid entity type' });
         return;
@@ -112,11 +177,11 @@ router.post('/upload', upload.single('file'), async (req: AuthRequest, res) => {
       return;
     }
     
-    // Upload to Backblaze B2
-    const folder = `${companyId}/${entityType}/${entityId}`;
+    // Upload to Backblaze B2 with organized structure
     const b2Result = await uploadToB2(file.buffer, file.originalname, {
-      folder,
+      folder: `${companyId}/${entityType}/${entityId}`,
       contentType: file.mimetype,
+      metadata,
     });
     
     // Save file record to database
