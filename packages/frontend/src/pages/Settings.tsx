@@ -319,7 +319,7 @@ const Settings = () => {
   }
 
   // Group documents by stage for better visualization
-  const documentsByStage = documentTemplates.reduce((acc, doc) => {
+  const documentsByStage = documentTemplates.reduce((acc: Record<string, any[]>, doc: any) => {
     if (!acc[doc.stage]) acc[doc.stage] = []
     acc[doc.stage].push(doc)
     return acc
@@ -398,7 +398,7 @@ const Settings = () => {
             </Box>
 
             <Grid container spacing={3}>
-              {feeTemplates.map((template) => (
+              {feeTemplates.map((template: any) => (
                 <Grid item xs={12} md={6} lg={4} key={template.id}>
                   <Card sx={{ 
                     height: '100%',
@@ -520,7 +520,7 @@ const Settings = () => {
             )}
           </Box>
 
-          {applicationStages.map((stage) => {
+          {applicationStages.map((stage: any) => {
             const stageDocs = documentsByStage[stage.value] || []
             if (stageDocs.length === 0 && user?.role !== UserRole.SUPER_ADMIN) return null
 
@@ -551,8 +551,8 @@ const Settings = () => {
                         </TableRow>
                       ) : (
                         stageDocs
-                          .sort((a, b) => a.order - b.order)
-                          .map((doc) => (
+                          .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+                          .map((doc: any) => (
                             <TableRow key={doc.id}>
                               <TableCell>{doc.name}</TableCell>
                               <TableCell align="center">
@@ -849,7 +849,7 @@ const Settings = () => {
                         helperText="Leave empty for general template"
                       >
                         <MenuItem value="">None (General)</MenuItem>
-                        {nationalities.map((nationality) => (
+                        {nationalities.map((nationality: string) => (
                           <MenuItem key={nationality} value={nationality}>
                             {nationality}
                           </MenuItem>
@@ -1004,7 +1004,7 @@ const Settings = () => {
                       error={!!documentForm.formState.errors.stage}
                       helperText={documentForm.formState.errors.stage?.message as string}
                     >
-                      {applicationStages.map((stage) => (
+                      {applicationStages.map((stage: any) => (
                         <MenuItem key={stage.value} value={stage.value}>
                           {stage.label}
                         </MenuItem>
