@@ -787,7 +787,7 @@ const CandidateForm = () => {
                         fullWidth
                         label="First Name"
                         error={!!errors.firstName}
-                        helperText={errors.firstName?.message}
+                        helperText={errors.firstName?.message as string}
                       />
                     )}
                   />
@@ -804,7 +804,7 @@ const CandidateForm = () => {
                         fullWidth
                         label="Last Name"
                         error={!!errors.lastName}
-                        helperText={errors.lastName?.message}
+                        helperText={errors.lastName?.message as string}
                       />
                     )}
                   />
@@ -822,7 +822,7 @@ const CandidateForm = () => {
                         select
                         label="Nationality"
                         error={!!errors.nationality}
-                        helperText={errors.nationality?.message}
+                        helperText={errors.nationality?.message as string}
                         value={field.value || ''}
                       >
                         <MenuItem value="">Select nationality</MenuItem>
@@ -864,7 +864,7 @@ const CandidateForm = () => {
                         select
                         label="Status"
                         error={!!errors.status}
-                        helperText={errors.status?.message}
+                        helperText={errors.status?.message as string}
                       >
                         {Object.values(CandidateStatus).map((status) => (
                           <MenuItem key={status} value={status}>
