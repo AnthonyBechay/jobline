@@ -582,7 +582,7 @@ router.get('/:id/costs', async (req: AuthRequest, res) => {
   }
 });
 
-// Update application (general update endpoint)
+// Update application (general update endpoint) with document validation
 router.patch('/:id', async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
@@ -592,6 +592,9 @@ router.patch('/:id', async (req: AuthRequest, res) => {
     // Check application belongs to company
     const existingApplication = await prisma.application.findFirst({
       where: { id, companyId },
+      include: {
+        documentItems: true,
+      }
     });
     
     if (!existingApplication) {
@@ -599,8 +602,37 @@ router.patch('/:id', async (req: AuthRequest, res) => {
       return;
     }
     
-    // If status is being updated, handle special logic
+    // If status is being updated, validate required documents first
     if (status) {
+      // Check if all required office documents for current stage are received/submitted
+      const requiredDocs = await prisma.documentTemplate.findMany({
+        where: {
+          companyId,
+          stage: existingApplication.status,
+          required: true,
+          requiredFrom: 'office'
+        }
+      });
+      
+      // Get document statuses for this application
+      const docStatuses = existingApplication.documentItems.reduce((acc, item) => {
+        acc[item.documentName] = item.status;
+        return acc;
+      }, {} as Record<string, string>);
+      
+      // Check if all required office documents are at least received
+      const missingDocs = requiredDocs.filter(doc => 
+        !docStatuses[doc.name] || docStatuses[doc.name] === 'PENDING'
+      );
+      
+      if (missingDocs.length > 0) {
+        res.status(400).json({ 
+          error: 'Cannot proceed to next stage',
+          message: `Missing required documents: ${missingDocs.map(d => d.name).join(', ')}`,
+          missingDocuments: missingDocs.map(d => d.name)
+        });
+        return;
+      }
       const application = await prisma.application.update({
         where: { id },
         data: { status, ...updateData },

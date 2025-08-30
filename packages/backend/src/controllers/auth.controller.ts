@@ -53,6 +53,21 @@ export const register = async (req: Request, res: Response): Promise<void> => {
           name: companyName,
         },
       });
+      
+      // Create company info setting
+      await tx.setting.create({
+        data: {
+          key: 'company_info',
+          value: { 
+            name: companyName,
+            phone: '',
+            address: '',
+            email: email
+          },
+          description: 'Company information and settings',
+          companyId: company.id,
+        },
+      });
 
       // Create the super admin user
       const user = await tx.user.create({

@@ -17,7 +17,9 @@ router.get('/stats', async (req: AuthRequest, res) => {
     thisMonth.setDate(1);
     thisMonth.setHours(0, 0, 0, 0);
     
-    // Get counts
+    const companyId = req.user!.companyId;
+    
+    // Get counts - filtered by company
     const [
       totalClients,
       totalCandidates,
@@ -26,21 +28,26 @@ router.get('/stats', async (req: AuthRequest, res) => {
       pendingPayments,
       upcomingRenewals,
     ] = await Promise.all([
-      prisma.client.count(),
-      prisma.candidate.count(),
+      prisma.client.count({ where: { companyId } }),
+      prisma.candidate.count({ where: { companyId } }),
       prisma.application.count({
         where: {
+          companyId,
           status: {
             notIn: ['CONTRACT_ENDED'],
           },
         },
       }),
       prisma.documentChecklistItem.count({
-        where: { status: 'PENDING' },
+        where: { 
+          status: 'PENDING',
+          application: { companyId }
+        },
       }),
       // Count applications with no payments
       prisma.application.count({
         where: {
+          companyId,
           payments: { none: {} },
           status: { notIn: ['CONTRACT_ENDED'] },
         },
@@ -48,6 +55,7 @@ router.get('/stats', async (req: AuthRequest, res) => {
       // Count applications with permits expiring in next 60 days
       prisma.application.count({
         where: {
+          companyId,
           permitExpiryDate: {
             gte: today,
             lte: new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000),
@@ -63,12 +71,14 @@ router.get('/stats', async (req: AuthRequest, res) => {
         prisma.payment.aggregate({
           where: {
             paymentDate: { gte: thisMonth },
+            application: { companyId },
           },
           _sum: { amount: true },
         }),
         prisma.cost.aggregate({
           where: {
             costDate: { gte: thisMonth },
+            application: { companyId },
           },
           _sum: { amount: true },
         }),
@@ -102,10 +112,13 @@ router.get('/stats', async (req: AuthRequest, res) => {
 // Get application pipeline
 router.get('/pipeline', async (req: AuthRequest, res) => {
   try {
+    const companyId = req.user!.companyId;
+    
     const pipeline = await prisma.application.groupBy({
       by: ['status'],
       _count: true,
       where: {
+        companyId,
         status: {
           notIn: ['CONTRACT_ENDED'],
         },
@@ -115,7 +128,10 @@ router.get('/pipeline', async (req: AuthRequest, res) => {
     const pipelineWithDetails = await Promise.all(
       pipeline.map(async (stage) => {
         const applications = await prisma.application.findMany({
-          where: { status: stage.status },
+          where: { 
+            status: stage.status,
+            companyId 
+          },
           include: {
             client: true,
             candidate: true,
@@ -142,10 +158,12 @@ router.get('/pipeline', async (req: AuthRequest, res) => {
 // Get recent activities
 router.get('/activities', async (req: AuthRequest, res) => {
   try {
+    const companyId = req.user!.companyId;
     const limit = 20;
     
     // Get recent applications
     const recentApplications = await prisma.application.findMany({
+      where: { companyId },
       include: {
         client: true,
         candidate: true,
@@ -156,6 +174,9 @@ router.get('/activities', async (req: AuthRequest, res) => {
     
     // Get recent payments
     const recentPayments = await prisma.payment.findMany({
+      where: {
+        application: { companyId },
+      },
       include: {
         client: true,
         application: {
@@ -196,11 +217,13 @@ router.get('/activities', async (req: AuthRequest, res) => {
 // Get renewal reminders
 router.get('/renewals', async (req: AuthRequest, res) => {
   try {
+    const companyId = req.user!.companyId;
     const today = new Date();
     const sixtyDaysFromNow = new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000);
     
     const renewals = await prisma.application.findMany({
       where: {
+        companyId,
         permitExpiryDate: {
           gte: today,
           lte: sixtyDaysFromNow,

@@ -52,10 +52,13 @@ router.post('/', superAdminOnly, async (req: AuthRequest, res) => {
   }
 });
 
-// Get all users (Super Admin only)
+// Get all users (Super Admin only) - filtered by company
 router.get('/', superAdminOnly, async (req: AuthRequest, res) => {
   try {
+    const companyId = req.user!.companyId;
+    
     const users = await prisma.user.findMany({
+      where: { companyId }, // Filter by company
       select: {
         id: true,
         name: true,
@@ -74,13 +77,17 @@ router.get('/', superAdminOnly, async (req: AuthRequest, res) => {
   }
 });
 
-// Get user by ID (Super Admin only)
+// Get user by ID (Super Admin only) - company-specific
 router.get('/:id', superAdminOnly, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
+    const companyId = req.user!.companyId;
     
-    const user = await prisma.user.findUnique({
-      where: { id },
+    const user = await prisma.user.findFirst({
+      where: { 
+        id,
+        companyId // Ensure user belongs to same company
+      },
       select: {
         id: true,
         name: true,
@@ -103,11 +110,22 @@ router.get('/:id', superAdminOnly, async (req: AuthRequest, res) => {
   }
 });
 
-// Update user (Super Admin only)
+// Update user (Super Admin only) - company-specific
 router.put('/:id', superAdminOnly, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
+    const companyId = req.user!.companyId;
     const { name, email, role, password } = req.body;
+    
+    // Check user belongs to same company
+    const existingUser = await prisma.user.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!existingUser) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
     
     const updateData: any = { name, email, role };
     
@@ -134,14 +152,25 @@ router.put('/:id', superAdminOnly, async (req: AuthRequest, res) => {
   }
 });
 
-// Delete user (Super Admin only)
+// Delete user (Super Admin only) - company-specific
 router.delete('/:id', superAdminOnly, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
+    const companyId = req.user!.companyId;
     
     // Prevent deleting yourself
     if (id === req.user?.id) {
       res.status(400).json({ error: 'Cannot delete your own account' });
+      return;
+    }
+    
+    // Check user belongs to same company
+    const userToDelete = await prisma.user.findFirst({
+      where: { id, companyId },
+    });
+    
+    if (!userToDelete) {
+      res.status(404).json({ error: 'User not found' });
       return;
     }
     

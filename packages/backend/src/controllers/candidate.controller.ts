@@ -13,8 +13,16 @@ export const getAllCandidates = async (req: AuthRequest, res: Response): Promise
       companyId, // Filter by company
     };
     
+    // Handle multiple status filters
     if (status) {
-      where.status = status as CandidateStatus;
+      if (Array.isArray(status)) {
+        where.status = { in: status as CandidateStatus[] };
+      } else if (typeof status === 'string' && status.includes(',')) {
+        // Handle comma-separated status values
+        where.status = { in: status.split(',') as CandidateStatus[] };
+      } else {
+        where.status = status as CandidateStatus;
+      }
     }
     
     if (nationality) {
@@ -167,8 +175,11 @@ export const updateCandidate = async (req: AuthRequest, res: Response): Promise<
       return;
     }
     
-    // Verify agent belongs to the same company if provided
-    if (updateData.agentId && req.user?.role === 'SUPER_ADMIN') {
+    // Handle agentId - allow null/empty string to remove agent
+    if (updateData.agentId === '' || updateData.agentId === null) {
+      updateData.agentId = null;
+    } else if (updateData.agentId && req.user?.role === 'SUPER_ADMIN') {
+      // Verify agent belongs to the same company if provided
       const agent = await prisma.agent.findFirst({
         where: { id: updateData.agentId, companyId },
       });
@@ -178,11 +189,18 @@ export const updateCandidate = async (req: AuthRequest, res: Response): Promise<
         return;
       }
     } else if (req.user?.role !== 'SUPER_ADMIN') {
+      // Non-super admins cannot change agent
       delete updateData.agentId;
     }
     
+    // Handle dateOfBirth conversion
     if (updateData.dateOfBirth) {
       updateData.dateOfBirth = new Date(updateData.dateOfBirth);
+    }
+    
+    // Handle skills - ensure it's an array
+    if (updateData.skills && typeof updateData.skills === 'string') {
+      updateData.skills = updateData.skills.split(',').map((s: string) => s.trim()).filter(Boolean);
     }
     
     const candidate = await prisma.candidate.update({
