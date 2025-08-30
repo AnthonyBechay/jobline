@@ -38,11 +38,24 @@ export const uploadToB2 = async (
   options: UploadOptions = {}
 ): Promise<UploadResult> => {
   try {
+    // Check if B2 credentials are configured
+    if (!process.env.B2_KEY_ID || !process.env.B2_APPLICATION_KEY) {
+      console.error('Backblaze B2 credentials not configured');
+      throw new Error('Storage service not configured. Please contact administrator.');
+    }
+
     // Generate unique file name
     const fileExt = path.extname(originalName);
     const fileName = options.fileName || `${uuidv4()}${fileExt}`;
     const folder = options.folder || 'uploads';
     const key = `${folder}/${fileName}`;
+    
+    console.log('Uploading to B2:', {
+      bucket: BUCKET_NAME,
+      key,
+      contentType: options.contentType || getMimeType(originalName),
+      size: buffer.length
+    });
     
     // Prepare upload parameters
     const command = new PutObjectCommand({
@@ -62,15 +75,34 @@ export const uploadToB2 = async (
     // Generate a signed URL for the file
     const url = await getSignedUrlForB2(key);
     
+    console.log('Upload successful:', { key, url });
+    
     return {
       key,
       url,
       bucket: BUCKET_NAME,
       size: buffer.length,
     };
-  } catch (error) {
-    console.error('B2 upload error:', error);
-    throw new Error('Failed to upload file to Backblaze B2');
+  } catch (error: any) {
+    console.error('B2 upload error details:', {
+      message: error.message,
+      code: error.code,
+      statusCode: error.$metadata?.httpStatusCode,
+      requestId: error.$metadata?.requestId,
+      bucket: BUCKET_NAME,
+      endpoint: process.env.B2_ENDPOINT
+    });
+    
+    // Provide more specific error messages
+    if (error.code === 'NoSuchBucket') {
+      throw new Error('Storage bucket not found. Please check configuration.');
+    } else if (error.code === 'InvalidAccessKeyId' || error.code === 'SignatureDoesNotMatch') {
+      throw new Error('Invalid storage credentials. Please check configuration.');
+    } else if (error.code === 'AccessDenied') {
+      throw new Error('Access denied to storage service. Please check permissions.');
+    } else {
+      throw new Error(`Failed to upload file: ${error.message || 'Unknown error'}`);
+    }
   }
 };
 

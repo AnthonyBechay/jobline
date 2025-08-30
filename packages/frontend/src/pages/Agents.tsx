@@ -204,6 +204,15 @@ const Agents = () => {
           pageSizeOptions={[5, 10, 25]}
           loading={loading}
           disableRowSelectionOnClick
+          onRowClick={(params) => openDialog(params.row)}
+          sx={{
+            '& .MuiDataGrid-row': {
+              cursor: 'pointer',
+            },
+            '& .MuiDataGrid-row:hover': {
+              backgroundColor: 'rgba(0, 0, 0, 0.04)',
+            },
+          }}
         />
       </Paper>
 

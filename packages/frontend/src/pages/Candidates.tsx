@@ -520,6 +520,15 @@ const CandidateList = () => {
             paginationMode="server"
             checkboxSelection
             disableRowSelectionOnClick
+            onRowClick={(params) => navigate(`/candidates/${params.row.id}`)}
+            sx={{
+              '& .MuiDataGrid-row': {
+                cursor: 'pointer',
+              },
+              '& .MuiDataGrid-row:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.04)',
+              },
+            }}
           />
         </Paper>
       )}

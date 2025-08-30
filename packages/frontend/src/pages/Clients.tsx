@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Routes, Route, useNavigate } from 'react-router-dom'
+import { Routes, Route, useNavigate, useParams } from 'react-router-dom'
 import {
   Box,
   Button,
@@ -20,8 +20,15 @@ import {
   List,
   ListItem,
   ListItemText,
+  ListItemIcon,
+  ListItemSecondaryAction,
   Divider,
   Tooltip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  CircularProgress,
 } from '@mui/material'
 import { DataGrid, GridColDef } from '@mui/x-data-grid'
 import {
@@ -36,6 +43,8 @@ import {
   Home as HomeIcon,
   History as HistoryIcon,
   PersonAdd as ReferralIcon,
+  InsertDriveFile as FileIcon,
+  Delete as DeleteFileIcon,
 } from '@mui/icons-material'
 import { useForm, Controller } from 'react-hook-form'
 import { Client, PaginatedResponse, Application } from '../shared/types'
@@ -229,6 +238,15 @@ const ClientList = () => {
           paginationMode="server"
           checkboxSelection
           disableRowSelectionOnClick
+          onRowClick={(params) => navigate(`/clients/${params.row.id}`)}
+          sx={{
+            '& .MuiDataGrid-row': {
+              cursor: 'pointer',
+            },
+            '& .MuiDataGrid-row:hover': {
+              backgroundColor: 'rgba(0, 0, 0, 0.04)',
+            },
+          }}
         />
       </Paper>
 
@@ -251,14 +269,18 @@ const ClientList = () => {
 // Client Form Component
 const ClientForm = () => {
   const navigate = useNavigate()
+  const { id } = useParams<{ id: string }>()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [clients, setClients] = useState<Client[]>([])
-  const { control, handleSubmit, formState: { errors } } = useForm<Client>()
+  const { control, handleSubmit, setValue, formState: { errors } } = useForm<Client>()
 
   useEffect(() => {
     fetchClients()
-  }, [])
+    if (id) {
+      fetchClientDetails()
+    }
+  }, [id])
 
   const fetchClients = async () => {
     try {
@@ -270,13 +292,34 @@ const ClientForm = () => {
     }
   }
 
+  const fetchClientDetails = async () => {
+    try {
+      const response = await api.get<Client>(`/clients/${id}`)
+      const client = response.data
+      // Set form values for editing
+      setValue('name', client.name)
+      setValue('phone', client.phone)
+      setValue('address', client.address || '')
+      setValue('notes', client.notes || '')
+      setValue('referredByClient', client.referredByClient || '')
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to fetch client details')
+    }
+  }
+
   const onSubmit = async (data: any) => {
     try {
       setLoading(true)
-      await api.post('/clients', data)
+      if (id) {
+        // Update existing client
+        await api.patch(`/clients/${id}`, data)
+      } else {
+        // Create new client
+        await api.post('/clients', data)
+      }
       navigate('/clients')
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create client')
+      setError(err.response?.data?.error || `Failed to ${id ? 'update' : 'create'} client`)
     } finally {
       setLoading(false)
     }
@@ -285,7 +328,7 @@ const ClientForm = () => {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">New Client</Typography>
+        <Typography variant="h4">{id ? 'Edit Client' : 'New Client'}</Typography>
         <Button variant="outlined" onClick={() => navigate('/clients')}>
           Back to List
         </Button>
@@ -386,7 +429,7 @@ const ClientForm = () => {
                   Cancel
                 </Button>
                 <Button type="submit" variant="contained" disabled={loading}>
-                  {loading ? 'Creating...' : 'Create Client'}
+                  {loading ? (id ? 'Updating...' : 'Creating...') : (id ? 'Update Client' : 'Create Client')}
                 </Button>
               </Box>
             </Grid>
@@ -402,14 +445,20 @@ const ClientDetails = () => {
   const navigate = useNavigate()
   const [client, setClient] = useState<Client | null>(null)
   const [applications, setApplications] = useState<Application[]>([])
+  const [uploadedFiles, setUploadedFiles] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [uploadDialog, setUploadDialog] = useState(false)
+  const [uploadType, setUploadType] = useState<'id' | 'custom1' | 'custom2'>('id')
+  const [customDocName, setCustomDocName] = useState('')
+  const [uploading, setUploading] = useState(false)
   const clientId = window.location.pathname.split('/').pop()
 
   useEffect(() => {
     if (clientId && clientId !== 'new' && !clientId.includes('edit')) {
       fetchClientDetails()
       fetchClientApplications()
+      fetchUploadedFiles()
     }
   }, [clientId])
 
@@ -437,6 +486,60 @@ const ClientDetails = () => {
     }
   }
 
+  const fetchUploadedFiles = async () => {
+    try {
+      const response = await api.get(`/files?entityType=client&entityId=${clientId}`)
+      setUploadedFiles(response.data || [])
+    } catch (err) {
+      console.error('Failed to fetch uploaded files:', err)
+      setUploadedFiles([])
+    }
+  }
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setError('File size should be less than 10MB')
+      return
+    }
+
+    try {
+      setUploading(true)
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('entityType', 'client')
+      formData.append('entityId', clientId || '')
+      
+      // Add custom document name as metadata if provided
+      const docName = uploadType === 'id' ? 'Client ID' : 
+                     uploadType === 'custom1' ? (customDocName || 'Custom Document 1') :
+                     (customDocName || 'Custom Document 2')
+      formData.append('documentName', docName)
+
+      await api.post('/files/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+
+      // Refresh uploaded files list
+      await fetchUploadedFiles()
+      
+      // Close dialog and reset
+      setUploadDialog(false)
+      setCustomDocName('')
+      event.target.value = ''
+    } catch (err: any) {
+      console.error('File upload error:', err)
+      setError(err.response?.data?.error || 'Failed to upload document')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   if (loading) return <Box>Loading...</Box>
   if (error) return <Alert severity="error">{error}</Alert>
   if (!client) return <Alert severity="info">Client not found</Alert>
@@ -458,6 +561,8 @@ const ClientDetails = () => {
           </Button>
         </Box>
       </Box>
+
+      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
@@ -537,7 +642,108 @@ const ClientDetails = () => {
             </CardContent>
           </Card>
         </Grid>
+
+        <Grid item xs={12}>
+          <Card>
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6" gutterBottom>
+                  <FileIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+                  Documents
+                </Typography>
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<UploadIcon />}
+                  onClick={() => setUploadDialog(true)}
+                >
+                  Upload Document
+                </Button>
+              </Box>
+              
+              {uploadedFiles.length === 0 ? (
+                <Typography color="textSecondary">No documents uploaded yet</Typography>
+              ) : (
+                <List>
+                  {uploadedFiles.map((file) => (
+                    <ListItem key={file.id}>
+                      <ListItemIcon>
+                        <FileIcon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={file.originalName}
+                        secondary={`Uploaded on ${new Date(file.uploadedAt).toLocaleDateString()} by ${file.uploadedBy}`}
+                      />
+                      <ListItemSecondaryAction>
+                        <IconButton
+                          size="small"
+                          component="a"
+                          href={file.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <DownloadIcon />
+                        </IconButton>
+                      </ListItemSecondaryAction>
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
+
+      {/* Upload Dialog */}
+      <Dialog open={uploadDialog} onClose={() => setUploadDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Upload Document</DialogTitle>
+        <DialogContent>
+          <FormControl fullWidth sx={{ mt: 2, mb: 2 }}>
+            <InputLabel>Document Type</InputLabel>
+            <Select
+              value={uploadType}
+              onChange={(e) => setUploadType(e.target.value as 'id' | 'custom1' | 'custom2')}
+            >
+              <MenuItem value="id">Client ID</MenuItem>
+              <MenuItem value="custom1">Custom Document 1</MenuItem>
+              <MenuItem value="custom2">Custom Document 2</MenuItem>
+            </Select>
+          </FormControl>
+          
+          {(uploadType === 'custom1' || uploadType === 'custom2') && (
+            <TextField
+              fullWidth
+              label="Document Name"
+              value={customDocName}
+              onChange={(e) => setCustomDocName(e.target.value)}
+              placeholder="Enter document name"
+              sx={{ mb: 2 }}
+            />
+          )}
+          
+          <input
+            type="file"
+            id="client-file-upload"
+            style={{ display: 'none' }}
+            onChange={handleFileUpload}
+            accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+          />
+          <label htmlFor="client-file-upload">
+            <Button
+              variant="outlined"
+              component="span"
+              fullWidth
+              disabled={uploading}
+              startIcon={uploading ? <CircularProgress size={20} /> : <UploadIcon />}
+            >
+              {uploading ? 'Uploading...' : 'Select File'}
+            </Button>
+          </label>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setUploadDialog(false)} disabled={uploading}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }
