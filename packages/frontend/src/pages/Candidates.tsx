@@ -32,6 +32,8 @@ import {
   Tabs,
   Tab,
   CardActionArea,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material'
 import { DataGrid, GridColDef } from '@mui/x-data-grid'
 import {
@@ -48,6 +50,9 @@ import {
   Person as PersonIcon,
   Work as WorkIcon,
   Language as LanguageIcon,
+  Clear as ClearIcon,
+  Face as FaceIcon,
+  Accessibility as BodyIcon,
 } from '@mui/icons-material'
 import { useForm, Controller } from 'react-hook-form'
 import { Candidate, CandidateStatus, Agent, PaginatedResponse } from '../shared/types'
@@ -98,7 +103,7 @@ const CandidateCard = ({ candidate, onView, onEdit, onDelete, onExportPdf }: any
         <CardHeader
           avatar={
             <Avatar
-              src={candidate.photoUrl}
+              src={candidate.facePhotoUrl || candidate.photoUrl}
               sx={{ width: 56, height: 56 }}
             >
               {candidate.firstName?.[0]}{candidate.lastName?.[0]}
@@ -185,28 +190,26 @@ const CandidateList = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
-  const [nationalities, setNationalities] = useState<string[]>([])
+  const [nationalities, setNationalities] = useState<any[]>([])
   const [selectedTab, setSelectedTab] = useState('all')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(24)
   const [totalRows, setTotalRows] = useState(0)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [statusFilter, setStatusFilter] = useState<CandidateStatus[]>([
+    CandidateStatus.AVAILABLE_ABROAD,
+    CandidateStatus.AVAILABLE_IN_LEBANON,
+    CandidateStatus.RESERVED
+  ])
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; candidate: Candidate | null }>({
     open: false,
     candidate: null,
   })
 
-  // Initial filter - only available statuses
-  const initialStatuses = [
-    CandidateStatus.AVAILABLE_ABROAD,
-    CandidateStatus.AVAILABLE_IN_LEBANON,
-    CandidateStatus.RESERVED
-  ]
-
   useEffect(() => {
     fetchCandidates()
     fetchNationalities()
-  }, [page, pageSize, selectedTab])
+  }, [page, pageSize, selectedTab, statusFilter])
 
   const fetchCandidates = async () => {
     try {
@@ -223,8 +226,8 @@ const CandidateList = () => {
         params.append('nationality', selectedTab)
       }
       
-      // Apply initial status filter - only available candidates by default
-      initialStatuses.forEach(status => {
+      // Apply status filter
+      statusFilter.forEach(status => {
         params.append('status', status)
       })
 
@@ -240,14 +243,10 @@ const CandidateList = () => {
 
   const fetchNationalities = async () => {
     try {
-      const response = await api.get<string[]>('/settings/nationalities')
+      const response = await api.get('/nationalities')
       setNationalities(response.data || [])
     } catch (err) {
       console.error('Failed to fetch nationalities:', err)
-      setNationalities([
-        'Ethiopian', 'Filipino', 'Sri Lankan', 'Bangladeshi', 'Kenyan',
-        'Nigerian', 'Ugandan', 'Ghanaian', 'Nepalese', 'Indian'
-      ])
     }
   }
 
@@ -273,6 +272,16 @@ const CandidateList = () => {
     setPage(0)
   }
 
+  const handleStatusFilterChange = (status: CandidateStatus) => {
+    setStatusFilter(prev => {
+      if (prev.includes(status)) {
+        return prev.filter(s => s !== status)
+      } else {
+        return [...prev, status]
+      }
+    })
+  }
+
   const handleExportPdf = async (candidate: Candidate) => {
     try {
       const response = await api.get(`/candidates/${candidate.id}/export-pdf`, {
@@ -293,32 +302,17 @@ const CandidateList = () => {
     }
   }
 
-  const handleExportAllCsv = async () => {
-    try {
-      const response = await api.get('/candidates/export', {
-        responseType: 'blob'
-      })
-      
-      const url = window.URL.createObjectURL(new Blob([response.data]))
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', 'candidates.csv')
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
-    } catch (err) {
-      console.error('Failed to export CSV:', err)
-      setError('Failed to export candidates as CSV')
-    }
-  }
-
-  // Count candidates by nationality
+  // Count candidates by nationality - only show tabs with candidates
   const candidateCountByNationality = candidates.reduce((acc, candidate) => {
     const nat = candidate.nationality || 'Other'
     acc[nat] = (acc[nat] || 0) + 1
     return acc
   }, {} as Record<string, number>)
+
+  // Filter nationalities to only show those with candidates
+  const nationalitiesWithCandidates = nationalities.filter(nat => 
+    candidateCountByNationality[nat.name] > 0
+  )
 
   const columns: GridColDef[] = [
     {
@@ -327,7 +321,7 @@ const CandidateList = () => {
       width: 60,
       renderCell: (params) => (
         <Avatar 
-          src={params.row.photoUrl} 
+          src={params.row.facePhotoUrl || params.row.photoUrl} 
           alt={`${params.row.firstName} ${params.row.lastName}`}
           sx={{ width: 32, height: 32 }}
         >
@@ -417,11 +411,6 @@ const CandidateList = () => {
           >
             List View
           </Button>
-          <Tooltip title="Export all as CSV">
-            <IconButton color="primary" onClick={handleExportAllCsv}>
-              <DownloadIcon />
-            </IconButton>
-          </Tooltip>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
@@ -434,11 +423,11 @@ const CandidateList = () => {
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
-      {/* Search Bar */}
+      {/* Search and Filter Bar */}
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Box display="flex" gap={2} alignItems="center">
+        <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
           <TextField
-            fullWidth
+            sx={{ flex: 1, minWidth: 300 }}
             size="small"
             placeholder="Search by name..."
             value={searchTerm}
@@ -454,13 +443,25 @@ const CandidateList = () => {
               ),
             }}
           />
-          <Button variant="contained" onClick={handleSearch}>
-            Search
-          </Button>
+          
+          {/* Status Filter Chips */}
+          <Box display="flex" gap={1} alignItems="center">
+            <Typography variant="body2" color="text.secondary">Status:</Typography>
+            {Object.values(CandidateStatus).map(status => (
+              <Chip
+                key={status}
+                label={status.replace(/_/g, ' ')}
+                color={statusFilter.includes(status) ? getStatusColor(status) : 'default'}
+                variant={statusFilter.includes(status) ? 'filled' : 'outlined'}
+                onClick={() => handleStatusFilterChange(status)}
+                size="small"
+              />
+            ))}
+          </Box>
         </Box>
       </Paper>
 
-      {/* Nationality Tabs */}
+      {/* Nationality Tabs - Only show tabs with candidates */}
       <Paper sx={{ mb: 2 }}>
         <Tabs
           value={selectedTab}
@@ -473,11 +474,11 @@ const CandidateList = () => {
             label={`All (${totalRows})`} 
             value="all" 
           />
-          {nationalities.map((nationality) => (
+          {nationalitiesWithCandidates.map((nationality) => (
             <Tab
-              key={nationality}
-              label={`${nationality} (${candidateCountByNationality[nationality] || 0})`}
-              value={nationality}
+              key={nationality.id}
+              label={`${nationality.name} (${candidateCountByNationality[nationality.name] || 0})`}
+              value={nationality.name}
             />
           ))}
         </Tabs>
@@ -549,18 +550,20 @@ const CandidateList = () => {
   )
 }
 
-// Enhanced Candidate Form Component with Photo Upload
+// Enhanced Candidate Form Component with Two Photo Uploads
 const CandidateForm = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const facePhotoRef = useRef<HTMLInputElement>(null)
+  const bodyPhotoRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [agents, setAgents] = useState<Agent[]>([])
-  const [nationalities, setNationalities] = useState<string[]>([])
+  const [nationalities, setNationalities] = useState<any[]>([])
   const [isEditMode, setIsEditMode] = useState(false)
   const [candidateId, setCandidateId] = useState<string | null>(null)
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [facePhotoPreview, setFacePhotoPreview] = useState<string | null>(null)
+  const [bodyPhotoPreview, setBodyPhotoPreview] = useState<string | null>(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const { control, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<any>()
 
@@ -594,14 +597,19 @@ const CandidateForm = () => {
         education: candidate.education || '',
         experienceSummary: candidate.experienceSummary || '',
         photoUrl: candidate.photoUrl || '',
+        facePhotoUrl: candidate.facePhotoUrl || '',
+        fullBodyPhotoUrl: candidate.fullBodyPhotoUrl || '',
         agentId: candidate.agentId || '',
         skills: Array.isArray(candidate.skills) ? candidate.skills.join(', ') : '',
         dateOfBirth: candidate.dateOfBirth ? new Date(candidate.dateOfBirth).toISOString().split('T')[0] : '',
       }
       
-      // Set photo preview if exists
-      if (candidate.photoUrl) {
-        setPhotoPreview(candidate.photoUrl)
+      // Set photo previews if exist
+      if (candidate.facePhotoUrl) {
+        setFacePhotoPreview(candidate.facePhotoUrl)
+      }
+      if (candidate.fullBodyPhotoUrl) {
+        setBodyPhotoPreview(candidate.fullBodyPhotoUrl)
       }
       
       // Explicitly set all form values
@@ -628,18 +636,15 @@ const CandidateForm = () => {
 
   const fetchNationalities = async () => {
     try {
-      const response = await api.get<string[]>('/settings/nationalities')
-      setNationalities(response.data || [])
+      const response = await api.get('/nationalities')
+      const activeNationalities = response.data?.filter((n: any) => n.active) || []
+      setNationalities(activeNationalities)
     } catch (err) {
       console.error('Failed to fetch nationalities:', err)
-      setNationalities([
-        'Ethiopian', 'Filipino', 'Sri Lankan', 'Bangladeshi', 'Kenyan',
-        'Nigerian', 'Ugandan', 'Ghanaian', 'Nepalese', 'Indian'
-      ])
     }
   }
 
-  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: 'face' | 'body') => {
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -656,16 +661,55 @@ const CandidateForm = () => {
     try {
       setUploadingPhoto(true)
       
-      // For now, just create a local preview
+      // Create a local preview immediately
       const previewUrl = URL.createObjectURL(file)
-      setPhotoPreview(previewUrl)
-      setValue('photoUrl', previewUrl)
       
-      // TODO: Implement actual file upload to server
+      // Show preview immediately
+      if (type === 'face') {
+        setFacePhotoPreview(previewUrl)
+      } else {
+        setBodyPhotoPreview(previewUrl)
+      }
+      
+      // Upload to server
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('entityType', 'candidate')
+      formData.append('entityId', candidateId || 'temp')
+      formData.append('documentType', type === 'face' ? 'face-photo' : 'body-photo')
+      
+      try {
+        const response = await api.post('/files/upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        })
+        
+        // Update form and preview with server URL
+        if (type === 'face') {
+          setFacePhotoPreview(response.data.url)
+          setValue('facePhotoUrl', response.data.url)
+        } else {
+          setBodyPhotoPreview(response.data.url)
+          setValue('fullBodyPhotoUrl', response.data.url)
+        }
+      } catch (uploadErr: any) {
+        // If upload fails, keep the local preview but warn user
+        console.error('Photo upload to server failed:', uploadErr)
+        // Store the file locally for retry on form submit
+        if (type === 'face') {
+          setValue('facePhotoFile', file)
+        } else {
+          setValue('bodyPhotoFile', file)
+        }
+      }
+      
+      // Clean up the local preview URL later
+      setTimeout(() => URL.revokeObjectURL(previewUrl), 100)
       
     } catch (err: any) {
       console.error('Photo upload error:', err)
-      setError('Failed to upload photo')
+      setError('Failed to process photo')
     } finally {
       setUploadingPhoto(false)
     }
@@ -685,6 +729,8 @@ const CandidateForm = () => {
         education: data.education || null,
         experienceSummary: data.experienceSummary || null,
         photoUrl: data.photoUrl || null,
+        facePhotoUrl: data.facePhotoUrl || null,
+        fullBodyPhotoUrl: data.fullBodyPhotoUrl || null,
         dateOfBirth: data.dateOfBirth || null,
       }
       
@@ -699,9 +745,9 @@ const CandidateForm = () => {
         submitData.skills = []
       }
       
-      // Handle agentId - only for super admin
-      if (user?.role === 'SUPER_ADMIN') {
-        submitData.agentId = data.agentId || null
+      // Handle agentId - optional, can be null
+      if (user?.role === 'SUPER_ADMIN' && data.agentId) {
+        submitData.agentId = data.agentId
       }
       
       if (isEditMode && candidateId) {
@@ -735,31 +781,82 @@ const CandidateForm = () => {
           <Grid container spacing={3}>
             {/* Photo Upload Section */}
             <Grid item xs={12} md={3}>
-              <Box textAlign="center">
+              <Typography variant="h6" gutterBottom>Photos</Typography>
+              
+              {/* Face Photo */}
+              <Box textAlign="center" mb={2}>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  <FaceIcon sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+                  Face Photo
+                </Typography>
                 <Avatar
-                  src={photoPreview || ''}
-                  sx={{ width: 150, height: 150, mx: 'auto', mb: 2 }}
+                  src={facePhotoPreview || ''}
+                  sx={{ width: 120, height: 120, mx: 'auto', mb: 1 }}
                 >
-                  {!photoPreview && <PhotoCameraIcon sx={{ fontSize: 60 }} />}
+                  {!facePhotoPreview && <FaceIcon sx={{ fontSize: 40 }} />}
                 </Avatar>
                 <input
                   type="file"
-                  ref={fileInputRef}
+                  ref={facePhotoRef}
                   style={{ display: 'none' }}
                   accept="image/*"
-                  onChange={handlePhotoUpload}
+                  onChange={(e) => handlePhotoUpload(e, 'face')}
                 />
                 <Button
                   variant="outlined"
+                  size="small"
                   startIcon={<PhotoCameraIcon />}
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => facePhotoRef.current?.click()}
                   disabled={uploadingPhoto}
                   fullWidth
                 >
-                  {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
+                  Upload Face
                 </Button>
                 <Controller
-                  name="photoUrl"
+                  name="facePhotoUrl"
+                  control={control}
+                  defaultValue=""
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      type="hidden"
+                    />
+                  )}
+                />
+              </Box>
+
+              {/* Full Body Photo */}
+              <Box textAlign="center">
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  <BodyIcon sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+                  Full Body Photo
+                </Typography>
+                <Avatar
+                  src={bodyPhotoPreview || ''}
+                  variant="rounded"
+                  sx={{ width: 120, height: 160, mx: 'auto', mb: 1 }}
+                >
+                  {!bodyPhotoPreview && <BodyIcon sx={{ fontSize: 40 }} />}
+                </Avatar>
+                <input
+                  type="file"
+                  ref={bodyPhotoRef}
+                  style={{ display: 'none' }}
+                  accept="image/*"
+                  onChange={(e) => handlePhotoUpload(e, 'body')}
+                />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<PhotoCameraIcon />}
+                  onClick={() => bodyPhotoRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  fullWidth
+                >
+                  Upload Body
+                </Button>
+                <Controller
+                  name="fullBodyPhotoUrl"
                   control={control}
                   defaultValue=""
                   render={({ field }) => (
@@ -827,8 +924,8 @@ const CandidateForm = () => {
                       >
                         <MenuItem value="">Select nationality</MenuItem>
                         {nationalities.map((nationality) => (
-                          <MenuItem key={nationality} value={nationality}>
-                            {nationality}
+                          <MenuItem key={nationality.id} value={nationality.name}>
+                            {nationality.name}
                           </MenuItem>
                         ))}
                       </TextField>
@@ -886,7 +983,7 @@ const CandidateForm = () => {
                           {...field}
                           fullWidth
                           select
-                          label="Agent"
+                          label="Agent (Optional)"
                           value={field.value || ''}
                         >
                           <MenuItem value="">None</MenuItem>
@@ -1062,13 +1159,26 @@ const CandidateDetails = () => {
       <Grid container spacing={3}>
         <Grid item xs={12} md={4}>
           <Card>
+            {/* Display both photos if available */}
             <CardMedia
               component="img"
-              height="300"
-              image={candidate.photoUrl || '/placeholder-avatar.jpg'}
-              alt={`${candidate.firstName} ${candidate.lastName}`}
+              height="250"
+              image={candidate.facePhotoUrl || candidate.photoUrl || '/placeholder-avatar.jpg'}
+              alt={`${candidate.firstName} ${candidate.lastName} - Face`}
               sx={{ objectFit: 'cover' }}
             />
+            {candidate.fullBodyPhotoUrl && (
+              <>
+                <Divider />
+                <CardMedia
+                  component="img"
+                  height="300"
+                  image={candidate.fullBodyPhotoUrl}
+                  alt={`${candidate.firstName} ${candidate.lastName} - Full Body`}
+                  sx={{ objectFit: 'cover' }}
+                />
+              </>
+            )}
             <CardContent>
               <Typography variant="h5" gutterBottom>
                 {candidate.firstName} {candidate.lastName}

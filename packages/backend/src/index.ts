@@ -23,6 +23,8 @@ import publicRouter from './routes/public.routes';
 import documentItemRouter from './routes/documentItem.routes';
 import documentTemplateRouter from './routes/documentTemplate.routes';
 import fileRouter from './routes/file.routes';
+import nationalitiesRouter from './routes/nationalities.routes';
+import companyRouter from './routes/company.routes';
 
 // Import middleware
 import { errorHandler } from './middleware/error.middleware';
@@ -107,6 +109,8 @@ app.use('/api/public', publicRouter); // For client shareable links
 app.use('/api/document-items', documentItemRouter);
 app.use('/api/document-templates', documentTemplateRouter);
 app.use('/api/files', fileRouter);
+app.use('/api/nationalities', nationalitiesRouter);
+app.use('/api/company', companyRouter);
 
 // Error handling middleware
 app.use(notFound);

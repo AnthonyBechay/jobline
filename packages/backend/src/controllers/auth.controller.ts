@@ -21,7 +21,15 @@ const generateToken = (user: { id: string; name: string; email: string; role: Us
 // Register - creates a new company/office with Super Admin
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, email, password, companyName } = req.body;
+    const { 
+      name, 
+      email, 
+      password, 
+      companyName,
+      companyPhone,
+      companyAddress,
+      companyEmail
+    } = req.body;
 
     // Validate required fields
     if (!name || !email || !password || !companyName) {
@@ -47,27 +55,38 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     // Create company and user in a transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Create the company/office
+      // Create the company/office with details
       const company = await tx.company.create({
         data: {
           name: companyName,
+          phone: companyPhone || null,
+          address: companyAddress || null,
+          email: companyEmail || null,
         },
       });
       
-      // Create company info setting
-      await tx.setting.create({
-        data: {
-          key: 'company_info',
-          value: { 
-            name: companyName,
-            phone: '',
-            address: '',
-            email: email
+      // Create nationalities setting
+      const defaultNationalities = [
+        { code: 'ET', name: 'Ethiopia', active: true },
+        { code: 'KE', name: 'Kenya', active: true },
+        { code: 'UG', name: 'Uganda', active: true },
+        { code: 'PH', name: 'Philippines', active: true },
+        { code: 'BD', name: 'Bangladesh', active: true },
+        { code: 'LK', name: 'Sri Lanka', active: true },
+        { code: 'IN', name: 'India', active: true },
+        { code: 'NP', name: 'Nepal', active: true },
+        { code: 'SY', name: 'Syria', active: true },
+        { code: 'EG', name: 'Egypt', active: true },
+      ];
+      
+      for (const nationality of defaultNationalities) {
+        await tx.nationality.create({
+          data: {
+            ...nationality,
+            companyId: company.id,
           },
-          description: 'Company information and settings',
-          companyId: company.id,
-        },
-      });
+        });
+      }
 
       // Create the super admin user
       const user = await tx.user.create({
@@ -158,7 +177,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 // Login
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password } = req.body;
+    const { email, password, companyName } = req.body;
 
     // Find user with company
     const user = await prisma.user.findUnique({
@@ -168,6 +187,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     if (!user) {
       res.status(401).json({ error: 'Invalid email or password' });
+      return;
+    }
+
+    // Verify company name matches
+    if (user.company.name.toLowerCase() !== companyName.toLowerCase()) {
+      res.status(401).json({ error: 'Invalid company name for this user' });
       return;
     }
 

@@ -2,11 +2,17 @@ import PDFDocument from 'pdfkit';
 import { Candidate } from '@prisma/client';
 
 export async function generateCandidatePDF(candidate: any): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     try {
       const doc = new PDFDocument({
         size: 'A4',
-        margin: 50
+        margin: 50,
+        info: {
+          Title: `${candidate.firstName} ${candidate.lastName} - Candidate Profile`,
+          Author: 'Jobline Recruitment Platform',
+          Subject: 'Candidate Profile',
+          Keywords: 'recruitment, candidate, profile'
+        }
       });
       
       const buffers: Buffer[] = [];
@@ -16,159 +22,276 @@ export async function generateCandidatePDF(candidate: any): Promise<Buffer> {
         resolve(pdfData);
       });
       
-      // Header with candidate name
-      doc.fontSize(24)
-         .font('Helvetica-Bold')
-         .text(`${candidate.firstName} ${candidate.lastName}`, 50, 50);
+      // Header section with photo placeholder
+      let yPosition = 50;
       
-      // Status badge
-      doc.fontSize(12)
-         .font('Helvetica')
-         .fillColor(getStatusColor(candidate.status))
-         .text(candidate.status.replace(/_/g, ' '), 50, 85)
+      // Add photo placeholder (in production, you'd fetch and embed actual images)
+      if (candidate.facePhotoUrl || candidate.photoUrl) {
+        // Draw photo frame
+        doc.rect(450, 50, 100, 120)
+           .stroke('#cccccc');
+        
+        // Add photo placeholder text
+        doc.fontSize(10)
+           .fillColor('#999999')
+           .text('Face Photo', 465, 105, { width: 70, align: 'center' })
+           .fillColor('black');
+      }
+      
+      // If full body photo exists, add second frame
+      if (candidate.fullBodyPhotoUrl) {
+        doc.rect(450, 180, 100, 140)
+           .stroke('#cccccc');
+        
+        doc.fontSize(10)
+           .fillColor('#999999')
+           .text('Full Body', 465, 245, { width: 70, align: 'center' })
+           .fillColor('black');
+      }
+      
+      // Candidate name
+      doc.fontSize(26)
+         .font('Helvetica-Bold')
+         .fillColor('#1e3a5f')
+         .text(`${candidate.firstName} ${candidate.lastName}`, 50, yPosition)
          .fillColor('black');
+      
+      yPosition += 40;
+      
+      // Status badge with better styling
+      const statusText = candidate.status.replace(/_/g, ' ').toUpperCase();
+      const statusColor = getStatusColor(candidate.status);
+      
+      doc.fontSize(11)
+         .font('Helvetica-Bold')
+         .fillColor(statusColor)
+         .text(statusText, 50, yPosition)
+         .fillColor('black');
+      
+      yPosition += 20;
       
       // Candidate ID
       doc.fontSize(10)
+         .font('Helvetica')
          .fillColor('#666666')
-         .text(`ID: ${candidate.id.substring(0, 8)}`, 50, 105)
+         .text(`ID: ${candidate.id.substring(0, 8).toUpperCase()}`, 50, yPosition)
          .fillColor('black');
       
-      // Add a line separator
-      doc.moveTo(50, 130)
-         .lineTo(550, 130)
-         .stroke();
+      yPosition += 30;
+      
+      // Separator line
+      doc.moveTo(50, yPosition)
+         .lineTo(400, yPosition)
+         .stroke('#e0e0e0');
+      
+      yPosition += 25;
       
       // Personal Information Section
       doc.fontSize(16)
          .font('Helvetica-Bold')
-         .text('Personal Information', 50, 150);
-      
-      doc.fontSize(12)
-         .font('Helvetica');
-      
-      let yPosition = 180;
-      const lineHeight = 25;
-      
-      // Add personal details
-      addInfoRow(doc, 'Nationality:', candidate.nationality || 'Not specified', 50, yPosition);
-      yPosition += lineHeight;
-      
-      addInfoRow(doc, 'Date of Birth:', 
-        candidate.dateOfBirth ? new Date(candidate.dateOfBirth).toLocaleDateString() : 'Not specified', 
-        50, yPosition);
-      yPosition += lineHeight;
-      
-      if (candidate.dateOfBirth) {
-        addInfoRow(doc, 'Age:', `${calculateAge(new Date(candidate.dateOfBirth))} years`, 50, yPosition);
-        yPosition += lineHeight;
-      }
-      
-      addInfoRow(doc, 'Education:', candidate.education || 'Not specified', 50, yPosition);
-      yPosition += lineHeight;
-      
-      if (candidate.agent) {
-        addInfoRow(doc, 'Agent:', candidate.agent.name, 50, yPosition);
-        yPosition += lineHeight;
-      }
-      
-      // Skills Section
-      yPosition += 20;
-      doc.fontSize(16)
-         .font('Helvetica-Bold')
-         .text('Skills & Expertise', 50, yPosition);
+         .fillColor('#1e3a5f')
+         .text('Personal Information', 50, yPosition)
+         .fillColor('black');
       
       yPosition += 30;
-      doc.fontSize(12)
-         .font('Helvetica');
+      
+      // Create two-column layout for personal info
+      const leftColumnX = 50;
+      const rightColumnX = 300;
+      let leftY = yPosition;
+      let rightY = yPosition;
+      
+      // Left column
+      doc.fontSize(11);
+      
+      addInfoField(doc, 'Nationality', candidate.nationality || 'Not specified', leftColumnX, leftY);
+      leftY += 35;
+      
+      addInfoField(doc, 'Date of Birth', 
+        candidate.dateOfBirth ? new Date(candidate.dateOfBirth).toLocaleDateString() : 'Not specified', 
+        leftColumnX, leftY);
+      leftY += 35;
+      
+      if (candidate.dateOfBirth) {
+        addInfoField(doc, 'Age', `${calculateAge(new Date(candidate.dateOfBirth))} years`, leftColumnX, leftY);
+        leftY += 35;
+      }
+      
+      // Right column
+      addInfoField(doc, 'Education', candidate.education || 'Not specified', rightColumnX, rightY);
+      rightY += 35;
+      
+      if (candidate.agent) {
+        addInfoField(doc, 'Agent', candidate.agent.name, rightColumnX, rightY);
+        rightY += 35;
+      }
+      
+      yPosition = Math.max(leftY, rightY) + 20;
+      
+      // Skills Section
+      doc.fontSize(16)
+         .font('Helvetica-Bold')
+         .fillColor('#1e3a5f')
+         .text('Skills & Expertise', 50, yPosition)
+         .fillColor('black');
+      
+      yPosition += 25;
       
       if (candidate.skills && candidate.skills.length > 0) {
-        const skillsText = candidate.skills.join(', ');
-        doc.text(skillsText, 50, yPosition, {
-          width: 500,
-          align: 'left'
+        // Draw skill chips
+        let xPos = 50;
+        let lineY = yPosition;
+        const chipHeight = 25;
+        const chipPadding = 10;
+        
+        doc.fontSize(10).font('Helvetica');
+        
+        candidate.skills.forEach((skill: string) => {
+          const skillWidth = doc.widthOfString(skill) + chipPadding * 2;
+          
+          // Check if we need to wrap to next line
+          if (xPos + skillWidth > 550) {
+            xPos = 50;
+            lineY += chipHeight + 5;
+          }
+          
+          // Draw skill chip
+          doc.roundedRect(xPos, lineY, skillWidth, chipHeight, 12)
+             .stroke('#4a6fa5');
+          
+          doc.fillColor('#4a6fa5')
+             .text(skill, xPos + chipPadding, lineY + 7)
+             .fillColor('black');
+          
+          xPos += skillWidth + 5;
         });
-        yPosition += 40;
+        
+        yPosition = lineY + chipHeight + 20;
       } else {
-        doc.fillColor('#999999')
+        doc.fontSize(11)
+           .font('Helvetica')
+           .fillColor('#999999')
            .text('No skills listed', 50, yPosition)
            .fillColor('black');
         yPosition += 25;
       }
       
       // Experience Summary Section
-      yPosition += 20;
+      yPosition += 15;
       doc.fontSize(16)
          .font('Helvetica-Bold')
-         .text('Experience Summary', 50, yPosition);
+         .fillColor('#1e3a5f')
+         .text('Experience Summary', 50, yPosition)
+         .fillColor('black');
       
-      yPosition += 30;
-      doc.fontSize(12)
+      yPosition += 25;
+      
+      doc.fontSize(11)
          .font('Helvetica')
          .text(candidate.experienceSummary || 'No experience summary provided.', 50, yPosition, {
            width: 500,
-           align: 'left'
+           align: 'justify',
+           lineGap: 3
          });
+      
+      yPosition += doc.heightOfString(candidate.experienceSummary || 'No experience summary provided.', {
+        width: 500
+      }) + 30;
       
       // Employment History Section (if available)
       if (candidate.applications && candidate.applications.length > 0) {
-        yPosition += 60;
-        
         // Check if we need a new page
-        if (yPosition > 650) {
+        if (yPosition > 600) {
           doc.addPage();
           yPosition = 50;
         }
         
         doc.fontSize(16)
            .font('Helvetica-Bold')
-           .text('Employment History', 50, yPosition);
+           .fillColor('#1e3a5f')
+           .text('Employment History', 50, yPosition)
+           .fillColor('black');
         
-        yPosition += 30;
-        doc.fontSize(12)
-           .font('Helvetica');
+        yPosition += 25;
         
-        candidate.applications.forEach((app: any) => {
+        candidate.applications.forEach((app: any, index: number) => {
           if (yPosition > 700) {
             doc.addPage();
             yPosition = 50;
           }
           
-          doc.font('Helvetica-Bold')
-             .text(app.client?.name || 'Unknown Client', 50, yPosition);
+          // Draw timeline marker
+          doc.circle(45, yPosition + 5, 3)
+             .fillAndStroke('#4a6fa5', '#4a6fa5');
           
-          doc.font('Helvetica')
-             .fontSize(10)
+          // Draw connecting line (except for last item)
+          if (index < candidate.applications.length - 1) {
+            doc.moveTo(45, yPosition + 8)
+               .lineTo(45, yPosition + 45)
+               .stroke('#cccccc');
+          }
+          
+          // Employment details
+          doc.fontSize(12)
+             .font('Helvetica-Bold')
+             .fillColor('#333333')
+             .text(app.client?.name || 'Unknown Client', 60, yPosition)
+             .fillColor('black');
+          
+          doc.fontSize(10)
+             .font('Helvetica')
              .fillColor('#666666')
              .text(
                `${new Date(app.createdAt).toLocaleDateString()} - ${
                  app.status === 'ACTIVE_EMPLOYMENT' ? 'Present' : new Date(app.updatedAt).toLocaleDateString()
                }`,
-               50,
+               60,
                yPosition + 15
-             )
+             );
+          
+          // Status
+          doc.fontSize(9)
+             .fillColor(getStatusColor(app.status))
+             .text(app.status.replace(/_/g, ' '), 60, yPosition + 28)
              .fillColor('black');
           
-          yPosition += 40;
+          yPosition += 50;
         });
       }
       
-      // Footer
-      const pageHeight = doc.page.height;
-      doc.fontSize(10)
-         .fillColor('#888888')
-         .text(
-           `Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`,
-           50,
-           pageHeight - 100,
-           { align: 'center', width: 500 }
-         )
-         .text(
-           `© ${new Date().getFullYear()} Jobline Recruitment Platform - Confidential`,
-           50,
-           pageHeight - 80,
-           { align: 'center', width: 500 }
-         );
+      // Footer on every page
+      const pages = doc.bufferedPageRange();
+      for (let i = 0; i < pages.count; i++) {
+        doc.switchToPage(i);
+        
+        // Footer line
+        doc.moveTo(50, doc.page.height - 120)
+           .lineTo(doc.page.width - 50, doc.page.height - 120)
+           .stroke('#e0e0e0');
+        
+        // Footer text
+        doc.fontSize(9)
+           .font('Helvetica')
+           .fillColor('#888888')
+           .text(
+             `Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`,
+             50,
+             doc.page.height - 100,
+             { align: 'center', width: doc.page.width - 100 }
+           )
+           .text(
+             `Page ${i + 1} of ${pages.count}`,
+             50,
+             doc.page.height - 85,
+             { align: 'center', width: doc.page.width - 100 }
+           )
+           .text(
+             `© ${new Date().getFullYear()} Jobline Recruitment Platform - Confidential`,
+             50,
+             doc.page.height - 70,
+             { align: 'center', width: doc.page.width - 100 }
+           );
+      }
       
       // Finalize PDF
       doc.end();
@@ -179,11 +302,16 @@ export async function generateCandidatePDF(candidate: any): Promise<Buffer> {
   });
 }
 
-function addInfoRow(doc: any, label: string, value: string, x: number, y: number) {
-  doc.font('Helvetica-Bold')
-     .text(label, x, y, { continued: true })
+function addInfoField(doc: any, label: string, value: string, x: number, y: number) {
+  doc.fontSize(9)
      .font('Helvetica')
-     .text(` ${value}`);
+     .fillColor('#666666')
+     .text(label.toUpperCase(), x, y)
+     .fontSize(11)
+     .font('Helvetica-Bold')
+     .fillColor('#333333')
+     .text(value, x, y + 12)
+     .fillColor('black');
 }
 
 function getStatusColor(status: string): string {
@@ -194,9 +322,12 @@ function getStatusColor(status: string): string {
     case 'RESERVED':
       return '#FF9800'; // Orange
     case 'PLACED':
+    case 'ACTIVE_EMPLOYMENT':
       return '#9C27B0'; // Purple
     case 'IN_PROCESS':
       return '#2196F3'; // Blue
+    case 'CONTRACT_ENDED':
+      return '#757575'; // Grey
     default:
       return '#000000'; // Black
   }

@@ -7,6 +7,9 @@ const Register = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     companyName: '',
+    companyPhone: '',
+    companyAddress: '',
+    companyEmail: '',
     name: '',
     email: '',
     password: '',
@@ -45,6 +48,9 @@ const Register = () => {
       // Register company and super admin
       const response = await api.post('/auth/register', {
         companyName: formData.companyName,
+        companyPhone: formData.companyPhone,
+        companyAddress: formData.companyAddress,
+        companyEmail: formData.companyEmail,
         name: formData.name,
         email: formData.email,
         password: formData.password,
@@ -114,6 +120,39 @@ const Register = () => {
               required
               placeholder="e.g., Beirut Recruitment Agency"
               helperText="This will be your office name in the system"
+            />
+            
+            <TextField
+              fullWidth
+              margin="normal"
+              label="Company Phone"
+              name="companyPhone"
+              value={formData.companyPhone}
+              onChange={handleChange}
+              placeholder="e.g., +961 1 234567"
+            />
+            
+            <TextField
+              fullWidth
+              margin="normal"
+              label="Company Email"
+              name="companyEmail"
+              type="email"
+              value={formData.companyEmail}
+              onChange={handleChange}
+              placeholder="e.g., info@company.com"
+            />
+            
+            <TextField
+              fullWidth
+              margin="normal"
+              label="Company Address"
+              name="companyAddress"
+              value={formData.companyAddress}
+              onChange={handleChange}
+              multiline
+              rows={2}
+              placeholder="e.g., 123 Main Street, Beirut, Lebanon"
             />
 
             <Divider sx={{ my: 3 }} />

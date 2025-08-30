@@ -547,12 +547,14 @@ const ApplicationForm = () => {
                 <Controller
                   name="brokerId"
                   control={control}
+                  defaultValue=""
                   render={({ field }) => (
                     <TextField
                       {...field}
                       fullWidth
                       select
                       label="Broker (Optional)"
+                      value={field.value || ''}
                     >
                       <MenuItem value="">None</MenuItem>
                       {brokers && brokers.length > 0 && brokers.map((broker) => (

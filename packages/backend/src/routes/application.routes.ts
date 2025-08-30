@@ -626,10 +626,12 @@ router.patch('/:id', async (req: AuthRequest, res) => {
       );
       
       if (missingDocs.length > 0) {
+        const docList = missingDocs.map(d => d.name).join(', ');
         res.status(400).json({ 
-          error: 'Cannot proceed to next stage',
-          message: `Missing required documents: ${missingDocs.map(d => d.name).join(', ')}`,
-          missingDocuments: missingDocs.map(d => d.name)
+          error: `Please submit the following documents before proceeding: ${docList}`,
+          message: `We need these documents to move to the next stage: ${docList}`,
+          missingDocuments: missingDocs.map(d => d.name),
+          userFriendly: true
         });
         return;
       }

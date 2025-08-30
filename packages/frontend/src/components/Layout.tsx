@@ -15,6 +15,7 @@ import {
   Menu,
   MenuItem,
   Toolbar,
+  alpha,
 } from '@mui/material'
 import {
   Menu as MenuIcon,
@@ -34,7 +35,7 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { UserRole } from '@jobline/shared'
 
-const drawerWidth = 240
+const drawerWidth = 260
 
 const Layout = () => {
   const navigate = useNavigate()
@@ -63,15 +64,15 @@ const Layout = () => {
 
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard', roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN] },
-    { text: 'Candidates', icon: <PersonSearchIcon />, path: '/candidates', roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN] },
-    { text: 'Clients', icon: <PeopleIcon />, path: '/clients', roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN] },
     { text: 'Applications', icon: <AssignmentIcon />, path: '/applications', roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN] },
+    { text: 'Clients', icon: <PeopleIcon />, path: '/clients', roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN] },
+    { text: 'Candidates', icon: <PersonSearchIcon />, path: '/candidates', roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN] },
     { text: 'Financial', icon: <MoneyIcon />, path: '/financial', roles: [UserRole.SUPER_ADMIN] },
     { text: 'Agents', icon: <BusinessIcon />, path: '/agents', roles: [UserRole.SUPER_ADMIN] },
     { text: 'Brokers', icon: <SupportIcon />, path: '/brokers', roles: [UserRole.SUPER_ADMIN] },
     { text: 'Users', icon: <GroupIcon />, path: '/users', roles: [UserRole.SUPER_ADMIN] },
     { text: 'Reminders', icon: <ReminderIcon />, path: '/reminders', roles: [UserRole.SUPER_ADMIN] },
-    { text: 'Settings', icon: <SettingsIcon />, path: '/settings', roles: [UserRole.SUPER_ADMIN] },
+    { text: 'Settings', icon: <SettingsIcon />, path: '/settings', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
   ]
 
   const filteredMenuItems = menuItems.filter(item => 
@@ -79,48 +80,110 @@ const Layout = () => {
   )
 
   const drawer = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Toolbar sx={{ minHeight: '56px !important', px: 2 }}>
-        <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-          Jobline
-        </Typography>
-        {mobileOpen && (
-          <IconButton onClick={handleDrawerToggle} sx={{ ml: 'auto', display: { sm: 'none' } }}>
-            <ChevronLeftIcon />
-          </IconButton>
-        )}
+    <Box sx={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      background: 'linear-gradient(180deg, #1e3a5f 0%, #2c5282 100%)',
+    }}>
+      <Toolbar sx={{ 
+        minHeight: '64px !important', 
+        px: 2,
+        background: 'transparent',
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+          <Typography 
+            variant="h5" 
+            noWrap 
+            component="div" 
+            sx={{ 
+              fontWeight: 'bold', 
+              color: '#ffffff',
+              letterSpacing: '0.5px',
+              flexGrow: 1,
+            }}
+          >
+            JOBLINE
+          </Typography>
+          {mobileOpen && (
+            <IconButton 
+              onClick={handleDrawerToggle} 
+              sx={{ 
+                ml: 'auto', 
+                display: { sm: 'none' },
+                color: '#ffffff'
+              }}
+            >
+              <ChevronLeftIcon />
+            </IconButton>
+          )}
+        </Box>
       </Toolbar>
-      <Divider />
       
-      {/* User info at top */}
-      <Box sx={{ px: 2, py: 1.5, bgcolor: 'grey.50' }}>
+      {/* User info section */}
+      <Box sx={{ 
+        px: 2, 
+        py: 2,
+        background: alpha('#000000', 0.1),
+        borderTop: '1px solid',
+        borderBottom: '1px solid',
+        borderColor: alpha('#ffffff', 0.1),
+      }}>
         <Box 
           sx={{ 
             display: 'flex', 
             alignItems: 'center', 
             gap: 1.5,
             cursor: 'pointer',
-            '&:hover': { opacity: 0.8 },
+            borderRadius: 2,
+            p: 1,
+            transition: 'all 0.3s',
+            '&:hover': { 
+              bgcolor: alpha('#ffffff', 0.05),
+            },
           }}
           onClick={handleMenuOpen}
         >
-          <Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.main' }}>
+          <Avatar 
+            sx={{ 
+              width: 40, 
+              height: 40, 
+              bgcolor: '#ffffff',
+              color: '#1e3a5f',
+              fontWeight: 'bold',
+            }}
+          >
             {user?.name?.charAt(0).toUpperCase()}
           </Avatar>
           <Box sx={{ flexGrow: 1 }}>
-            <Typography variant="body2" fontWeight="600">{user?.name}</Typography>
-            <Typography variant="caption" color="text.secondary">
-              {user?.role?.replace('_', ' ')}
+            <Typography 
+              variant="body1" 
+              fontWeight="600" 
+              sx={{ color: '#ffffff', lineHeight: 1.2 }}
+            >
+              {user?.name}
+            </Typography>
+            <Typography 
+              variant="caption" 
+              sx={{ 
+                color: alpha('#ffffff', 0.7),
+                textTransform: 'capitalize',
+              }}
+            >
+              {user?.role?.replace('_', ' ').toLowerCase()}
             </Typography>
           </Box>
         </Box>
       </Box>
-      <Divider />
       
-      {/* Menu items with reduced spacing */}
-      <List sx={{ flexGrow: 1, py: 0.5 }}>
+      {/* Menu items */}
+      <List sx={{ 
+        flexGrow: 1, 
+        py: 1,
+        px: 1,
+      }}>
         {filteredMenuItems.map((item) => (
-          <ListItem key={item.text} disablePadding sx={{ my: 0 }}>
+          <ListItem key={item.text} disablePadding sx={{ my: 0.5 }}>
             <ListItemButton
               selected={location.pathname.startsWith(item.path)}
               onClick={() => {
@@ -128,30 +191,68 @@ const Layout = () => {
                 if (mobileOpen) setMobileOpen(false)
               }}
               sx={{
-                py: 0.8,
-                minHeight: 42,
+                py: 1.2,
+                px: 2,
+                borderRadius: 2,
+                transition: 'all 0.3s',
+                color: alpha('#ffffff', 0.9),
+                '&:hover': {
+                  backgroundColor: alpha('#ffffff', 0.1),
+                  transform: 'translateX(4px)',
+                },
                 '&.Mui-selected': {
-                  backgroundColor: 'primary.light',
+                  backgroundColor: alpha('#ffffff', 0.15),
+                  color: '#ffffff',
+                  '& .MuiListItemIcon-root': {
+                    color: '#ffffff',
+                  },
                   '&:hover': {
-                    backgroundColor: 'primary.light',
+                    backgroundColor: alpha('#ffffff', 0.2),
                   },
                 },
               }}
             >
-              <ListItemIcon sx={{ minWidth: 40, color: location.pathname.startsWith(item.path) ? 'primary.main' : 'inherit' }}>
+              <ListItemIcon sx={{ 
+                minWidth: 40, 
+                color: location.pathname.startsWith(item.path) 
+                  ? '#ffffff' 
+                  : alpha('#ffffff', 0.7)
+              }}>
                 {item.icon}
               </ListItemIcon>
               <ListItemText 
                 primary={item.text} 
                 primaryTypographyProps={{
-                  fontSize: '0.9rem',
-                  fontWeight: location.pathname.startsWith(item.path) ? 'medium' : 'regular'
+                  fontSize: '0.95rem',
+                  fontWeight: location.pathname.startsWith(item.path) ? 600 : 400,
+                  letterSpacing: '0.3px',
                 }}
               />
             </ListItemButton>
           </ListItem>
         ))}
       </List>
+      
+      {/* Company info at bottom */}
+      {user?.company?.name && (
+        <Box sx={{ 
+          px: 2, 
+          py: 1.5,
+          borderTop: '1px solid',
+          borderColor: alpha('#ffffff', 0.1),
+        }}>
+          <Typography 
+            variant="caption" 
+            sx={{ 
+              color: alpha('#ffffff', 0.5),
+              display: 'block',
+              textAlign: 'center',
+            }}
+          >
+            {user.company.name}
+          </Typography>
+        </Box>
+      )}
       
       {/* User menu dropdown */}
       <Menu
@@ -165,6 +266,12 @@ const Layout = () => {
         transformOrigin={{
           vertical: 'top',
           horizontal: 'right',
+        }}
+        sx={{
+          '& .MuiPaper-root': {
+            minWidth: 200,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+          }
         }}
       >
         <MenuItem disabled>
@@ -195,7 +302,11 @@ const Layout = () => {
   )
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh', bgcolor: 'grey.50' }}>
+    <Box sx={{ 
+      display: 'flex', 
+      height: '100vh', 
+      bgcolor: '#e8edf3',
+    }}>
       {/* Mobile menu button */}
       <IconButton
         color="inherit"
@@ -207,11 +318,12 @@ const Layout = () => {
           left: 16,
           zIndex: 1200,
           display: { sm: 'none' },
-          bgcolor: 'background.paper',
-          boxShadow: 2,
+          bgcolor: '#1e3a5f',
+          color: '#ffffff',
+          boxShadow: 3,
           '&:hover': {
-            bgcolor: 'background.paper',
-            boxShadow: 3,
+            bgcolor: '#2c5282',
+            boxShadow: 4,
           }
         }}
       >
@@ -234,9 +346,7 @@ const Layout = () => {
             '& .MuiDrawer-paper': { 
               boxSizing: 'border-box', 
               width: drawerWidth,
-              bgcolor: 'background.paper',
-              borderRight: '1px solid',
-              borderColor: 'divider',
+              border: 'none',
             },
           }}
         >
@@ -249,9 +359,8 @@ const Layout = () => {
             '& .MuiDrawer-paper': { 
               boxSizing: 'border-box', 
               width: drawerWidth,
-              bgcolor: 'background.paper',
-              borderRight: '1px solid',
-              borderColor: 'divider',
+              border: 'none',
+              boxShadow: '4px 0 24px rgba(0,0,0,0.12)',
             },
           }}
           open
@@ -263,13 +372,17 @@ const Layout = () => {
         component="main"
         sx={{
           flexGrow: 1,
-          p: { xs: 2, sm: 3 },
+          p: { xs: 2, sm: 3, md: 4 },
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           overflow: 'auto',
-          bgcolor: 'grey.50',
+          bgcolor: '#e8edf3',
         }}
       >
-        <Box sx={{ pt: { xs: 7, sm: 0 } }}>
+        <Box sx={{ 
+          pt: { xs: 7, sm: 0 },
+          maxWidth: '1600px',
+          mx: 'auto',
+        }}>
           <Outlet />
         </Box>
       </Box>

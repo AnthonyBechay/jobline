@@ -34,6 +34,7 @@ router.get('/status/:shareableLink', async (req, res) => {
         },
         payments: {
           select: {
+            id: true,
             amount: true,
             currency: true,
             paymentDate: true,
@@ -73,31 +74,42 @@ router.get('/status/:shareableLink', async (req, res) => {
     
     const outstandingBalance = Math.max(0, expectedTotal - totalPaid);
     
-    // Return public-safe information
+    // Return public-safe information in the format expected by frontend
     res.json({
-      status: application.status,
-      type: application.type,
-      createdAt: application.createdAt,
-      client: {
-        name: application.client.name,
-      },
-      candidate: {
-        firstName: application.candidate.firstName,
-        lastName: application.candidate.lastName,
-        nationality: application.candidate.nationality,
-        photoUrl: application.candidate.photoUrl,
+      application: {
+        id: application.id,
+        status: application.status,
+        type: application.type,
+        createdAt: application.createdAt,
+        permitExpiryDate: application.permitExpiryDate,
+        client: {
+          name: application.client.name,
+        },
+        candidate: {
+          firstName: application.candidate.firstName,
+          lastName: application.candidate.lastName,
+          nationality: application.candidate.nationality,
+          photoUrl: application.candidate.photoUrl,
+        },
       },
       documents: application.documentItems.map(doc => ({
-        name: doc.documentName,
+        id: doc.id,
+        documentName: doc.documentName,
         status: doc.status,
+        stage: doc.stage,
+      })),
+      payments: application.payments.map(payment => ({
+        id: payment.id,
+        amount: Number(payment.amount),
+        currency: payment.currency,
+        paymentDate: payment.paymentDate,
+        notes: '',
       })),
       financials: {
         totalPaid,
         outstandingBalance,
         currency: 'USD',
-        payments: application.payments,
       },
-      permitExpiryDate: application.permitExpiryDate,
     });
   } catch (error) {
     console.error('Get public status error:', error);

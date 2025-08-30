@@ -4,6 +4,9 @@ export interface Company {
   name: string;
   phone?: string;
   address?: string;
+  email?: string;
+  website?: string;
+  taxId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +42,8 @@ export interface Candidate {
   firstName: string;
   lastName: string;
   photoUrl?: string;
+  facePhotoUrl?: string;
+  fullBodyPhotoUrl?: string;
   dateOfBirth?: Date;
   nationality: string;
   education?: string;
@@ -63,6 +68,20 @@ export interface Client {
   referredByClient?: string;
   referrer?: Client;
   companyId: string;
+  documents?: ClientDocument[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Client document types
+export interface ClientDocument {
+  id: string;
+  clientId: string;
+  documentName: string;
+  fileName: string;
+  url: string;
+  mimeType: string;
+  size: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -263,6 +282,7 @@ export interface ApiError {
 export interface LoginRequest {
   email: string;
   password: string;
+  companyName: string;
 }
 
 export interface LoginResponse {
@@ -272,7 +292,21 @@ export interface LoginResponse {
 
 export interface RegisterRequest {
   companyName: string;
+  companyPhone?: string;
+  companyAddress?: string;
+  companyEmail?: string;
   name: string;
   email: string;
   password: string;
+}
+
+// Nationality type
+export interface Nationality {
+  id: string;
+  code: string;
+  name: string;
+  active: boolean;
+  companyId: string;
+  createdAt: Date;
+  updatedAt: Date;
 }

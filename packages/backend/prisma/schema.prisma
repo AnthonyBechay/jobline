@@ -16,6 +16,9 @@ model Company {
   name          String
   phone         String?
   address       String?
+  email         String?
+  website       String?
+  taxId         String?  @map("tax_id")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
   
@@ -30,6 +33,7 @@ model Company {
   templates     DocumentTemplate[]
   feeTemplates  FeeTemplate[]
   files         File[]
+  nationalities Nationality[]
 
   @@map("companies")
 }
@@ -94,6 +98,8 @@ model Candidate {
   firstName         String           @map("first_name")
   lastName          String           @map("last_name")
   photoUrl          String?          @map("photo_url")
+  facePhotoUrl      String?          @map("face_photo_url")
+  fullBodyPhotoUrl  String?          @map("full_body_photo_url")
   dateOfBirth       DateTime?        @map("date_of_birth")
   nationality       String
   education         String?
@@ -124,20 +130,21 @@ enum CandidateStatus {
 
 // Client model
 model Client {
-  id               String        @id @default(uuid())
+  id               String            @id @default(uuid())
   name             String
   phone            String
   address          String?
   notes            String?
-  referredByClient String?       @map("referred_by_client_id")
-  referrer         Client?       @relation("ClientReferrals", fields: [referredByClient], references: [id])
-  referrals        Client[]      @relation("ClientReferrals")
-  companyId        String        @map("company_id")
-  company          Company       @relation(fields: [companyId], references: [id])
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  referredByClient String?           @map("referred_by_client_id")
+  referrer         Client?           @relation("ClientReferrals", fields: [referredByClient], references: [id])
+  referrals        Client[]          @relation("ClientReferrals")
+  companyId        String            @map("company_id")
+  company          Company           @relation(fields: [companyId], references: [id])
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
   applications     Application[]
   payments         Payment[]
+  documents        ClientDocument[]
 
   @@index([companyId])
   @@map("clients")
@@ -336,4 +343,37 @@ model File {
   @@index([entityType, entityId])
   @@index([companyId])
   @@map("files")
+}
+
+// ClientDocument model for client-specific documents
+model ClientDocument {
+  id           String   @id @default(uuid())
+  clientId     String   @map("client_id")
+  client       Client   @relation(fields: [clientId], references: [id])
+  documentName String   @map("document_name")
+  fileName     String   @map("file_name")
+  url          String
+  mimeType     String   @map("mime_type")
+  size         BigInt
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([clientId])
+  @@map("client_documents")
+}
+
+// Nationality model for managing nationalities
+model Nationality {
+  id        String   @id @default(uuid())
+  code      String
+  name      String
+  active    Boolean  @default(true)
+  companyId String   @map("company_id")
+  company   Company  @relation(fields: [companyId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("nationalities")
 }

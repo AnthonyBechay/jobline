@@ -121,13 +121,20 @@ export const createCandidate = async (req: AuthRequest, res: Response): Promise<
     } = req.body;
     
     // Verify agent belongs to the same company if provided
-    if (agentId && req.user?.role === 'SUPER_ADMIN') {
-      const agent = await prisma.agent.findFirst({
-        where: { id: agentId, companyId },
-      });
-      
-      if (!agent) {
-        res.status(400).json({ error: 'Invalid agent ID' });
+    // Only validate agentId if it's provided, not empty, and user is Super Admin
+    if (agentId && agentId !== '') {
+      if (req.user?.role === 'SUPER_ADMIN') {
+        const agent = await prisma.agent.findFirst({
+          where: { id: agentId, companyId },
+        });
+        
+        if (!agent) {
+          res.status(400).json({ error: 'Invalid agent ID' });
+          return;
+        }
+      } else {
+        // Non-super admins cannot set agent
+        res.status(403).json({ error: 'Only Super Admin can assign agents' });
         return;
       }
     }
@@ -144,7 +151,7 @@ export const createCandidate = async (req: AuthRequest, res: Response): Promise<
         experienceSummary,
         status,
         companyId, // Set company ID
-        ...(req.user?.role === 'SUPER_ADMIN' && agentId ? { agentId } : {}),
+        ...(req.user?.role === 'SUPER_ADMIN' && agentId && agentId !== '' ? { agentId } : { agentId: null }),  // Explicitly set null if no agent
       },
       include: {
         agent: true,

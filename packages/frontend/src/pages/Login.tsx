@@ -7,6 +7,7 @@ const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const [formData, setFormData] = useState({
+    companyName: '',
     email: '',
     password: '',
   });
@@ -58,6 +59,19 @@ const Login = () => {
           )}
 
           <form onSubmit={handleSubmit}>
+            <TextField
+              fullWidth
+              margin="normal"
+              label="Company Name"
+              name="companyName"
+              type="text"
+              value={formData.companyName}
+              onChange={handleChange}
+              required
+              autoComplete="organization"
+              autoFocus
+            />
+            
             <TextField
               fullWidth
               margin="normal"
