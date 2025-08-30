@@ -37,7 +37,7 @@ import {
   DocumentStatus,
   Payment,
 } from '../shared/types'
-import api from '../services/api'
+import { publicApi } from '../services/api'
 
 // Status workflow mapping for client view
 const statusWorkflow = {
@@ -119,7 +119,8 @@ const ClientStatus = () => {
 
   const fetchApplicationStatus = async () => {
     try {
-      const response = await api.get(`/applications/status/${shareableLink}`)
+      // Use public endpoint that doesn't require authentication
+      const response = await publicApi.get(`/public/status/${shareableLink}`)
       setApplication(response.data?.application || null)
       setDocuments(response.data?.documents || [])
       setPayments(response.data?.payments || [])

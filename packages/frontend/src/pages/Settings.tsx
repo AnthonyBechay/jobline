@@ -33,6 +33,11 @@ import {
   ListItemSecondaryAction,
   Switch,
   FormControlLabel,
+  Avatar,
+  Select,
+  FormControl,
+  InputLabel,
+  Checkbox,
 } from '@mui/material'
 import {
   Add as AddIcon,
@@ -45,9 +50,12 @@ import {
   Settings as SettingsIcon,
   Notifications as NotificationIcon,
   Business as BusinessIcon,
+  PhotoCamera as PhotoIcon,
+  Upload as UploadIcon,
 } from '@mui/icons-material'
 import { useForm, Controller } from 'react-hook-form'
 import { useAuth } from '../contexts/AuthContext'
+import { ApplicationStatus, UserRole } from '../shared/types'
 import api from '../services/api'
 
 interface TabPanelProps {
@@ -64,6 +72,19 @@ function TabPanel(props: TabPanelProps) {
     </div>
   )
 }
+
+// Application status stages for document templates
+const applicationStages = [
+  { value: 'PENDING_MOL', label: 'MoL Pre-Authorization' },
+  { value: 'MOL_AUTH_RECEIVED', label: 'MoL Authorization Received' },
+  { value: 'VISA_PROCESSING', label: 'Visa Processing' },
+  { value: 'VISA_RECEIVED', label: 'Visa Received' },
+  { value: 'WORKER_ARRIVED', label: 'Worker Arrived' },
+  { value: 'LABOUR_PERMIT_PROCESSING', label: 'Labour Permit Processing' },
+  { value: 'RESIDENCY_PERMIT_PROCESSING', label: 'Residency Permit Processing' },
+  { value: 'ACTIVE_EMPLOYMENT', label: 'Active Employment' },
+  { value: 'RENEWAL_PENDING', label: 'Renewal Pending' },
+]
 
 const Settings = () => {
   const { user } = useAuth()
@@ -83,21 +104,37 @@ const Settings = () => {
     type: '',
     id: null,
   })
+  const [companySettings, setCompanySettings] = useState<any>({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    logo: '',
+    registrationNumber: '',
+    taxNumber: '',
+    website: '',
+    bankName: '',
+    bankAccount: '',
+    bankIBAN: '',
+  })
+  const [uploadingLogo, setUploadingLogo] = useState(false)
 
   const feeForm = useForm<any>()
   const documentForm = useForm<any>()
-  const settingsForm = useForm<any>()
 
   useEffect(() => {
     fetchData()
-  }, [])
+    if (user?.role === UserRole.SUPER_ADMIN) {
+      fetchCompanySettings()
+    }
+  }, [user])
 
   const fetchData = async () => {
     try {
       setLoading(true)
       
-      // Fetch fee templates
-      if (user?.role === 'SUPER_ADMIN') {
+      // Fetch fee templates (Super Admin only)
+      if (user?.role === UserRole.SUPER_ADMIN) {
         try {
           const feeRes = await api.get('/fee-templates')
           setFeeTemplates(feeRes.data || [])
@@ -124,6 +161,65 @@ const Settings = () => {
       setError('Failed to fetch settings')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchCompanySettings = async () => {
+    try {
+      const response = await api.get('/settings/company')
+      if (response.data) {
+        setCompanySettings(response.data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch company settings:', err)
+    }
+  }
+
+  const handleSaveCompanySettings = async () => {
+    try {
+      await api.post('/settings/company', companySettings)
+      setSuccess('Company settings saved successfully')
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to save company settings')
+    }
+  }
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Logo size should be less than 5MB')
+      return
+    }
+
+    try {
+      setUploadingLogo(true)
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('entityType', 'company')
+      formData.append('entityId', 'logo')
+
+      const response = await api.post('/files/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+
+      setCompanySettings((prev: any) => ({
+        ...prev,
+        logo: response.data.url
+      }))
+      setSuccess('Logo uploaded successfully')
+    } catch (err: any) {
+      setError('Failed to upload logo')
+    } finally {
+      setUploadingLogo(false)
     }
   }
 
@@ -174,11 +270,18 @@ const Settings = () => {
 
   const handleSaveDocumentTemplate = async (data: any) => {
     try {
+      // Ensure required fields are properly set
+      const templateData = {
+        ...data,
+        required: data.required === true || data.required === 'true',
+        order: parseInt(data.order) || 0,
+      }
+
       if (editingDocument) {
-        await api.put(`/document-templates/${editingDocument.id}`, data)
+        await api.put(`/document-templates/${editingDocument.id}`, templateData)
         setSuccess('Document template updated successfully')
       } else {
-        await api.post('/document-templates', data)
+        await api.post('/document-templates', templateData)
         setSuccess('Document template created successfully')
       }
       setDocumentDialog(false)
@@ -202,6 +305,25 @@ const Settings = () => {
       setError(err.response?.data?.error || 'Failed to delete document template')
     }
   }
+
+  const handleEditDocumentTemplate = (doc: any) => {
+    setEditingDocument(doc)
+    documentForm.reset({
+      name: doc.name,
+      stage: doc.stage,
+      requiredFrom: doc.requiredFrom || 'office',
+      required: doc.required,
+      order: doc.order || 0,
+    })
+    setDocumentDialog(true)
+  }
+
+  // Group documents by stage for better visualization
+  const documentsByStage = documentTemplates.reduce((acc, doc) => {
+    if (!acc[doc.stage]) acc[doc.stage] = []
+    acc[doc.stage].push(doc)
+    return acc
+  }, {} as Record<string, any[]>)
 
   return (
     <Box>
@@ -244,152 +366,152 @@ const Settings = () => {
             },
           }}
         >
-          <Tab icon={<MoneyIcon />} label="Fee Templates" iconPosition="start" />
+          {user?.role === UserRole.SUPER_ADMIN && (
+            <Tab icon={<MoneyIcon />} label="Fee Templates" iconPosition="start" />
+          )}
           <Tab icon={<DocumentIcon />} label="Document Templates" iconPosition="start" />
-          <Tab icon={<BusinessIcon />} label="Company Settings" iconPosition="start" />
+          {user?.role === UserRole.SUPER_ADMIN && (
+            <Tab icon={<BusinessIcon />} label="Company Settings" iconPosition="start" />
+          )}
           <Tab icon={<NotificationIcon />} label="Notifications" iconPosition="start" />
         </Tabs>
 
-        <TabPanel value={tabValue} index={0}>
-          {user?.role === 'SUPER_ADMIN' ? (
-            <>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  <MoneyIcon sx={{ mr: 1, verticalAlign: 'middle', color: 'primary.main' }} />
-                  Fee Templates
-                </Typography>
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={() => {
-                    setEditingFee(null)
-                    feeForm.reset()
-                    setFeeDialog(true)
-                  }}
-                  sx={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        {/* Fee Templates Tab - Super Admin Only */}
+        {user?.role === UserRole.SUPER_ADMIN && (
+          <TabPanel value={tabValue} index={0}>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                <MoneyIcon sx={{ mr: 1, verticalAlign: 'middle', color: 'primary.main' }} />
+                Fee Templates
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => {
+                  setEditingFee(null)
+                  feeForm.reset()
+                  setFeeDialog(true)
+                }}
+              >
+                Add Fee Template
+              </Button>
+            </Box>
+
+            <Grid container spacing={3}>
+              {feeTemplates.map((template) => (
+                <Grid item xs={12} md={6} lg={4} key={template.id}>
+                  <Card sx={{ 
+                    height: '100%',
+                    transition: 'all 0.3s ease',
                     '&:hover': {
-                      background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
-                    },
-                  }}
-                >
-                  Add Fee Template
-                </Button>
-              </Box>
-
-              <Grid container spacing={3}>
-                {feeTemplates.map((template) => (
-                  <Grid item xs={12} md={6} lg={4} key={template.id}>
-                    <Card sx={{ 
-                      height: '100%',
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        transform: 'translateY(-4px)',
-                        boxShadow: '0 12px 24px rgba(0,0,0,0.15)',
-                      }
-                    }}>
-                      <CardHeader
-                        title={template.name}
-                        subheader={
-                          <Box display="flex" alignItems="center" gap={1}>
-                            {template.nationality && (
-                              <Chip
-                                icon={<LanguageIcon />}
-                                label={template.nationality}
-                                size="small"
-                                color="primary"
-                                variant="outlined"
-                              />
-                            )}
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 12px 24px rgba(0,0,0,0.15)',
+                    }
+                  }}>
+                    <CardHeader
+                      title={template.name}
+                      subheader={
+                        <Box display="flex" alignItems="center" gap={1}>
+                          {template.nationality && (
                             <Chip
-                              label={template.currency}
+                              icon={<LanguageIcon />}
+                              label={template.nationality}
                               size="small"
-                              color="secondary"
+                              color="primary"
+                              variant="outlined"
                             />
-                          </Box>
-                        }
-                        action={
-                          <Box>
-                            <IconButton onClick={() => handleEditFeeTemplate(template)}>
-                              <EditIcon />
-                            </IconButton>
-                            <IconButton 
-                              onClick={() => setDeleteConfirmDialog({ 
-                                open: true, 
-                                type: 'fee', 
-                                id: template.id 
-                              })}
-                              color="error"
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          </Box>
-                        }
-                      />
-                      <CardContent>
-                        <Grid container spacing={2}>
-                          <Grid item xs={12}>
-                            <Typography variant="h4" color="primary" gutterBottom>
-                              ${template.defaultPrice}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              Default Price
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={6}>
-                            <Typography variant="body2" color="text.secondary">
-                              Min: ${template.minPrice}
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={6}>
-                            <Typography variant="body2" color="text.secondary">
-                              Max: ${template.maxPrice}
-                            </Typography>
-                          </Grid>
-                          {template.description && (
-                            <Grid item xs={12}>
-                              <Divider sx={{ my: 1 }} />
-                              <Typography variant="body2">
-                                {template.description}
-                              </Typography>
-                            </Grid>
                           )}
+                          <Chip
+                            label={template.currency}
+                            size="small"
+                            color="secondary"
+                          />
+                        </Box>
+                      }
+                      action={
+                        <Box>
+                          <IconButton onClick={() => handleEditFeeTemplate(template)}>
+                            <EditIcon />
+                          </IconButton>
+                          <IconButton 
+                            onClick={() => setDeleteConfirmDialog({ 
+                              open: true, 
+                              type: 'fee', 
+                              id: template.id 
+                            })}
+                            color="error"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Box>
+                      }
+                    />
+                    <CardContent>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                          <Typography variant="h4" color="primary" gutterBottom>
+                            ${template.defaultPrice}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Default Price
+                          </Typography>
                         </Grid>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="body2" color="text.secondary">
+                            Min: ${template.minPrice}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="body2" color="text.secondary">
+                            Max: ${template.maxPrice}
+                          </Typography>
+                        </Grid>
+                        {template.description && (
+                          <Grid item xs={12}>
+                            <Divider sx={{ my: 1 }} />
+                            <Typography variant="body2">
+                              {template.description}
+                            </Typography>
+                          </Grid>
+                        )}
+                      </Grid>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
 
-              {feeTemplates.length === 0 && (
-                <Paper sx={{ p: 4, textAlign: 'center', bgcolor: 'background.default' }}>
-                  <MoneyIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-                  <Typography color="text.secondary">
-                    No fee templates created yet. Click "Add Fee Template" to get started.
-                  </Typography>
-                </Paper>
-              )}
-            </>
-          ) : (
-            <Alert severity="info">
-              Only Super Admins can manage fee templates
-            </Alert>
-          )}
-        </TabPanel>
+            {feeTemplates.length === 0 && (
+              <Paper sx={{ p: 4, textAlign: 'center', bgcolor: 'background.default' }}>
+                <MoneyIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+                <Typography color="text.secondary">
+                  No fee templates created yet. Click "Add Fee Template" to get started.
+                </Typography>
+              </Paper>
+            )}
+          </TabPanel>
+        )}
 
-        <TabPanel value={tabValue} index={1}>
+        {/* Document Templates Tab */}
+        <TabPanel value={tabValue} index={user?.role === UserRole.SUPER_ADMIN ? 1 : 0}>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
               <DocumentIcon sx={{ mr: 1, verticalAlign: 'middle', color: 'primary.main' }} />
               Document Templates
             </Typography>
-            {user?.role === 'SUPER_ADMIN' && (
+            {user?.role === UserRole.SUPER_ADMIN && (
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={() => {
                   setEditingDocument(null)
-                  documentForm.reset()
+                  documentForm.reset({
+                    name: '',
+                    stage: 'PENDING_MOL',
+                    requiredFrom: 'office',
+                    required: true,
+                    order: 0,
+                  })
                   setDocumentDialog(true)
                 }}
               >
@@ -398,119 +520,251 @@ const Settings = () => {
             )}
           </Box>
 
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Document Name</TableCell>
-                  <TableCell>Stage</TableCell>
-                  <TableCell>Required From</TableCell>
-                  <TableCell>Required</TableCell>
-                  <TableCell>Order</TableCell>
-                  {user?.role === 'SUPER_ADMIN' && <TableCell>Actions</TableCell>}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {documentTemplates.map((doc) => (
-                  <TableRow key={doc.id}>
-                    <TableCell>{doc.name}</TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={doc.stage.replace(/_/g, ' ')} 
-                        size="small"
-                        color="primary"
-                        variant="outlined"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={doc.requiredFrom || 'Office'} 
-                        size="small"
-                        color={doc.requiredFrom === 'client' ? 'warning' : 'info'}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={doc.required ? 'Yes' : 'No'} 
-                        size="small"
-                        color={doc.required ? 'success' : 'default'}
-                      />
-                    </TableCell>
-                    <TableCell>{doc.order}</TableCell>
-                    {user?.role === 'SUPER_ADMIN' && (
-                      <TableCell>
-                        <IconButton 
-                          size="small"
-                          onClick={() => {
-                            setEditingDocument(doc)
-                            documentForm.reset(doc)
-                            setDocumentDialog(true)
-                          }}
-                        >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton 
-                          size="small"
-                          color="error"
-                          onClick={() => setDeleteConfirmDialog({ 
-                            open: true, 
-                            type: 'document', 
-                            id: doc.id 
-                          })}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+          {applicationStages.map((stage) => {
+            const stageDocs = documentsByStage[stage.value] || []
+            if (stageDocs.length === 0 && user?.role !== UserRole.SUPER_ADMIN) return null
+
+            return (
+              <Box key={stage.value} mb={3}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                  {stage.label}
+                </Typography>
+                <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Document Name</TableCell>
+                        <TableCell align="center">Required From</TableCell>
+                        <TableCell align="center">Required</TableCell>
+                        <TableCell align="center">Order</TableCell>
+                        {user?.role === UserRole.SUPER_ADMIN && <TableCell align="center">Actions</TableCell>}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {stageDocs.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={user?.role === UserRole.SUPER_ADMIN ? 5 : 4} align="center">
+                            <Typography variant="body2" color="text.secondary">
+                              No documents configured for this stage
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        stageDocs
+                          .sort((a, b) => a.order - b.order)
+                          .map((doc) => (
+                            <TableRow key={doc.id}>
+                              <TableCell>{doc.name}</TableCell>
+                              <TableCell align="center">
+                                <Chip 
+                                  label={doc.requiredFrom === 'client' ? 'Client' : 'Office'} 
+                                  size="small"
+                                  color={doc.requiredFrom === 'client' ? 'warning' : 'info'}
+                                />
+                              </TableCell>
+                              <TableCell align="center">
+                                <Chip 
+                                  label={doc.required ? 'Required' : 'Optional'} 
+                                  size="small"
+                                  color={doc.required ? 'success' : 'default'}
+                                  variant={doc.required ? 'filled' : 'outlined'}
+                                />
+                              </TableCell>
+                              <TableCell align="center">{doc.order}</TableCell>
+                              {user?.role === UserRole.SUPER_ADMIN && (
+                                <TableCell align="center">
+                                  <IconButton 
+                                    size="small"
+                                    onClick={() => handleEditDocumentTemplate(doc)}
+                                  >
+                                    <EditIcon fontSize="small" />
+                                  </IconButton>
+                                  <IconButton 
+                                    size="small"
+                                    color="error"
+                                    onClick={() => setDeleteConfirmDialog({ 
+                                      open: true, 
+                                      type: 'document', 
+                                      id: doc.id 
+                                    })}
+                                  >
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            )
+          })}
         </TabPanel>
 
-        <TabPanel value={tabValue} index={2}>
-          <Typography variant="h6" gutterBottom>
-            <BusinessIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-            Company Settings
-          </Typography>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Company Name"
-                defaultValue="Jobline Recruitment"
-                disabled={user?.role !== 'SUPER_ADMIN'}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Company Email"
-                defaultValue="info@jobline.com"
-                disabled={user?.role !== 'SUPER_ADMIN'}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Company Phone"
-                defaultValue="+961 1 234567"
-                disabled={user?.role !== 'SUPER_ADMIN'}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Company Address"
-                defaultValue="Beirut, Lebanon"
-                disabled={user?.role !== 'SUPER_ADMIN'}
-              />
-            </Grid>
-          </Grid>
-        </TabPanel>
+        {/* Company Settings Tab - Super Admin Only */}
+        {user?.role === UserRole.SUPER_ADMIN && (
+          <TabPanel value={tabValue} index={2}>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                <BusinessIcon sx={{ mr: 1, verticalAlign: 'middle', color: 'primary.main' }} />
+                Company Settings
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<SaveIcon />}
+                onClick={handleSaveCompanySettings}
+              >
+                Save Settings
+              </Button>
+            </Box>
 
-        <TabPanel value={tabValue} index={3}>
+            <Grid container spacing={3}>
+              {/* Company Logo */}
+              <Grid item xs={12} md={3}>
+                <Box textAlign="center">
+                  <Avatar
+                    src={companySettings.logo}
+                    sx={{ width: 150, height: 150, mx: 'auto', mb: 2 }}
+                  >
+                    <BusinessIcon sx={{ fontSize: 60 }} />
+                  </Avatar>
+                  <input
+                    type="file"
+                    id="logo-upload"
+                    style={{ display: 'none' }}
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                  />
+                  <label htmlFor="logo-upload">
+                    <Button
+                      variant="outlined"
+                      component="span"
+                      startIcon={uploadingLogo ? null : <PhotoIcon />}
+                      disabled={uploadingLogo}
+                      fullWidth
+                    >
+                      {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
+                    </Button>
+                  </label>
+                </Box>
+              </Grid>
+
+              {/* Company Details */}
+              <Grid item xs={12} md={9}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Company Name"
+                      value={companySettings.name}
+                      onChange={(e) => setCompanySettings({ ...companySettings, name: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Email"
+                      type="email"
+                      value={companySettings.email}
+                      onChange={(e) => setCompanySettings({ ...companySettings, email: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Phone"
+                      value={companySettings.phone}
+                      onChange={(e) => setCompanySettings({ ...companySettings, phone: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Website"
+                      value={companySettings.website}
+                      onChange={(e) => setCompanySettings({ ...companySettings, website: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Address"
+                      multiline
+                      rows={2}
+                      value={companySettings.address}
+                      onChange={(e) => setCompanySettings({ ...companySettings, address: e.target.value })}
+                    />
+                  </Grid>
+
+                  {/* Legal Information */}
+                  <Grid item xs={12}>
+                    <Divider sx={{ my: 2 }}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Legal Information
+                      </Typography>
+                    </Divider>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Registration Number"
+                      value={companySettings.registrationNumber}
+                      onChange={(e) => setCompanySettings({ ...companySettings, registrationNumber: e.target.value })}
+                      helperText="Official business registration number"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Tax Number"
+                      value={companySettings.taxNumber}
+                      onChange={(e) => setCompanySettings({ ...companySettings, taxNumber: e.target.value })}
+                      helperText="VAT or Tax identification number"
+                    />
+                  </Grid>
+
+                  {/* Banking Information */}
+                  <Grid item xs={12}>
+                    <Divider sx={{ my: 2 }}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Banking Information
+                      </Typography>
+                    </Divider>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      fullWidth
+                      label="Bank Name"
+                      value={companySettings.bankName}
+                      onChange={(e) => setCompanySettings({ ...companySettings, bankName: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      fullWidth
+                      label="Account Number"
+                      value={companySettings.bankAccount}
+                      onChange={(e) => setCompanySettings({ ...companySettings, bankAccount: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      fullWidth
+                      label="IBAN"
+                      value={companySettings.bankIBAN}
+                      onChange={(e) => setCompanySettings({ ...companySettings, bankIBAN: e.target.value })}
+                    />
+                  </Grid>
+                </Grid>
+              </Grid>
+            </Grid>
+          </TabPanel>
+        )}
+
+        {/* Notifications Tab */}
+        <TabPanel value={tabValue} index={user?.role === UserRole.SUPER_ADMIN ? 3 : 1}>
           <Typography variant="h6" gutterBottom>
             <NotificationIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
             Notification Settings
@@ -543,51 +797,216 @@ const Settings = () => {
                 <Switch defaultChecked />
               </ListItemSecondaryAction>
             </ListItem>
+            <ListItem>
+              <ListItemText
+                primary="Document Reminders"
+                secondary="Alert when documents are required from clients"
+              />
+              <ListItemSecondaryAction>
+                <Switch defaultChecked />
+              </ListItemSecondaryAction>
+            </ListItem>
           </List>
         </TabPanel>
       </Paper>
 
       {/* Fee Template Dialog */}
-      <Dialog open={feeDialog} onClose={() => setFeeDialog(false)} maxWidth="sm" fullWidth>
-        <form onSubmit={feeForm.handleSubmit(handleSaveFeeTemplate)}>
+      {user?.role === UserRole.SUPER_ADMIN && (
+        <Dialog open={feeDialog} onClose={() => setFeeDialog(false)} maxWidth="sm" fullWidth>
+          <form onSubmit={feeForm.handleSubmit(handleSaveFeeTemplate)}>
+            <DialogTitle>
+              {editingFee ? 'Edit Fee Template' : 'Create Fee Template'}
+            </DialogTitle>
+            <DialogContent>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid item xs={12}>
+                  <Controller
+                    name="name"
+                    control={feeForm.control}
+                    rules={{ required: 'Name is required' }}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        label="Template Name"
+                        error={!!feeForm.formState.errors.name}
+                        helperText={feeForm.formState.errors.name?.message as string}
+                      />
+                    )}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Controller
+                    name="nationality"
+                    control={feeForm.control}
+                    defaultValue=""
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        select
+                        label="Nationality (Optional)"
+                        helperText="Leave empty for general template"
+                      >
+                        <MenuItem value="">None (General)</MenuItem>
+                        {nationalities.map((nationality) => (
+                          <MenuItem key={nationality} value={nationality}>
+                            {nationality}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    )}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Controller
+                    name="currency"
+                    control={feeForm.control}
+                    defaultValue="USD"
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        select
+                        label="Currency"
+                      >
+                        <MenuItem value="USD">USD</MenuItem>
+                        <MenuItem value="LBP">LBP</MenuItem>
+                        <MenuItem value="EUR">EUR</MenuItem>
+                      </TextField>
+                    )}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Controller
+                    name="defaultPrice"
+                    control={feeForm.control}
+                    rules={{ required: 'Default price is required', min: 0 }}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        label="Default Price"
+                        type="number"
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                        }}
+                        error={!!feeForm.formState.errors.defaultPrice}
+                        helperText={feeForm.formState.errors.defaultPrice?.message as string}
+                      />
+                    )}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Controller
+                    name="minPrice"
+                    control={feeForm.control}
+                    rules={{ required: 'Minimum price is required', min: 0 }}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        label="Minimum Price"
+                        type="number"
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                        }}
+                        error={!!feeForm.formState.errors.minPrice}
+                        helperText={feeForm.formState.errors.minPrice?.message as string}
+                      />
+                    )}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Controller
+                    name="maxPrice"
+                    control={feeForm.control}
+                    rules={{ required: 'Maximum price is required', min: 0 }}
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        label="Maximum Price"
+                        type="number"
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                        }}
+                        error={!!feeForm.formState.errors.maxPrice}
+                        helperText={feeForm.formState.errors.maxPrice?.message as string}
+                      />
+                    )}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <Controller
+                    name="description"
+                    control={feeForm.control}
+                    defaultValue=""
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        label="Description (Optional)"
+                        multiline
+                        rows={2}
+                      />
+                    )}
+                  />
+                </Grid>
+              </Grid>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setFeeDialog(false)}>Cancel</Button>
+              <Button type="submit" variant="contained">
+                {editingFee ? 'Update' : 'Create'}
+              </Button>
+            </DialogActions>
+          </form>
+        </Dialog>
+      )}
+
+      {/* Document Template Dialog */}
+      <Dialog open={documentDialog} onClose={() => setDocumentDialog(false)} maxWidth="sm" fullWidth>
+        <form onSubmit={documentForm.handleSubmit(handleSaveDocumentTemplate)}>
           <DialogTitle>
-            {editingFee ? 'Edit Fee Template' : 'Create Fee Template'}
+            {editingDocument ? 'Edit Document Template' : 'Create Document Template'}
           </DialogTitle>
           <DialogContent>
             <Grid container spacing={2} sx={{ mt: 1 }}>
               <Grid item xs={12}>
                 <Controller
                   name="name"
-                  control={feeForm.control}
-                  rules={{ required: 'Name is required' }}
+                  control={documentForm.control}
+                  rules={{ required: 'Document name is required' }}
                   render={({ field }) => (
                     <TextField
                       {...field}
                       fullWidth
-                      label="Template Name"
-                      error={!!feeForm.formState.errors.name}
-                      helperText={feeForm.formState.errors.name?.message as string}
+                      label="Document Name"
+                      error={!!documentForm.formState.errors.name}
+                      helperText={documentForm.formState.errors.name?.message as string}
                     />
                   )}
                 />
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid item xs={12}>
                 <Controller
-                  name="nationality"
-                  control={feeForm.control}
-                  defaultValue=""
+                  name="stage"
+                  control={documentForm.control}
+                  rules={{ required: 'Stage is required' }}
+                  defaultValue="PENDING_MOL"
                   render={({ field }) => (
                     <TextField
                       {...field}
                       fullWidth
                       select
-                      label="Nationality (Optional)"
-                      helperText="Leave empty for general template"
+                      label="Application Stage"
+                      error={!!documentForm.formState.errors.stage}
+                      helperText={documentForm.formState.errors.stage?.message as string}
                     >
-                      <MenuItem value="">None (General)</MenuItem>
-                      {nationalities.map((nationality) => (
-                        <MenuItem key={nationality} value={nationality}>
-                          {nationality}
+                      {applicationStages.map((stage) => (
+                        <MenuItem key={stage.value} value={stage.value}>
+                          {stage.label}
                         </MenuItem>
                       ))}
                     </TextField>
@@ -596,95 +1015,53 @@ const Settings = () => {
               </Grid>
               <Grid item xs={12} md={6}>
                 <Controller
-                  name="currency"
-                  control={feeForm.control}
-                  defaultValue="USD"
+                  name="requiredFrom"
+                  control={documentForm.control}
+                  defaultValue="office"
                   render={({ field }) => (
                     <TextField
                       {...field}
                       fullWidth
                       select
-                      label="Currency"
+                      label="Required From"
                     >
-                      <MenuItem value="USD">USD</MenuItem>
-                      <MenuItem value="LBP">LBP</MenuItem>
-                      <MenuItem value="EUR">EUR</MenuItem>
+                      <MenuItem value="office">Office</MenuItem>
+                      <MenuItem value="client">Client</MenuItem>
                     </TextField>
                   )}
                 />
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={6}>
                 <Controller
-                  name="defaultPrice"
-                  control={feeForm.control}
-                  rules={{ required: 'Default price is required', min: 0 }}
+                  name="order"
+                  control={documentForm.control}
+                  defaultValue={0}
                   render={({ field }) => (
                     <TextField
                       {...field}
                       fullWidth
-                      label="Default Price"
+                      label="Display Order"
                       type="number"
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">$</InputAdornment>,
-                      }}
-                      error={!!feeForm.formState.errors.defaultPrice}
-                      helperText={feeForm.formState.errors.defaultPrice?.message as string}
-                    />
-                  )}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Controller
-                  name="minPrice"
-                  control={feeForm.control}
-                  rules={{ required: 'Minimum price is required', min: 0 }}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      fullWidth
-                      label="Minimum Price"
-                      type="number"
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">$</InputAdornment>,
-                      }}
-                      error={!!feeForm.formState.errors.minPrice}
-                      helperText={feeForm.formState.errors.minPrice?.message as string}
-                    />
-                  )}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Controller
-                  name="maxPrice"
-                  control={feeForm.control}
-                  rules={{ required: 'Maximum price is required', min: 0 }}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      fullWidth
-                      label="Maximum Price"
-                      type="number"
-                      InputProps={{
-                        startAdornment: <InputAdornment position="start">$</InputAdornment>,
-                      }}
-                      error={!!feeForm.formState.errors.maxPrice}
-                      helperText={feeForm.formState.errors.maxPrice?.message as string}
+                      helperText="Lower numbers appear first"
                     />
                   )}
                 />
               </Grid>
               <Grid item xs={12}>
                 <Controller
-                  name="description"
-                  control={feeForm.control}
-                  defaultValue=""
+                  name="required"
+                  control={documentForm.control}
+                  defaultValue={true}
                   render={({ field }) => (
-                    <TextField
-                      {...field}
-                      fullWidth
-                      label="Description (Optional)"
-                      multiline
-                      rows={2}
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          {...field}
+                          checked={field.value === true}
+                          onChange={(e) => field.onChange(e.target.checked)}
+                        />
+                      }
+                      label="This document is required"
                     />
                   )}
                 />
@@ -692,9 +1069,9 @@ const Settings = () => {
             </Grid>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setFeeDialog(false)}>Cancel</Button>
+            <Button onClick={() => setDocumentDialog(false)}>Cancel</Button>
             <Button type="submit" variant="contained">
-              {editingFee ? 'Update' : 'Create'}
+              {editingDocument ? 'Update' : 'Create'}
             </Button>
           </DialogActions>
         </form>

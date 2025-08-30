@@ -141,9 +141,22 @@ router.post('/upload', upload.single('file'), async (req: AuthRequest, res) => {
       originalName: fileRecord.originalName,
       url: fileRecord.url,
     });
-  } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ error: 'Failed to upload file' });
+  } catch (error: any) {
+    console.error('Upload error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      entityType: req.body?.entityType,
+      entityId: req.body?.entityId,
+      companyId: req.user?.companyId
+    });
+    
+    // Send more specific error message
+    const errorMessage = error.message || 'Failed to upload file';
+    res.status(500).json({ 
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    });
   }
 });
 

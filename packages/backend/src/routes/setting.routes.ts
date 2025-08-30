@@ -231,6 +231,55 @@ router.delete('/documents/templates/:id', async (req: AuthRequest, res) => {
 
 
 
+// Get company settings
+router.get('/company', async (req: AuthRequest, res) => {
+  try {
+    const companyId = req.user!.companyId;
+    
+    const companySetting = await prisma.setting.findFirst({
+      where: { 
+        key: 'company_info',
+        companyId,
+      },
+    });
+    
+    // Return existing settings or empty object
+    res.json(companySetting?.value || {});
+  } catch (error) {
+    console.error('Get company settings error:', error);
+    res.status(500).json({ error: 'Failed to fetch company settings' });
+  }
+});
+
+// Update company settings
+router.post('/company', async (req: AuthRequest, res) => {
+  try {
+    const companyId = req.user!.companyId;
+    const companyInfo = req.body;
+    
+    const setting = await prisma.setting.upsert({
+      where: { 
+        companyId_key: {
+          companyId,
+          key: 'company_info',
+        },
+      },
+      update: { value: companyInfo },
+      create: { 
+        key: 'company_info', 
+        value: companyInfo, 
+        description: 'Company information and settings',
+        companyId 
+      },
+    });
+    
+    res.json(setting.value);
+  } catch (error) {
+    console.error('Update company settings error:', error);
+    res.status(500).json({ error: 'Failed to update company settings' });
+  }
+});
+
 // Update nationalities (company-specific)
 router.put('/nationalities', async (req: AuthRequest, res) => {
   try {

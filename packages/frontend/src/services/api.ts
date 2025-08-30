@@ -46,4 +46,21 @@ api.interceptors.response.use(
   }
 )
 
+// Create a separate axios instance for public endpoints
+export const publicApi = axios.create({
+  baseURL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+// Public API doesn't need auth interceptors
+publicApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Just pass through the error without redirecting
+    return Promise.reject(error)
+  }
+)
+
 export default api
