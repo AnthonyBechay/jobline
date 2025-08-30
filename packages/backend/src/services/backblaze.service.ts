@@ -14,7 +14,8 @@ const s3Client = new S3Client({
   forcePathStyle: true, // Required for B2
 });
 
-const BUCKET_NAME = process.env.B2_BUCKET_NAME || 'jobline-files';
+// Use the actual bucket name from environment or default
+const BUCKET_NAME = process.env.B2_BUCKET_NAME || 'jobline';
 
 interface UploadOptions {
   folder?: string;
@@ -139,6 +140,28 @@ const generateOrganizedPath = (
 };
 
 /**
+ * Generate a signed URL for private file access (internal with custom client)
+ */
+const getSignedUrlForB2Internal = async (
+  client: S3Client,
+  key: string,
+  expiresIn: number = 3600
+): Promise<string> => {
+  try {
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    });
+    
+    const url = await getS3SignedUrl(client, command, { expiresIn });
+    return url;
+  } catch (error) {
+    console.error('B2 signed URL error:', error);
+    throw new Error('Failed to generate signed URL');
+  }
+};
+
+/**
  * Upload a file to Backblaze B2 with organized folder structure
  */
 export const uploadToB2 = async (
@@ -153,13 +176,42 @@ export const uploadToB2 = async (
       throw new Error('Storage service not configured. Please contact administrator.');
     }
 
+    // Fix common Key ID issues
+    let keyId = process.env.B2_KEY_ID.trim();
+    
+    // If the key ID doesn't start with '00', it might be missing the prefix
+    // Backblaze key IDs typically start with '00' followed by 10 more characters
+    if (keyId.length === 10 && !keyId.startsWith('00')) {
+      console.warn('B2 Key ID might be missing "00" prefix, adding it...');
+      keyId = '00' + keyId;
+    } else if (keyId.length === 11 && !keyId.startsWith('00')) {
+      console.warn('B2 Key ID might be missing "0" prefix, adding it...');
+      keyId = '0' + keyId;
+    }
+    
+    // Ensure the key is properly formatted (no extra characters)
+    keyId = keyId.replace(/[^a-zA-Z0-9]/g, '');
+
     // Log credentials (partially, for debugging)
     console.log('B2 Configuration Check:', {
-      keyIdLength: process.env.B2_KEY_ID?.length,
-      keyIdPrefix: process.env.B2_KEY_ID?.substring(0, 4),
+      keyIdLength: keyId.length,
+      keyIdPrefix: keyId.substring(0, 4),
+      keyIdSuffix: keyId.substring(keyId.length - 2),
       hasAppKey: !!process.env.B2_APPLICATION_KEY,
+      appKeyLength: process.env.B2_APPLICATION_KEY?.length,
       endpoint: process.env.B2_ENDPOINT,
       bucket: BUCKET_NAME
+    });
+    
+    // Create a new S3 client with the corrected credentials
+    const s3ClientCorrected = new S3Client({
+      endpoint: process.env.B2_ENDPOINT || 'https://s3.eu-central-003.backblazeb2.com',
+      region: process.env.B2_REGION || 'eu-central-003',
+      credentials: {
+        accessKeyId: keyId,
+        secretAccessKey: process.env.B2_APPLICATION_KEY!.trim(),
+      },
+      forcePathStyle: true,
     });
     
     // Generate organized file path
@@ -206,10 +258,10 @@ export const uploadToB2 = async (
     });
     
     // Upload to B2
-    await s3Client.send(command);
+    await s3ClientCorrected.send(command);
     
     // Generate a signed URL for the file
-    const url = await getSignedUrlForB2(key);
+    const url = await getSignedUrlForB2Internal(s3ClientCorrected, key);
     
     console.log('Upload successful:', { key, url });
     
