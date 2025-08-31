@@ -12,15 +12,26 @@ datasource db {
 
 // Company model - each Super Admin creates a company/office
 model Company {
-  id            String   @id @default(uuid())
-  name          String
-  phone         String?
-  address       String?
-  email         String?
-  website       String?
-  taxId         String?  @map("tax_id")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id                    String    @id @default(uuid())
+  name                  String
+  phone                 String?
+  address               String?
+  email                 String?
+  website               String?
+  taxId                 String?   @map("tax_id")
+  molRegistrationNumber String?   @map("mol_registration_number")
+  bankName              String?   @map("bank_name")
+  bankAccountNumber     String?   @map("bank_account_number")
+  bankIBAN              String?   @map("bank_iban")
+  bankSwiftCode         String?   @map("bank_swift_code")
+  licenseNumber         String?   @map("license_number")
+  establishedDate       DateTime? @map("established_date")
+  numberOfEmployees     Int?      @map("number_of_employees")
+  contactPersonName     String?   @map("contact_person_name")
+  contactPersonPhone    String?   @map("contact_person_phone")
+  contactPersonEmail    String?   @map("contact_person_email")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
   
   // Relations
   users         User[]
@@ -283,6 +294,7 @@ model DocumentTemplate {
   id           String            @id @default(uuid())
   stage        ApplicationStatus
   name         String
+  description  String?           // Description/instructions for the document
   required     Boolean           @default(true)
   requiredFrom String            @default("office") // "office" or "client"  
   order        Int               @default(0)

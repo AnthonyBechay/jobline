@@ -225,7 +225,9 @@ export interface DocumentTemplate {
   id: string;
   stage: ApplicationStatus;
   name: string;
+  description?: string;
   required: boolean;
+  requiredFrom?: string; // 'office' or 'client'
   order: number;
   companyId: string;
   createdAt: Date;
@@ -256,6 +258,7 @@ export interface FeeTemplate {
   maxPrice: number;
   currency: string;
   nationality?: string;
+  serviceType?: string;
   description?: string;
   companyId: string;
   createdAt: Date;
@@ -305,6 +308,28 @@ export interface Nationality {
   id: string;
   code: string;
   name: string;
+  active: boolean;
+  companyId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Service Type
+export interface ServiceType {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  companyId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Cost Type Model
+export interface CostTypeModel {
+  id: string;
+  name: string;
+  description?: string;
   active: boolean;
   companyId: string;
   createdAt: Date;

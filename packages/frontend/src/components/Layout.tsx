@@ -25,11 +25,9 @@ import {
   Assignment as AssignmentIcon,
   AttachMoney as MoneyIcon,
   Settings as SettingsIcon,
-  Group as GroupIcon,
   Business as BusinessIcon,
   Support as SupportIcon,
   ExitToApp as LogoutIcon,
-  NotificationsActive as ReminderIcon,
   ChevronLeft as ChevronLeftIcon,
 } from '@mui/icons-material'
 import { useAuth } from '../contexts/AuthContext'
@@ -70,8 +68,6 @@ const Layout = () => {
     { text: 'Financial', icon: <MoneyIcon />, path: '/financial', roles: [UserRole.SUPER_ADMIN] },
     { text: 'Agents', icon: <BusinessIcon />, path: '/agents', roles: [UserRole.SUPER_ADMIN] },
     { text: 'Brokers', icon: <SupportIcon />, path: '/brokers', roles: [UserRole.SUPER_ADMIN] },
-    { text: 'Users', icon: <GroupIcon />, path: '/users', roles: [UserRole.SUPER_ADMIN] },
-    { text: 'Reminders', icon: <ReminderIcon />, path: '/reminders', roles: [UserRole.SUPER_ADMIN] },
     { text: 'Settings', icon: <SettingsIcon />, path: '/settings', roles: [UserRole.SUPER_ADMIN] },
   ]
 

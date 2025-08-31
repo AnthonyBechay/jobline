@@ -58,6 +58,7 @@ router.post(
   [
     body('stage').notEmpty().withMessage('Stage is required'),
     body('name').notEmpty().trim().withMessage('Name is required'),
+    body('description').optional().trim(),
     body('required').optional().isBoolean(),
     body('requiredFrom').optional().isIn(['office', 'client']).withMessage('Must be either office or client'),
     body('order').optional().isInt({ min: 0 }),
@@ -65,7 +66,7 @@ router.post(
   validate,
   async (req: AuthRequest, res) => {
     try {
-      const { stage, name, required = true, requiredFrom = 'office', order = 0 } = req.body;
+      const { stage, name, description, required = true, requiredFrom = 'office', order = 0 } = req.body;
       const companyId = req.user!.companyId;
       
       // Check if a template with this name and stage already exists
@@ -86,6 +87,7 @@ router.post(
         data: {
           stage,
           name,
+          description,
           required,
           requiredFrom,
           order,
@@ -109,6 +111,7 @@ router.put(
     param('id').isUUID(),
     body('stage').optional(),
     body('name').optional().trim(),
+    body('description').optional().trim(),
     body('required').optional().isBoolean(),
     body('requiredFrom').optional().isIn(['office', 'client']),
     body('order').optional().isInt({ min: 0 }),

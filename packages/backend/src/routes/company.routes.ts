@@ -20,6 +20,17 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
         address: true,
         website: true,
         taxId: true,
+        molRegistrationNumber: true,
+        bankName: true,
+        bankAccountNumber: true,
+        bankIBAN: true,
+        bankSwiftCode: true,
+        licenseNumber: true,
+        establishedDate: true,
+        numberOfEmployees: true,
+        contactPersonName: true,
+        contactPersonPhone: true,
+        contactPersonEmail: true,
       },
     });
 
@@ -32,7 +43,18 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
         phone: '',
         address: '',
         website: '',
-        taxId: ''
+        taxId: '',
+        molRegistrationNumber: '',
+        bankName: '',
+        bankAccountNumber: '',
+        bankIBAN: '',
+        bankSwiftCode: '',
+        licenseNumber: '',
+        establishedDate: null,
+        numberOfEmployees: null,
+        contactPersonName: '',
+        contactPersonPhone: '',
+        contactPersonEmail: '',
       });
       return;
     }
@@ -47,7 +69,25 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
 // Update company settings (Super Admin only)
 router.put('/', authenticate, authorize(UserRole.SUPER_ADMIN), async (req: AuthRequest, res) => {
   try {
-    const { name, email, phone, address, website, taxId } = req.body;
+    const { 
+      name, 
+      email, 
+      phone, 
+      address, 
+      website, 
+      taxId,
+      molRegistrationNumber,
+      bankName,
+      bankAccountNumber,
+      bankIBAN,
+      bankSwiftCode,
+      licenseNumber,
+      establishedDate,
+      numberOfEmployees,
+      contactPersonName,
+      contactPersonPhone,
+      contactPersonEmail,
+    } = req.body;
 
     const company = await prisma.company.update({
       where: {
@@ -60,6 +100,17 @@ router.put('/', authenticate, authorize(UserRole.SUPER_ADMIN), async (req: AuthR
         address,
         website,
         taxId,
+        molRegistrationNumber,
+        bankName,
+        bankAccountNumber,
+        bankIBAN,
+        bankSwiftCode,
+        licenseNumber,
+        establishedDate: establishedDate ? new Date(establishedDate) : null,
+        numberOfEmployees: numberOfEmployees ? parseInt(numberOfEmployees) : null,
+        contactPersonName,
+        contactPersonPhone,
+        contactPersonEmail,
       },
     });
 
