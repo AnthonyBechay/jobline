@@ -123,7 +123,7 @@ const Layout = () => {
       {/* User info section */}
       <Box sx={{ 
         px: 2, 
-        py: 2,
+        py: 1.5,
         background: alpha('#000000', 0.1),
         borderTop: '1px solid',
         borderBottom: '1px solid',
@@ -136,7 +136,7 @@ const Layout = () => {
             gap: 1.5,
             cursor: 'pointer',
             borderRadius: 2,
-            p: 1,
+            p: 0.75,
             transition: 'all 0.3s',
             '&:hover': { 
               bgcolor: alpha('#ffffff', 0.05),
@@ -179,11 +179,11 @@ const Layout = () => {
       {/* Menu items */}
       <List sx={{ 
         flexGrow: 1, 
-        py: 1,
+        py: 0.5,
         px: 1,
       }}>
         {filteredMenuItems.map((item) => (
-          <ListItem key={item.text} disablePadding sx={{ my: 0.5 }}>
+          <ListItem key={item.text} disablePadding sx={{ my: 0.25 }}>
             <ListItemButton
               selected={location.pathname.startsWith(item.path)}
               onClick={() => {
@@ -191,7 +191,7 @@ const Layout = () => {
                 if (mobileOpen) setMobileOpen(false)
               }}
               sx={{
-                py: 1.2,
+                py: 0.8,
                 px: 2,
                 borderRadius: 2,
                 transition: 'all 0.3s',

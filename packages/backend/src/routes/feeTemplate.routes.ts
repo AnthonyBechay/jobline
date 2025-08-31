@@ -71,12 +71,16 @@ router.post(
       const companyId = req.user!.companyId;
       
       // Validate price range
-      if (parseFloat(minPrice) > parseFloat(maxPrice)) {
+      const minPriceValue = parseFloat(minPrice);
+      const maxPriceValue = parseFloat(maxPrice);
+      const defaultPriceValue = parseFloat(defaultPrice);
+      
+      if (minPriceValue > maxPriceValue) {
         res.status(400).json({ error: 'Minimum price cannot be greater than maximum price' });
         return;
       }
       
-      if (parseFloat(defaultPrice) < parseFloat(minPrice) || parseFloat(defaultPrice) > parseFloat(maxPrice)) {
+      if (defaultPriceValue < minPriceValue || defaultPriceValue > maxPriceValue) {
         res.status(400).json({ error: 'Default price must be between minimum and maximum price' });
         return;
       }

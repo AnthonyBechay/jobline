@@ -183,9 +183,27 @@ const Settings = () => {
 
   const fetchCompanySettings = async () => {
     try {
-      const response = await api.get('/settings/company')
-      if (response.data) {
-        setCompanySettings(response.data)
+      // First get the actual company data
+      const companyRes = await api.get('/company')
+      if (companyRes.data) {
+        setCompanySettings(prev => ({
+          ...prev,
+          name: companyRes.data.name || '',
+          email: companyRes.data.email || '',
+          phone: companyRes.data.phone || '',
+          address: companyRes.data.address || '',
+          website: companyRes.data.website || '',
+          taxId: companyRes.data.taxId || '',
+        }))
+      }
+      
+      // Then get additional settings from the settings table
+      const settingsRes = await api.get('/settings/company')
+      if (settingsRes.data) {
+        setCompanySettings(prev => ({
+          ...prev,
+          ...settingsRes.data
+        }))
       }
     } catch (err) {
       console.error('Failed to fetch company settings:', err)
@@ -194,7 +212,26 @@ const Settings = () => {
 
   const handleSaveCompanySettings = async () => {
     try {
-      await api.post('/settings/company', companySettings)
+      // Update company basic info
+      await api.put('/company', {
+        name: companySettings.name,
+        email: companySettings.email,
+        phone: companySettings.phone,
+        address: companySettings.address,
+        website: companySettings.website,
+        taxId: companySettings.taxId,
+      })
+      
+      // Save additional settings to settings table
+      await api.post('/settings/company', {
+        logo: companySettings.logo,
+        registrationNumber: companySettings.registrationNumber,
+        taxNumber: companySettings.taxNumber,
+        bankName: companySettings.bankName,
+        bankAccount: companySettings.bankAccount,
+        bankIBAN: companySettings.bankIBAN,
+      })
+      
       setSuccess('Company settings saved successfully')
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to save company settings')
@@ -403,6 +440,7 @@ const Settings = () => {
 
         {/* Office Management Tab - Contains Fee Templates and Document Templates */}
         <TabPanel value={tabValue} index={0}>
+          <Box sx={{ px: 3, py: 2 }}>
           <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
             <AdminIcon sx={{ mr: 1, verticalAlign: 'middle', color: 'primary.main' }} />
             Office Management Settings
@@ -410,8 +448,8 @@ const Settings = () => {
           
           {/* Fee Templates Section - Only for Super Admin */}
           {user?.role === UserRole.SUPER_ADMIN && (
-            <Accordion defaultExpanded sx={{ mb: 2 }}>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Accordion defaultExpanded sx={{ mb: 2, borderRadius: 2, '&:before': { display: 'none' } }}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ bgcolor: 'background.default' }}>
                 <Typography variant="h6">
                   <MoneyIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
                   Fee Templates
@@ -503,10 +541,11 @@ const Settings = () => {
               </AccordionDetails>
             </Accordion>
           )}
+          </Box>
 
           {/* Document Templates Section */}
-          <Accordion defaultExpanded>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Accordion defaultExpanded sx={{ mb: 2, borderRadius: 2, '&:before': { display: 'none' } }}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ bgcolor: 'background.default' }}>
               <Typography variant="h6">
                 <DocumentIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
                 Document Requirements
@@ -627,6 +666,7 @@ const Settings = () => {
         {/* Company Settings Tab - Super Admin Only */}
         {user?.role === UserRole.SUPER_ADMIN && (
           <TabPanel value={tabValue} index={1}>
+            <Box sx={{ px: 3, py: 2 }}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
               <Typography variant="h6" sx={{ fontWeight: 600 }}>
                 <BusinessIcon sx={{ mr: 1, verticalAlign: 'middle', color: 'primary.main' }} />
@@ -779,11 +819,13 @@ const Settings = () => {
                 </Grid>
               </Grid>
             </Grid>
+            </Box>
           </TabPanel>
         )}
 
         {/* Nationalities Tab */}
         <TabPanel value={tabValue} index={user?.role === UserRole.SUPER_ADMIN ? 2 : 1}>
+          <Box sx={{ px: 3, py: 2 }}>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
               <LanguageIcon sx={{ mr: 1, verticalAlign: 'middle', color: 'primary.main' }} />
@@ -821,19 +863,11 @@ const Settings = () => {
                       <Typography variant="body1">{nationality.name}</Typography>
                     </TableCell>
                     <TableCell align="center">
-                      {user?.role === UserRole.SUPER_ADMIN ? (
-                        <Switch
-                          checked={nationality.active}
-                          onChange={() => handleToggleNationalityStatus(nationality.id)}
-                          color="primary"
-                        />
-                      ) : (
-                        <Chip
-                          label={nationality.active ? 'Active' : 'Inactive'}
-                          color={nationality.active ? 'success' : 'default'}
-                          size="small"
-                        />
-                      )}
+                      <Chip
+                        label={nationality.active ? 'Active' : 'Inactive'}
+                        color={nationality.active ? 'success' : 'default'}
+                        size="small"
+                      />
                     </TableCell>
                     <TableCell align="center">
                       <Typography variant="body2" color="text.secondary">
@@ -852,18 +886,20 @@ const Settings = () => {
                         >
                           <EditIcon fontSize="small" />
                         </IconButton>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => setDeleteConfirmDialog({
-                            open: true,
-                            type: 'nationality',
-                            id: nationality.id
-                          })}
-                          disabled={nationality.candidateCount > 0}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
+                        {nationality.candidateCount === 0 && (
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => {
+                              // Delete nationality
+                              const updated = nationalities.filter(n => n.id !== nationality.id)
+                              setNationalities(updated)
+                              setSuccess('Nationality deleted successfully')
+                            }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        )}
                       </TableCell>
                     )}
                   </TableRow>
@@ -871,10 +907,12 @@ const Settings = () => {
               </TableBody>
             </Table>
           </TableContainer>
+          </Box>
         </TabPanel>
 
         {/* Notifications Tab */}
         <TabPanel value={tabValue} index={user?.role === UserRole.SUPER_ADMIN ? 3 : 2}>
+          <Box sx={{ px: 3, py: 2 }}>
           <Typography variant="h6" gutterBottom>
             <NotificationIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
             Notification Settings
@@ -917,6 +955,7 @@ const Settings = () => {
               </ListItemSecondaryAction>
             </ListItem>
           </List>
+          </Box>
         </TabPanel>
       </Paper>
 
@@ -991,7 +1030,21 @@ const Settings = () => {
                   <Controller
                     name="defaultPrice"
                     control={feeForm.control}
-                    rules={{ required: 'Default price is required', min: 0 }}
+                    rules={{ 
+                      required: 'Default price is required', 
+                      min: { value: 0, message: 'Price must be positive' },
+                      validate: (value) => {
+                        const minPrice = feeForm.getValues('minPrice')
+                        const maxPrice = feeForm.getValues('maxPrice')
+                        if (minPrice && parseFloat(value) < parseFloat(minPrice)) {
+                          return 'Default price must be greater than or equal to minimum price'
+                        }
+                        if (maxPrice && parseFloat(value) > parseFloat(maxPrice)) {
+                          return 'Default price must be less than or equal to maximum price'
+                        }
+                        return true
+                      }
+                    }}
                     render={({ field }) => (
                       <TextField
                         {...field}
@@ -1011,7 +1064,10 @@ const Settings = () => {
                   <Controller
                     name="minPrice"
                     control={feeForm.control}
-                    rules={{ required: 'Minimum price is required', min: 0 }}
+                    rules={{ 
+                      required: 'Minimum price is required', 
+                      min: { value: 0, message: 'Price must be positive' }
+                    }}
                     render={({ field }) => (
                       <TextField
                         {...field}
@@ -1031,7 +1087,17 @@ const Settings = () => {
                   <Controller
                     name="maxPrice"
                     control={feeForm.control}
-                    rules={{ required: 'Maximum price is required', min: 0 }}
+                    rules={{ 
+                      required: 'Maximum price is required', 
+                      min: { value: 0, message: 'Price must be positive' },
+                      validate: (value) => {
+                        const minPrice = feeForm.getValues('minPrice')
+                        if (minPrice && parseFloat(value) < parseFloat(minPrice)) {
+                          return 'Maximum price must be greater than minimum price'
+                        }
+                        return true
+                      }
+                    }}
                     render={({ field }) => (
                       <TextField
                         {...field}

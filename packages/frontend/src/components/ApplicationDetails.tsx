@@ -168,6 +168,7 @@ const ApplicationDetails = () => {
   const [feeDialog, setFeeDialog] = useState(false)
   const [editClientDialog, setEditClientDialog] = useState(false)
   const [editCandidateDialog, setEditCandidateDialog] = useState(false)
+  const [validationError, setValidationError] = useState<string>('')
   
   // Form controls for dialogs
   const paymentForm = useForm<any>()
@@ -229,11 +230,27 @@ const ApplicationDetails = () => {
 
   const handleUpdateApplicationStatus = async (newStatus: ApplicationStatus) => {
     try {
+      setValidationError('')
       await api.patch(`/applications/${id}`, { status: newStatus })
       setUpdateStatusDialog(false)
       await fetchApplicationDetails()
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to update status')
+      const errorData = err.response?.data
+      if (errorData?.userFriendly && errorData?.scrollToDocuments) {
+        // User-friendly validation error - show in yellow alert and scroll to documents
+        setValidationError(errorData.message || errorData.error)
+        setUpdateStatusDialog(false)
+        // Scroll to documents tab
+        setTabValue(0) // Switch to office documents tab
+        setTimeout(() => {
+          const documentsSection = document.getElementById('documents-section')
+          if (documentsSection) {
+            documentsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+        }, 100)
+      } else {
+        setError(err.response?.data?.error || 'Failed to update status')
+      }
     }
   }
 
@@ -541,7 +558,12 @@ const ApplicationDetails = () => {
 
         {/* Documents and Financial Details Tabs */}
         <Grid item xs={12}>
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2 }} id="documents-section">
+            {validationError && (
+              <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setValidationError('')}>
+                {validationError}
+              </Alert>
+            )}
             <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
               <Tab label="Office Documents" />
               <Tab label="Client Documents" />

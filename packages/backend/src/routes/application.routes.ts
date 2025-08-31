@@ -200,7 +200,7 @@ router.post('/', async (req: AuthRequest, res) => {
           shareableLink,
           feeTemplateId: selectedFeeTemplateId,
           finalFeeAmount: selectedFinalFeeAmount,
-          brokerId,
+          brokerId: brokerId && brokerId !== '' ? brokerId : null, // Handle empty string as null
           companyId, // Set company ID
         },
         include: {
@@ -631,7 +631,8 @@ router.patch('/:id', async (req: AuthRequest, res) => {
           error: `Please submit the following documents before proceeding: ${docList}`,
           message: `We need these documents to move to the next stage: ${docList}`,
           missingDocuments: missingDocs.map(d => d.name),
-          userFriendly: true
+          userFriendly: true,
+          scrollToDocuments: true
         });
         return;
       }

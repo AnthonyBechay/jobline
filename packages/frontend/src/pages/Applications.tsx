@@ -447,7 +447,12 @@ const ApplicationForm = () => {
   const onSubmit = async (data: any) => {
     try {
       setLoading(true)
-      const response = await api.post('/applications', data)
+      // Clean up data before sending
+      const cleanData = {
+        ...data,
+        brokerId: data.brokerId || null, // Convert empty string to null
+      }
+      const response = await api.post('/applications', cleanData)
       navigate(`/applications/${response.data.id}`)
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to create application')
@@ -545,17 +550,18 @@ const ApplicationForm = () => {
             {user?.role === UserRole.SUPER_ADMIN && (
               <Grid item xs={12} md={6}>
                 <Controller
-                  name="brokerId"
-                  control={control}
-                  defaultValue=""
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      fullWidth
-                      select
-                      label="Broker (Optional)"
-                      value={field.value || ''}
-                    >
+                name="brokerId"
+                control={control}
+                defaultValue=""
+                render={({ field }) => (
+                <TextField
+                {...field}
+                fullWidth
+                select
+                label="Broker (Optional)"
+                value={field.value || ''}
+                  onChange={(e) => field.onChange(e.target.value || null)}
+                      >
                       <MenuItem value="">None</MenuItem>
                       {brokers && brokers.length > 0 && brokers.map((broker) => (
                         <MenuItem key={broker.id} value={broker.id}>
@@ -785,7 +791,20 @@ const ApplicationDetails = () => {
       await fetchApplicationDetails()
     } catch (err: any) {
       console.error('Failed to update application status:', err)
-      setError(err.response?.data?.error || 'Failed to update status')
+      const errorData = err.response?.data
+      if (errorData?.userFriendly && errorData?.scrollToDocuments) {
+        setError(errorData.message || errorData.error)
+        setUpdateStatusDialog(false)
+        // Scroll to documents section
+        setTimeout(() => {
+          const docSection = document.getElementById('document-checklist')
+          if (docSection) {
+            docSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+        }, 100)
+      } else {
+        setError(errorData?.error || 'Failed to update status')
+      }
     }
   }
 
@@ -1037,7 +1056,7 @@ const ApplicationDetails = () => {
 
         {/* Document Checklist with Tabs */}
         <Grid item xs={12}>
-          <Card>
+          <Card id="document-checklist">
             <CardContent>
               <Typography variant="h6" gutterBottom>
                 <DocumentIcon sx={{ mr: 1, verticalAlign: 'middle' }} />

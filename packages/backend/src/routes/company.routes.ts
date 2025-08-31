@@ -1,16 +1,16 @@
 import { Router } from 'express';
 import { prisma } from '../index';
-import { authenticate, authorize } from '../middleware/auth.middleware';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth.middleware';
 import { UserRole } from '@prisma/client';
 
 const router = Router();
 
 // Get company settings
-router.get('/', authenticate, async (req: any, res) => {
+router.get('/', authenticate, async (req: AuthRequest, res) => {
   try {
     const company = await prisma.company.findUnique({
       where: {
-        id: req.user.companyId,
+        id: req.user!.companyId,
       },
       select: {
         id: true,
@@ -24,7 +24,17 @@ router.get('/', authenticate, async (req: any, res) => {
     });
 
     if (!company) {
-      return res.status(404).json({ error: 'Company not found' });
+      // Return empty object if company not found (for new registrations)
+      res.json({ 
+        id: req.user!.companyId,
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        website: '',
+        taxId: ''
+      });
+      return;
     }
 
     res.json(company);
@@ -35,13 +45,13 @@ router.get('/', authenticate, async (req: any, res) => {
 });
 
 // Update company settings (Super Admin only)
-router.put('/', authenticate, authorize([UserRole.SUPER_ADMIN]), async (req: any, res) => {
+router.put('/', authenticate, authorize(UserRole.SUPER_ADMIN), async (req: AuthRequest, res) => {
   try {
     const { name, email, phone, address, website, taxId } = req.body;
 
     const company = await prisma.company.update({
       where: {
-        id: req.user.companyId,
+        id: req.user!.companyId,
       },
       data: {
         name,
