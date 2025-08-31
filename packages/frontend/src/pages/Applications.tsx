@@ -82,6 +82,7 @@ import {
   Broker,
   Payment,
   Cost,
+  CostTypeModel,
   UserRole
 } from '../shared/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -648,6 +649,7 @@ const ApplicationDetails = () => {
   const [uploadedFiles, setUploadedFiles] = useState<any[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [costs, setCosts] = useState<Cost[]>([])
+  const [costTypes, setCostTypes] = useState<CostTypeModel[]>([])
   const [feeTemplates, setFeeTemplates] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -676,6 +678,7 @@ const ApplicationDetails = () => {
       fetchApplicationDetails()
       fetchFeeTemplates()
       fetchUploadedFiles()
+      fetchCostTypes()
     }
   }, [id])
 
@@ -722,6 +725,23 @@ const ApplicationDetails = () => {
     } catch (err) {
       console.error('Failed to fetch fee templates:', err)
       setFeeTemplates([])
+    }
+  }
+
+  const fetchCostTypes = async () => {
+    try {
+      const response = await api.get<CostTypeModel[]>('/cost-types')
+      setCostTypes(response.data || [])
+    } catch (err) {
+      console.error('Failed to fetch cost types:', err)
+      // Provide default cost types if API fails
+      setCostTypes([
+        { id: '1', name: 'AGENT_FEE', description: 'Agent Fee', active: true, companyId: '', createdAt: new Date(), updatedAt: new Date() },
+        { id: '2', name: 'BROKER_FEE', description: 'Broker Fee', active: true, companyId: '', createdAt: new Date(), updatedAt: new Date() },
+        { id: '3', name: 'GOV_FEE', description: 'Government Fee', active: true, companyId: '', createdAt: new Date(), updatedAt: new Date() },
+        { id: '4', name: 'TICKET', description: 'Ticket', active: true, companyId: '', createdAt: new Date(), updatedAt: new Date() },
+        { id: '5', name: 'OTHER', description: 'Other', active: true, companyId: '', createdAt: new Date(), updatedAt: new Date() },
+      ])
     }
   }
 
@@ -831,7 +851,7 @@ const ApplicationDetails = () => {
         amount: parseFloat(costForm.amount),
       })
       setCostDialog(false)
-      setCostForm({ amount: '', currency: 'USD', costType: CostType.OTHER, description: '' })
+      setCostForm({ amount: '', currency: 'USD', costType: 'OTHER', description: '' })
       await fetchApplicationDetails()
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to add cost')
@@ -1442,13 +1462,11 @@ const ApplicationDetails = () => {
                 value={costForm.costType}
                 onChange={(e) => setCostForm({ ...costForm, costType: e.target.value })}
               >
-                <MenuItem value="AGENT_FEE">Agent Fee</MenuItem>
-                <MenuItem value="BROKER_FEE">Broker Fee</MenuItem>
-                <MenuItem value="GOV_FEE">Government Fee</MenuItem>
-                <MenuItem value="TICKET">Ticket</MenuItem>
-                <MenuItem value="EXPEDITED_FEE">Expedited Fee</MenuItem>
-                <MenuItem value="ATTORNEY_FEE">Attorney Fee</MenuItem>
-                <MenuItem value="OTHER">Other</MenuItem>
+                {costTypes.filter(ct => ct.active).map((type) => (
+                  <MenuItem key={type.id} value={type.name}>
+                    {type.description || type.name.replace(/_/g, ' ')}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
             <TextField

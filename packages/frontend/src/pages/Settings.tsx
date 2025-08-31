@@ -1,62 +1,45 @@
 import { useState, useEffect } from 'react'
 import {
   Box,
-  Button,
   Paper,
   Typography,
-  TextField,
-  Grid,
-  IconButton,
+  Tabs,
+  Tab,
+  Button,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Alert,
+  TextField,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  MenuItem,
-  Card,
-  CardContent,
-  CardHeader,
-  Tabs,
-  Tab,
-  Chip,
-  InputAdornment,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
+  IconButton,
+  Alert,
   Switch,
   FormControlLabel,
-  Avatar,
-  Checkbox,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
+  Grid,
+  Card,
+  CardContent,
+  Chip,
+  Divider,
 } from '@mui/material'
 import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Save as SaveIcon,
-  AttachMoney as MoneyIcon,
-  Description as DocumentIcon,
-  Language as LanguageIcon,
   Settings as SettingsIcon,
-  Notifications as NotificationIcon,
-  Business as BusinessIcon,
-  PhotoCamera as PhotoIcon,
-  ExpandMore as ExpandMoreIcon,
-  AdminPanelSettings as AdminIcon,
+  AttachMoney as MoneyIcon,
+  Category as CategoryIcon,
+  Description as DocumentIcon,
+  Business as ServiceIcon,
 } from '@mui/icons-material'
 import { useForm, Controller } from 'react-hook-form'
 import { useAuth } from '../contexts/AuthContext'
-import { ApplicationStatus, UserRole } from '../shared/types'
+import { CostTypeModel, ServiceType, DocumentTemplate, FeeTemplate, UserRole } from '../shared/types'
 import api from '../services/api'
 
 interface TabPanelProps {
@@ -68,1188 +51,862 @@ interface TabPanelProps {
 function TabPanel(props: TabPanelProps) {
   const { children, value, index, ...other } = props
   return (
-    <div role="tabpanel" hidden={value !== index} {...other}>
-      {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`settings-tabpanel-${index}`}
+      aria-labelledby={`settings-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
     </div>
   )
 }
 
-// Application status stages for document templates
-const applicationStages = [
-  { value: 'PENDING_MOL', label: 'MoL Pre-Authorization' },
-  { value: 'MOL_AUTH_RECEIVED', label: 'MoL Authorization Received' },
-  { value: 'VISA_PROCESSING', label: 'Visa Processing' },
-  { value: 'VISA_RECEIVED', label: 'Visa Received' },
-  { value: 'WORKER_ARRIVED', label: 'Worker Arrived' },
-  { value: 'LABOUR_PERMIT_PROCESSING', label: 'Labour Permit Processing' },
-  { value: 'RESIDENCY_PERMIT_PROCESSING', label: 'Residency Permit Processing' },
-  { value: 'ACTIVE_EMPLOYMENT', label: 'Active Employment' },
-  { value: 'RENEWAL_PENDING', label: 'Renewal Pending' },
-]
-
 const Settings = () => {
   const { user } = useAuth()
   const [tabValue, setTabValue] = useState(0)
-  const [feeTemplates, setFeeTemplates] = useState<any[]>([])
-  const [documentTemplates, setDocumentTemplates] = useState<any[]>([])
-  const [nationalities, setNationalities] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [feeDialog, setFeeDialog] = useState(false)
-  const [documentDialog, setDocumentDialog] = useState(false)
-  const [nationalityDialog, setNationalityDialog] = useState(false)
-  const [editingFee, setEditingFee] = useState<any>(null)
-  const [editingDocument, setEditingDocument] = useState<any>(null)
-  const [editingNationality, setEditingNationality] = useState<any>(null)
-  const [deleteConfirmDialog, setDeleteConfirmDialog] = useState<{ open: boolean; type: string; id: string | null }>({
-    open: false,
-    type: '',
-    id: null,
-  })
-  const [companySettings, setCompanySettings] = useState<any>({
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-    logo: '',
-    registrationNumber: '',
-    taxNumber: '',
-    website: '',
-    bankName: '',
-    bankAccount: '',
-    bankIBAN: '',
-  })
-  const [uploadingLogo, setUploadingLogo] = useState(false)
-  const [costTypes, setCostTypes] = useState<any[]>([])
-  const [serviceTypes, setServiceTypes] = useState<any[]>([])
 
-  const feeForm = useForm<any>()
-  const documentForm = useForm<any>()
-  const nationalityForm = useForm<any>()
+  // Cost Types State
+  const [costTypes, setCostTypes] = useState<CostTypeModel[]>([])
+  const [costTypeDialog, setCostTypeDialog] = useState(false)
+  const [editingCostType, setEditingCostType] = useState<CostTypeModel | null>(null)
+
+  // Service Types State
+  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([])
+  const [serviceTypeDialog, setServiceTypeDialog] = useState(false)
+  const [editingServiceType, setEditingServiceType] = useState<ServiceType | null>(null)
+
+  // Fee Templates State
+  const [feeTemplates, setFeeTemplates] = useState<FeeTemplate[]>([])
+  const [feeTemplateDialog, setFeeTemplateDialog] = useState(false)
+  const [editingFeeTemplate, setEditingFeeTemplate] = useState<FeeTemplate | null>(null)
+
+  // Document Templates State
+  const [documentTemplates, setDocumentTemplates] = useState<DocumentTemplate[]>([])
+  const [documentTemplateDialog, setDocumentTemplateDialog] = useState(false)
+  const [editingDocumentTemplate, setEditingDocumentTemplate] = useState<DocumentTemplate | null>(null)
+
+  const { control: costTypeControl, handleSubmit: handleCostTypeSubmit, reset: resetCostType, setValue: setCostTypeValue } = useForm()
+  const { control: serviceTypeControl, handleSubmit: handleServiceTypeSubmit, reset: resetServiceType, setValue: setServiceTypeValue } = useForm()
+  const { control: feeTemplateControl, handleSubmit: handleFeeTemplateSubmit, reset: resetFeeTemplate, setValue: setFeeTemplateValue } = useForm()
+  const { control: documentTemplateControl, handleSubmit: handleDocumentTemplateSubmit, reset: resetDocumentTemplate, setValue: setDocumentTemplateValue } = useForm()
 
   useEffect(() => {
-    fetchData()
     if (user?.role === UserRole.SUPER_ADMIN) {
-      fetchCompanySettings()
-      fetchCostTypes()
-      fetchServiceTypes()
+      fetchAllData()
     }
   }, [user])
 
-  const fetchData = async () => {
+  const fetchAllData = async () => {
+    setLoading(true)
     try {
-      setLoading(true)
-      
-      // Fetch fee templates (Super Admin only)
-      if (user?.role === UserRole.SUPER_ADMIN) {
-        try {
-          const feeRes = await api.get('/fee-templates')
-          setFeeTemplates(feeRes.data || [])
-        } catch (err) {
-          console.error('Failed to fetch fee templates:', err)
-        }
-      }
-
-      // Fetch document templates
-      try {
-        const docRes = await api.get('/document-templates')
-        setDocumentTemplates(docRes.data || [])
-      } catch (err) {
-        console.error('Failed to fetch document templates:', err)
-      }
-
-      // Fetch nationalities
-      try {
-        const natRes = await api.get('/nationalities')
-        setNationalities(natRes.data || [])
-      } catch (err) {
-        // If API fails, use default list
-        setNationalities([
-          { id: '1', name: 'Ethiopian', active: true },
-          { id: '2', name: 'Filipino', active: true },
-          { id: '3', name: 'Sri Lankan', active: true },
-          { id: '4', name: 'Bangladeshi', active: true },
-          { id: '5', name: 'Kenyan', active: true },
-          { id: '6', name: 'Nigerian', active: true },
-          { id: '7', name: 'Ugandan', active: true },
-          { id: '8', name: 'Ghanaian', active: true },
-          { id: '9', name: 'Nepalese', active: true },
-          { id: '10', name: 'Indian', active: true },
-        ])
-      }
-    } catch (err: any) {
-      setError('Failed to fetch settings')
+      await Promise.all([
+        fetchCostTypes(),
+        fetchServiceTypes(),
+        fetchFeeTemplates(),
+        fetchDocumentTemplates(),
+      ])
     } finally {
       setLoading(false)
     }
   }
 
+  // Cost Types CRUD
   const fetchCostTypes = async () => {
     try {
-      const response = await api.get('/cost-types')
+      const response = await api.get<CostTypeModel[]>('/cost-types')
       setCostTypes(response.data || [])
     } catch (err) {
       console.error('Failed to fetch cost types:', err)
-      // Set default cost types if API fails
-      setCostTypes([
-        { id: '1', name: 'Agent Fee', active: true },
-        { id: '2', name: 'Broker Fee', active: true },
-        { id: '3', name: 'Government Fee', active: true },
-        { id: '4', name: 'Ticket', active: true },
-        { id: '5', name: 'Expedited Fee', active: true },
-        { id: '6', name: 'Attorney Fee', active: true },
-        { id: '7', name: 'Other', active: true },
-      ])
     }
   }
 
+  const handleSaveCostType = async (data: any) => {
+    try {
+      if (editingCostType) {
+        await api.put(`/cost-types/${editingCostType.id}`, data)
+        setSuccess('Cost type updated successfully')
+      } else {
+        await api.post('/cost-types', data)
+        setSuccess('Cost type created successfully')
+      }
+      setCostTypeDialog(false)
+      resetCostType()
+      setEditingCostType(null)
+      fetchCostTypes()
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to save cost type')
+    }
+  }
+
+  const handleDeleteCostType = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this cost type?')) return
+    try {
+      await api.delete(`/cost-types/${id}`)
+      setSuccess('Cost type deleted successfully')
+      fetchCostTypes()
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to delete cost type')
+    }
+  }
+
+  const openEditCostType = (costType: CostTypeModel) => {
+    setEditingCostType(costType)
+    setCostTypeValue('name', costType.name)
+    setCostTypeValue('description', costType.description)
+    setCostTypeValue('active', costType.active)
+    setCostTypeDialog(true)
+  }
+
+  // Service Types CRUD
   const fetchServiceTypes = async () => {
     try {
-      const response = await api.get('/service-types')
+      const response = await api.get<ServiceType[]>('/service-types')
       setServiceTypes(response.data || [])
     } catch (err) {
       console.error('Failed to fetch service types:', err)
-      // Set default service types if API fails
-      setServiceTypes([
-        { id: '1', name: 'Standard Processing', active: true },
-        { id: '2', name: 'Express Processing', active: true },
-        { id: '3', name: 'VIP Service', active: true },
-        { id: '4', name: 'Document Assistance', active: true },
-      ])
     }
   }
 
-  const fetchCompanySettings = async () => {
+  const handleSaveServiceType = async (data: any) => {
     try {
-      // First get the actual company data
-      const companyRes = await api.get('/company')
-      if (companyRes.data) {
-        setCompanySettings((prev: any) => ({
-          ...prev,
-          name: companyRes.data.name || '',
-          email: companyRes.data.email || '',
-          phone: companyRes.data.phone || '',
-          address: companyRes.data.address || '',
-          website: companyRes.data.website || '',
-          taxId: companyRes.data.taxId || '',
-        }))
+      if (editingServiceType) {
+        await api.put(`/service-types/${editingServiceType.id}`, data)
+        setSuccess('Service type updated successfully')
+      } else {
+        await api.post('/service-types', data)
+        setSuccess('Service type created successfully')
       }
-      
-      // Then get additional settings from the settings table
-      const settingsRes = await api.get('/settings/company')
-      if (settingsRes.data) {
-        setCompanySettings((prev: any) => ({
-          ...prev,
-          ...settingsRes.data
-        }))
-      }
+      setServiceTypeDialog(false)
+      resetServiceType()
+      setEditingServiceType(null)
+      fetchServiceTypes()
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to save service type')
+    }
+  }
+
+  const handleDeleteServiceType = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this service type?')) return
+    try {
+      await api.delete(`/service-types/${id}`)
+      setSuccess('Service type deleted successfully')
+      fetchServiceTypes()
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to delete service type')
+    }
+  }
+
+  const openEditServiceType = (serviceType: ServiceType) => {
+    setEditingServiceType(serviceType)
+    setServiceTypeValue('name', serviceType.name)
+    setServiceTypeValue('description', serviceType.description)
+    setServiceTypeValue('active', serviceType.active)
+    setServiceTypeDialog(true)
+  }
+
+  // Fee Templates CRUD
+  const fetchFeeTemplates = async () => {
+    try {
+      const response = await api.get<FeeTemplate[]>('/fee-templates')
+      setFeeTemplates(response.data || [])
     } catch (err) {
-      console.error('Failed to fetch company settings:', err)
-    }
-  }
-
-  const handleSaveCompanySettings = async () => {
-    try {
-      // Update company basic info
-      await api.put('/company', {
-        name: companySettings.name,
-        email: companySettings.email,
-        phone: companySettings.phone,
-        address: companySettings.address,
-        website: companySettings.website,
-        taxId: companySettings.taxId,
-      })
-      
-      // Save additional settings to settings table
-      await api.post('/settings/company', {
-        logo: companySettings.logo,
-        registrationNumber: companySettings.registrationNumber,
-        taxNumber: companySettings.taxNumber,
-        bankName: companySettings.bankName,
-        bankAccount: companySettings.bankAccount,
-        bankIBAN: companySettings.bankIBAN,
-      })
-      
-      setSuccess('Company settings saved successfully')
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to save company settings')
-    }
-  }
-
-  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    if (!file.type.startsWith('image/')) {
-      setError('Please upload an image file')
-      return
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Logo size should be less than 5MB')
-      return
-    }
-
-    try {
-      setUploadingLogo(true)
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('entityType', 'company')
-      formData.append('entityId', 'logo')
-
-      const response = await api.post('/files/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
-
-      setCompanySettings((prev: any) => ({
-        ...prev,
-        logo: response.data.url
-      }))
-      setSuccess('Logo uploaded successfully')
-    } catch (err: any) {
-      setError('Failed to upload logo')
-    } finally {
-      setUploadingLogo(false)
+      console.error('Failed to fetch fee templates:', err)
     }
   }
 
   const handleSaveFeeTemplate = async (data: any) => {
     try {
-      if (editingFee) {
-        await api.put(`/fee-templates/${editingFee.id}`, data)
+      // Convert string values to numbers
+      const processedData = {
+        ...data,
+        defaultPrice: parseFloat(data.defaultPrice),
+        minPrice: parseFloat(data.minPrice),
+        maxPrice: parseFloat(data.maxPrice),
+      }
+      
+      if (editingFeeTemplate) {
+        await api.put(`/fee-templates/${editingFeeTemplate.id}`, processedData)
         setSuccess('Fee template updated successfully')
       } else {
-        await api.post('/fee-templates', data)
+        await api.post('/fee-templates', processedData)
         setSuccess('Fee template created successfully')
       }
-      setFeeDialog(false)
-      setEditingFee(null)
-      feeForm.reset()
-      await fetchData()
+      setFeeTemplateDialog(false)
+      resetFeeTemplate()
+      setEditingFeeTemplate(null)
+      fetchFeeTemplates()
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to save fee template')
     }
   }
 
-  const handleDeleteFeeTemplate = async () => {
-    if (!deleteConfirmDialog.id) return
-    
+  const handleDeleteFeeTemplate = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this fee template?')) return
     try {
-      await api.delete(`/fee-templates/${deleteConfirmDialog.id}`)
+      await api.delete(`/fee-templates/${id}`)
       setSuccess('Fee template deleted successfully')
-      setDeleteConfirmDialog({ open: false, type: '', id: null })
-      await fetchData()
+      fetchFeeTemplates()
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to delete fee template')
     }
   }
 
+  const openEditFeeTemplate = (feeTemplate: FeeTemplate) => {
+    setEditingFeeTemplate(feeTemplate)
+    setFeeTemplateValue('name', feeTemplate.name)
+    setFeeTemplateValue('description', feeTemplate.description)
+    setFeeTemplateValue('defaultPrice', feeTemplate.defaultPrice)
+    setFeeTemplateValue('minPrice', feeTemplate.minPrice)
+    setFeeTemplateValue('maxPrice', feeTemplate.maxPrice)
+    setFeeTemplateValue('nationality', feeTemplate.nationality)
+    setFeeTemplateValue('serviceType', feeTemplate.serviceType)
+    setFeeTemplateDialog(true)
+  }
+
+  // Document Templates CRUD
+  const fetchDocumentTemplates = async () => {
+    try {
+      const response = await api.get<DocumentTemplate[]>('/document-templates')
+      setDocumentTemplates(response.data || [])
+    } catch (err) {
+      console.error('Failed to fetch document templates:', err)
+    }
+  }
+
   const handleSaveDocumentTemplate = async (data: any) => {
     try {
-      const templateData = {
+      const processedData = {
         ...data,
-        required: data.required === true || data.required === 'true',
         order: parseInt(data.order) || 0,
       }
-
-      if (editingDocument) {
-        await api.put(`/document-templates/${editingDocument.id}`, templateData)
+      
+      if (editingDocumentTemplate) {
+        await api.put(`/document-templates/${editingDocumentTemplate.id}`, processedData)
         setSuccess('Document template updated successfully')
       } else {
-        await api.post('/document-templates', templateData)
+        await api.post('/document-templates', processedData)
         setSuccess('Document template created successfully')
       }
-      setDocumentDialog(false)
-      setEditingDocument(null)
-      documentForm.reset()
-      await fetchData()
+      setDocumentTemplateDialog(false)
+      resetDocumentTemplate()
+      setEditingDocumentTemplate(null)
+      fetchDocumentTemplates()
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to save document template')
     }
   }
 
-  const handleDeleteDocumentTemplate = async () => {
-    if (!deleteConfirmDialog.id) return
-    
+  const handleDeleteDocumentTemplate = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this document template?')) return
     try {
-      await api.delete(`/document-templates/${deleteConfirmDialog.id}`)
+      await api.delete(`/document-templates/${id}`)
       setSuccess('Document template deleted successfully')
-      setDeleteConfirmDialog({ open: false, type: '', id: null })
-      await fetchData()
+      fetchDocumentTemplates()
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to delete document template')
     }
   }
 
-  const handleSaveNationality = async (data: any) => {
-    try {
-      if (editingNationality) {
-        // Update existing nationality
-        const updated = nationalities.map(n => 
-          n.id === editingNationality.id ? { ...n, ...data } : n
-        )
-        setNationalities(updated)
-        // TODO: Save to backend when API is ready
-        setSuccess('Nationality updated successfully')
-      } else {
-        // Add new nationality
-        const newNationality = {
-          id: Date.now().toString(),
-          ...data,
-          active: true
-        }
-        setNationalities([...nationalities, newNationality])
-        // TODO: Save to backend when API is ready
-        setSuccess('Nationality added successfully')
-      }
-      setNationalityDialog(false)
-      setEditingNationality(null)
-      nationalityForm.reset()
-    } catch (err: any) {
-      setError('Failed to save nationality')
-    }
+  const openEditDocumentTemplate = (documentTemplate: DocumentTemplate) => {
+    setEditingDocumentTemplate(documentTemplate)
+    setDocumentTemplateValue('stage', documentTemplate.stage)
+    setDocumentTemplateValue('name', documentTemplate.name)
+    setDocumentTemplateValue('required', documentTemplate.required)
+    setDocumentTemplateValue('order', documentTemplate.order)
+    setDocumentTemplateDialog(true)
   }
 
-  const handleToggleNationalityStatus = (id: string) => {
-    const updated = nationalities.map(n => 
-      n.id === id ? { ...n, active: !n.active } : n
+  // Check permissions
+  if (user?.role !== UserRole.SUPER_ADMIN) {
+    return (
+      <Box>
+        <Alert severity="error">
+          You don't have permission to access this page. Only Super Admins can manage settings.
+        </Alert>
+      </Box>
     )
-    setNationalities(updated)
-    // TODO: Save to backend when API is ready
   }
-
-  // Group documents by stage for better visualization
-  const documentsByStage = documentTemplates.reduce((acc: Record<string, any[]>, doc: any) => {
-    if (!acc[doc.stage]) acc[doc.stage] = []
-    acc[doc.stage].push(doc)
-    return acc
-  }, {} as Record<string, any[]>)
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box>
-          <Typography variant="h4" gutterBottom sx={{ fontWeight: 700, color: 'primary.main' }}>
-            Settings
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Manage your system configuration and templates
-          </Typography>
-        </Box>
-      </Box>
+      <Typography variant="h4" gutterBottom>
+        <SettingsIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+        System Settings
+      </Typography>
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
-      <Paper sx={{ 
-        borderRadius: 3, 
-        overflow: 'hidden',
-        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.08)'
-      }}>
-        <Tabs 
-          value={tabValue} 
-          onChange={(e, newValue) => setTabValue(newValue)}
-          sx={{ 
-            borderBottom: 1, 
-            borderColor: 'divider',
-            background: 'linear-gradient(90deg, #1e3a5f 0%, #4a6fa5 100%)',
-            '& .MuiTab-root': {
-              color: 'rgba(255,255,255,0.7)',
-              '&.Mui-selected': {
-                color: '#ffffff',
-              },
-            },
-            '& .MuiTabs-indicator': {
-              backgroundColor: '#ffffff',
-              height: 3,
-            },
-          }}
-        >
-          <Tab icon={<AdminIcon />} label="Office Management" iconPosition="start" />
-          {user?.role === UserRole.SUPER_ADMIN && (
-            <Tab icon={<BusinessIcon />} label="Company Settings" iconPosition="start" />
-          )}
-          <Tab icon={<LanguageIcon />} label="Nationalities" iconPosition="start" />
-          <Tab icon={<NotificationIcon />} label="Notifications" iconPosition="start" />
+      <Paper sx={{ width: '100%' }}>
+        <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)}>
+          <Tab label="Cost Types" icon={<CategoryIcon />} iconPosition="start" />
+          <Tab label="Service Types" icon={<ServiceIcon />} iconPosition="start" />
+          <Tab label="Fee Templates" icon={<MoneyIcon />} iconPosition="start" />
+          <Tab label="Document Templates" icon={<DocumentIcon />} iconPosition="start" />
         </Tabs>
 
-        {/* Office Management Tab - Contains Fee Templates and Document Templates */}
+        {/* Cost Types Tab */}
         <TabPanel value={tabValue} index={0}>
-          <Box sx={{ px: 3, py: 2 }}>
-          <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
-            <AdminIcon sx={{ mr: 1, verticalAlign: 'middle', color: 'primary.main' }} />
-            Office Management Settings
-          </Typography>
-          
-          {/* Fee Templates Section - Only for Super Admin */}
-          {user?.role === UserRole.SUPER_ADMIN && (
-            <Accordion defaultExpanded sx={{ mb: 2, borderRadius: 2, '&:before': { display: 'none' } }}>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ bgcolor: 'background.default' }}>
-                <Typography variant="h6">
-                  <MoneyIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                  Fee Templates
-                </Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Box display="flex" justifyContent="flex-end" mb={2}>
-                  <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={() => {
-                      setEditingFee(null)
-                      feeForm.reset()
-                      setFeeDialog(true)
-                    }}
-                  >
-                    Add Fee Template
-                  </Button>
-                </Box>
-                
-                <Grid container spacing={2}>
-                  {feeTemplates.map((template: any) => (
-                    <Grid item xs={12} md={6} lg={4} key={template.id}>
-                      <Card>
-                        <CardContent>
-                          <Box display="flex" justifyContent="space-between" alignItems="start">
-                            <Box>
-                              <Typography variant="h6">{template.name}</Typography>
-                              {template.nationality && (
-                                <Chip 
-                                  label={template.nationality} 
-                                  size="small" 
-                                  color="primary" 
-                                  variant="outlined" 
-                                  sx={{ mt: 1 }}
-                                />
-                              )}
-                            </Box>
-                            <Box>
-                              <IconButton 
-                                size="small"
-                                onClick={() => {
-                                  setEditingFee(template)
-                                  feeForm.reset(template)
-                                  setFeeDialog(true)
-                                }}
-                              >
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                              <IconButton 
-                                size="small"
-                                color="error"
-                                onClick={() => setDeleteConfirmDialog({ 
-                                  open: true, 
-                                  type: 'fee', 
-                                  id: template.id 
-                                })}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          </Box>
-                          <Typography variant="h4" color="primary" sx={{ my: 2 }}>
-                            ${template.defaultPrice}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Range: ${template.minPrice} - ${template.maxPrice}
-                          </Typography>
-                          {template.description && (
-                            <Typography variant="body2" sx={{ mt: 1 }}>
-                              {template.description}
-                            </Typography>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  ))}
-                  {feeTemplates.length === 0 && (
-                    <Grid item xs={12}>
-                      <Paper sx={{ p: 4, textAlign: 'center', bgcolor: 'background.default' }}>
-                        <MoneyIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-                        <Typography color="text.secondary">
-                          No fee templates created yet. Click "Add Fee Template" to get started.
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                  )}
-                </Grid>
-              </AccordionDetails>
-            </Accordion>
-          )}
-          </Box>
-
-          {/* Document Templates Section */}
-          <Accordion defaultExpanded sx={{ mb: 2, borderRadius: 2, '&:before': { display: 'none' } }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ bgcolor: 'background.default' }}>
-              <Typography variant="h6">
-                <DocumentIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Document Requirements
-              </Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              {user?.role === UserRole.SUPER_ADMIN && (
-                <Box display="flex" justifyContent="flex-end" mb={2}>
-                  <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={() => {
-                      setEditingDocument(null)
-                      documentForm.reset({
-                        name: '',
-                        stage: 'PENDING_MOL',
-                        requiredFrom: 'office',
-                        required: true,
-                        order: 0,
-                      })
-                      setDocumentDialog(true)
-                    }}
-                  >
-                    Add Document Template
-                  </Button>
-                </Box>
-              )}
-              
-              {applicationStages.map((stage: any) => {
-                const stageDocs = documentsByStage[stage.value] || []
-                if (stageDocs.length === 0 && user?.role !== UserRole.SUPER_ADMIN) return null
-
-                return (
-                  <Box key={stage.value} mb={3}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                      {stage.label}
-                    </Typography>
-                    <TableContainer component={Paper} variant="outlined">
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Document Name</TableCell>
-                            <TableCell align="center">Required From</TableCell>
-                            <TableCell align="center">Required</TableCell>
-                            <TableCell align="center">Order</TableCell>
-                            {user?.role === UserRole.SUPER_ADMIN && <TableCell align="center">Actions</TableCell>}
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {stageDocs.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={user?.role === UserRole.SUPER_ADMIN ? 5 : 4} align="center">
-                                <Typography variant="body2" color="text.secondary">
-                                  No documents configured for this stage
-                                </Typography>
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            stageDocs
-                              .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
-                              .map((doc: any) => (
-                                <TableRow key={doc.id}>
-                                  <TableCell>{doc.name}</TableCell>
-                                  <TableCell align="center">
-                                    <Chip 
-                                      label={doc.requiredFrom === 'client' ? 'Client' : 'Office'} 
-                                      size="small"
-                                      color={doc.requiredFrom === 'client' ? 'warning' : 'info'}
-                                    />
-                                  </TableCell>
-                                  <TableCell align="center">
-                                    <Chip 
-                                      label={doc.required ? 'Required' : 'Optional'} 
-                                      size="small"
-                                      color={doc.required ? 'success' : 'default'}
-                                      variant={doc.required ? 'filled' : 'outlined'}
-                                    />
-                                  </TableCell>
-                                  <TableCell align="center">{doc.order}</TableCell>
-                                  {user?.role === UserRole.SUPER_ADMIN && (
-                                    <TableCell align="center">
-                                      <IconButton 
-                                        size="small"
-                                        onClick={() => {
-                                          setEditingDocument(doc)
-                                          documentForm.reset(doc)
-                                          setDocumentDialog(true)
-                                        }}
-                                      >
-                                        <EditIcon fontSize="small" />
-                                      </IconButton>
-                                      <IconButton 
-                                        size="small"
-                                        color="error"
-                                        onClick={() => setDeleteConfirmDialog({ 
-                                          open: true, 
-                                          type: 'document', 
-                                          id: doc.id 
-                                        })}
-                                      >
-                                        <DeleteIcon fontSize="small" />
-                                      </IconButton>
-                                    </TableCell>
-                                  )}
-                                </TableRow>
-                              ))
-                          )}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Box>
-                )
-              })}
-            </AccordionDetails>
-          </Accordion>
-        </TabPanel>
-
-        {/* Company Settings Tab - Super Admin Only */}
-        {user?.role === UserRole.SUPER_ADMIN && (
-          <TabPanel value={tabValue} index={1}>
-            <Box sx={{ px: 3, py: 2 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                <BusinessIcon sx={{ mr: 1, verticalAlign: 'middle', color: 'primary.main' }} />
-                Company Settings
-              </Typography>
-              <Button
-                variant="contained"
-                startIcon={<SaveIcon />}
-                onClick={handleSaveCompanySettings}
-              >
-                Save Settings
-              </Button>
-            </Box>
-
-            <Grid container spacing={3}>
-              {/* Company Logo */}
-              <Grid item xs={12} md={3}>
-                <Box textAlign="center">
-                  <Avatar
-                    src={companySettings.logo}
-                    sx={{ width: 150, height: 150, mx: 'auto', mb: 2 }}
-                  >
-                    <BusinessIcon sx={{ fontSize: 60 }} />
-                  </Avatar>
-                  <input
-                    type="file"
-                    id="logo-upload"
-                    style={{ display: 'none' }}
-                    accept="image/*"
-                    onChange={handleLogoUpload}
-                  />
-                  <label htmlFor="logo-upload">
-                    <Button
-                      variant="outlined"
-                      component="span"
-                      startIcon={uploadingLogo ? null : <PhotoIcon />}
-                      disabled={uploadingLogo}
-                      fullWidth
-                    >
-                      {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
-                    </Button>
-                  </label>
-                </Box>
-              </Grid>
-
-              {/* Company Details */}
-              <Grid item xs={12} md={9}>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      label="Company Name"
-                      value={companySettings.name}
-                      onChange={(e) => setCompanySettings({ ...companySettings, name: e.target.value })}
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      label="Email"
-                      type="email"
-                      value={companySettings.email}
-                      onChange={(e) => setCompanySettings({ ...companySettings, email: e.target.value })}
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      label="Phone"
-                      value={companySettings.phone}
-                      onChange={(e) => setCompanySettings({ ...companySettings, phone: e.target.value })}
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      label="Website"
-                      value={companySettings.website}
-                      onChange={(e) => setCompanySettings({ ...companySettings, website: e.target.value })}
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      label="Address"
-                      multiline
-                      rows={2}
-                      value={companySettings.address}
-                      onChange={(e) => setCompanySettings({ ...companySettings, address: e.target.value })}
-                    />
-                  </Grid>
-
-                  {/* Legal Information */}
-                  <Grid item xs={12}>
-                    <Divider sx={{ my: 2 }}>
-                      <Typography variant="subtitle2" color="text.secondary">
-                        Legal Information
-                      </Typography>
-                    </Divider>
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      label="Registration Number"
-                      value={companySettings.registrationNumber}
-                      onChange={(e) => setCompanySettings({ ...companySettings, registrationNumber: e.target.value })}
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      label="Tax Number"
-                      value={companySettings.taxNumber}
-                      onChange={(e) => setCompanySettings({ ...companySettings, taxNumber: e.target.value })}
-                    />
-                  </Grid>
-
-                  {/* Banking Information */}
-                  <Grid item xs={12}>
-                    <Divider sx={{ my: 2 }}>
-                      <Typography variant="subtitle2" color="text.secondary">
-                        Banking Information
-                      </Typography>
-                    </Divider>
-                  </Grid>
-                  <Grid item xs={12} md={4}>
-                    <TextField
-                      fullWidth
-                      label="Bank Name"
-                      value={companySettings.bankName}
-                      onChange={(e) => setCompanySettings({ ...companySettings, bankName: e.target.value })}
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={4}>
-                    <TextField
-                      fullWidth
-                      label="Account Number"
-                      value={companySettings.bankAccount}
-                      onChange={(e) => setCompanySettings({ ...companySettings, bankAccount: e.target.value })}
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={4}>
-                    <TextField
-                      fullWidth
-                      label="IBAN"
-                      value={companySettings.bankIBAN}
-                      onChange={(e) => setCompanySettings({ ...companySettings, bankIBAN: e.target.value })}
-                    />
-                  </Grid>
-                </Grid>
-              </Grid>
-            </Grid>
-            </Box>
-          </TabPanel>
-        )}
-
-        {/* Nationalities Tab */}
-        <TabPanel value={tabValue} index={user?.role === UserRole.SUPER_ADMIN ? 2 : 1}>
-          <Box sx={{ px: 3, py: 2 }}>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              <LanguageIcon sx={{ mr: 1, verticalAlign: 'middle', color: 'primary.main' }} />
-              Nationality Management
-            </Typography>
-            {user?.role === UserRole.SUPER_ADMIN && (
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => {
-                  setEditingNationality(null)
-                  nationalityForm.reset({ name: '', active: true })
-                  setNationalityDialog(true)
-                }}
-              >
-                Add Nationality
-              </Button>
-            )}
+            <Typography variant="h6">Manage Cost Types</Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setEditingCostType(null)
+                resetCostType()
+                setCostTypeDialog(true)
+              }}
+            >
+              Add Cost Type
+            </Button>
           </Box>
 
-          <TableContainer component={Paper}>
+          <TableContainer>
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Nationality</TableCell>
-                  <TableCell align="center">Status</TableCell>
-                  <TableCell align="center">Candidates Count</TableCell>
-                  {user?.role === UserRole.SUPER_ADMIN && <TableCell align="center">Actions</TableCell>}
+                  <TableCell>Name</TableCell>
+                  <TableCell>Description</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {nationalities.map((nationality: any) => (
-                  <TableRow key={nationality.id}>
+                {costTypes.map((costType) => (
+                  <TableRow key={costType.id}>
+                    <TableCell>{costType.name}</TableCell>
+                    <TableCell>{costType.description || '-'}</TableCell>
                     <TableCell>
-                      <Typography variant="body1">{nationality.name}</Typography>
-                    </TableCell>
-                    <TableCell align="center">
                       <Chip
-                        label={nationality.active ? 'Active' : 'Inactive'}
-                        color={nationality.active ? 'success' : 'default'}
+                        label={costType.active ? 'Active' : 'Inactive'}
+                        color={costType.active ? 'success' : 'default'}
                         size="small"
                       />
                     </TableCell>
-                    <TableCell align="center">
-                      <Typography variant="body2" color="text.secondary">
-                        {nationality.candidateCount || 0}
-                      </Typography>
+                    <TableCell>
+                      <IconButton size="small" onClick={() => openEditCostType(costType)}>
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton size="small" onClick={() => handleDeleteCostType(costType.id)}>
+                        <DeleteIcon />
+                      </IconButton>
                     </TableCell>
-                    {user?.role === UserRole.SUPER_ADMIN && (
-                      <TableCell align="center">
-                        <IconButton
-                          size="small"
-                          onClick={() => {
-                            setEditingNationality(nationality)
-                            nationalityForm.reset(nationality)
-                            setNationalityDialog(true)
-                          }}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        {nationality.candidateCount === 0 && (
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => {
-                              // Delete nationality
-                              const updated = nationalities.filter(n => n.id !== nationality.id)
-                              setNationalities(updated)
-                              setSuccess('Nationality deleted successfully')
-                            }}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        )}
-                      </TableCell>
-                    )}
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </TableContainer>
-          </Box>
         </TabPanel>
 
-        {/* Notifications Tab */}
-        <TabPanel value={tabValue} index={user?.role === UserRole.SUPER_ADMIN ? 3 : 2}>
-          <Box sx={{ px: 3, py: 2 }}>
-          <Typography variant="h6" gutterBottom>
-            <NotificationIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-            Notification Settings
-          </Typography>
-          <List>
-            <ListItem>
-              <ListItemText
-                primary="Email Notifications"
-                secondary="Receive email notifications for important events"
-              />
-              <ListItemSecondaryAction>
-                <Switch defaultChecked />
-              </ListItemSecondaryAction>
-            </ListItem>
-            <ListItem>
-              <ListItemText
-                primary="Renewal Reminders"
-                secondary="Get notified 60 days before permit expiry"
-              />
-              <ListItemSecondaryAction>
-                <Switch defaultChecked />
-              </ListItemSecondaryAction>
-            </ListItem>
-            <ListItem>
-              <ListItemText
-                primary="Payment Reminders"
-                secondary="Notify about pending payments"
-              />
-              <ListItemSecondaryAction>
-                <Switch defaultChecked />
-              </ListItemSecondaryAction>
-            </ListItem>
-            <ListItem>
-              <ListItemText
-                primary="Document Reminders"
-                secondary="Alert when documents are required from clients"
-              />
-              <ListItemSecondaryAction>
-                <Switch defaultChecked />
-              </ListItemSecondaryAction>
-            </ListItem>
-          </List>
+        {/* Service Types Tab */}
+        <TabPanel value={tabValue} index={1}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+            <Typography variant="h6">Manage Service Types</Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setEditingServiceType(null)
+                resetServiceType()
+                setServiceTypeDialog(true)
+              }}
+            >
+              Add Service Type
+            </Button>
           </Box>
+
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Description</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {serviceTypes.map((serviceType) => (
+                  <TableRow key={serviceType.id}>
+                    <TableCell>{serviceType.name}</TableCell>
+                    <TableCell>{serviceType.description || '-'}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={serviceType.active ? 'Active' : 'Inactive'}
+                        color={serviceType.active ? 'success' : 'default'}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <IconButton size="small" onClick={() => openEditServiceType(serviceType)}>
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton size="small" onClick={() => handleDeleteServiceType(serviceType.id)}>
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </TabPanel>
+
+        {/* Fee Templates Tab */}
+        <TabPanel value={tabValue} index={2}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+            <Typography variant="h6">Manage Fee Templates</Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setEditingFeeTemplate(null)
+                resetFeeTemplate()
+                setFeeTemplateDialog(true)
+              }}
+            >
+              Add Fee Template
+            </Button>
+          </Box>
+
+          <Grid container spacing={3}>
+            {feeTemplates.map((template) => (
+              <Grid item xs={12} md={6} lg={4} key={template.id}>
+                <Card>
+                  <CardContent>
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                      <Typography variant="h6">{template.name}</Typography>
+                      <Box>
+                        <IconButton size="small" onClick={() => openEditFeeTemplate(template)}>
+                          <EditIcon />
+                        </IconButton>
+                        <IconButton size="small" onClick={() => handleDeleteFeeTemplate(template.id)}>
+                          <DeleteIcon />
+                        </IconButton>
+                      </Box>
+                    </Box>
+                    <Typography variant="body2" color="textSecondary" gutterBottom>
+                      {template.description || 'No description'}
+                    </Typography>
+                    <Divider sx={{ my: 1 }} />
+                    <Typography variant="body2">
+                      <strong>Default Price:</strong> ${template.defaultPrice}
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Range:</strong> ${template.minPrice} - ${template.maxPrice}
+                    </Typography>
+                    {template.nationality && (
+                      <Typography variant="body2">
+                        <strong>Nationality:</strong> {template.nationality}
+                      </Typography>
+                    )}
+                    {template.serviceType && (
+                      <Typography variant="body2">
+                        <strong>Service Type:</strong> {template.serviceType}
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </TabPanel>
+
+        {/* Document Templates Tab */}
+        <TabPanel value={tabValue} index={3}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+            <Typography variant="h6">Manage Document Templates</Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setEditingDocumentTemplate(null)
+                resetDocumentTemplate()
+                setDocumentTemplateDialog(true)
+              }}
+            >
+              Add Document Template
+            </Button>
+          </Box>
+
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Stage</TableCell>
+                  <TableCell>Document Name</TableCell>
+                  <TableCell>Required</TableCell>
+                  <TableCell>Order</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {documentTemplates.sort((a, b) => a.order - b.order).map((template) => (
+                  <TableRow key={template.id}>
+                    <TableCell>
+                      <Chip
+                        label={template.stage.replace(/_/g, ' ')}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>{template.name}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={template.required ? 'Required' : 'Optional'}
+                        color={template.required ? 'error' : 'default'}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>{template.order}</TableCell>
+                    <TableCell>
+                      <IconButton size="small" onClick={() => openEditDocumentTemplate(template)}>
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton size="small" onClick={() => handleDeleteDocumentTemplate(template.id)}>
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </TabPanel>
       </Paper>
 
-      {/* Fee Template Dialog */}
-      {user?.role === UserRole.SUPER_ADMIN && (
-        <Dialog open={feeDialog} onClose={() => setFeeDialog(false)} maxWidth="sm" fullWidth>
-          <form onSubmit={feeForm.handleSubmit(handleSaveFeeTemplate)}>
-            <DialogTitle>
-              {editingFee ? 'Edit Fee Template' : 'Create Fee Template'}
-            </DialogTitle>
-            <DialogContent>
-              <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid item xs={12}>
-                  <Controller
-                    name="name"
-                    control={feeForm.control}
-                    rules={{ required: 'Name is required' }}
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        fullWidth
-                        label="Template Name"
-                        error={!!feeForm.formState.errors.name}
-                        helperText={feeForm.formState.errors.name?.message as string}
-                      />
-                    )}
-                  />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Controller
-                    name="nationality"
-                    control={feeForm.control}
-                    defaultValue=""
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        fullWidth
-                        select
-                        label="Nationality (Optional)"
-                        helperText="Leave empty for general template"
-                      >
-                        <MenuItem value="">None (General)</MenuItem>
-                        {nationalities.filter((n: any) => n.active).map((nationality: any) => (
-                          <MenuItem key={nationality.id} value={nationality.name}>
-                            {nationality.name}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    )}
-                  />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Controller
-                    name="currency"
-                    control={feeForm.control}
-                    defaultValue="USD"
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        fullWidth
-                        select
-                        label="Currency"
-                      >
-                        <MenuItem value="USD">USD</MenuItem>
-                        <MenuItem value="LBP">LBP</MenuItem>
-                        <MenuItem value="EUR">EUR</MenuItem>
-                      </TextField>
-                    )}
-                  />
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <Controller
-                    name="defaultPrice"
-                    control={feeForm.control}
-                    rules={{ 
-                      required: 'Default price is required', 
-                      min: { value: 0, message: 'Price must be positive' },
-                      validate: (value) => {
-                        const minPrice = feeForm.getValues('minPrice')
-                        const maxPrice = feeForm.getValues('maxPrice')
-                        if (minPrice && parseFloat(value) < parseFloat(minPrice)) {
-                          return 'Default price must be greater than or equal to minimum price'
-                        }
-                        if (maxPrice && parseFloat(value) > parseFloat(maxPrice)) {
-                          return 'Default price must be less than or equal to maximum price'
-                        }
-                        return true
-                      }
-                    }}
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        fullWidth
-                        label="Default Price"
-                        type="number"
-                        InputProps={{
-                          startAdornment: <InputAdornment position="start">$</InputAdornment>,
-                        }}
-                        error={!!feeForm.formState.errors.defaultPrice}
-                        helperText={feeForm.formState.errors.defaultPrice?.message as string}
-                      />
-                    )}
-                  />
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <Controller
-                    name="minPrice"
-                    control={feeForm.control}
-                    rules={{ 
-                      required: 'Minimum price is required', 
-                      min: { value: 0, message: 'Price must be positive' }
-                    }}
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        fullWidth
-                        label="Minimum Price"
-                        type="number"
-                        InputProps={{
-                          startAdornment: <InputAdornment position="start">$</InputAdornment>,
-                        }}
-                        error={!!feeForm.formState.errors.minPrice}
-                        helperText={feeForm.formState.errors.minPrice?.message as string}
-                      />
-                    )}
-                  />
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <Controller
-                    name="maxPrice"
-                    control={feeForm.control}
-                    rules={{ 
-                      required: 'Maximum price is required', 
-                      min: { value: 0, message: 'Price must be positive' },
-                      validate: (value) => {
-                        const minPrice = feeForm.getValues('minPrice')
-                        if (minPrice && parseFloat(value) < parseFloat(minPrice)) {
-                          return 'Maximum price must be greater than minimum price'
-                        }
-                        return true
-                      }
-                    }}
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        fullWidth
-                        label="Maximum Price"
-                        type="number"
-                        InputProps={{
-                          startAdornment: <InputAdornment position="start">$</InputAdornment>,
-                        }}
-                        error={!!feeForm.formState.errors.maxPrice}
-                        helperText={feeForm.formState.errors.maxPrice?.message as string}
-                      />
-                    )}
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <Controller
-                    name="description"
-                    control={feeForm.control}
-                    defaultValue=""
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        fullWidth
-                        label="Description (Optional)"
-                        multiline
-                        rows={2}
-                      />
-                    )}
-                  />
-                </Grid>
-              </Grid>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setFeeDialog(false)}>Cancel</Button>
-              <Button type="submit" variant="contained">
-                {editingFee ? 'Update' : 'Create'}
-              </Button>
-            </DialogActions>
-          </form>
-        </Dialog>
-      )}
-
-      {/* Document Template Dialog */}
-      <Dialog open={documentDialog} onClose={() => setDocumentDialog(false)} maxWidth="sm" fullWidth>
-        <form onSubmit={documentForm.handleSubmit(handleSaveDocumentTemplate)}>
-          <DialogTitle>
-            {editingDocument ? 'Edit Document Template' : 'Create Document Template'}
-          </DialogTitle>
+      {/* Cost Type Dialog */}
+      <Dialog open={costTypeDialog} onClose={() => setCostTypeDialog(false)} maxWidth="sm" fullWidth>
+        <form onSubmit={handleCostTypeSubmit(handleSaveCostType)}>
+          <DialogTitle>{editingCostType ? 'Edit Cost Type' : 'Add Cost Type'}</DialogTitle>
           <DialogContent>
             <Grid container spacing={2} sx={{ mt: 1 }}>
               <Grid item xs={12}>
                 <Controller
                   name="name"
-                  control={documentForm.control}
-                  rules={{ required: 'Document name is required' }}
-                  render={({ field }) => (
+                  control={costTypeControl}
+                  defaultValue=""
+                  rules={{ required: 'Name is required' }}
+                  render={({ field, fieldState }) => (
                     <TextField
                       {...field}
                       fullWidth
-                      label="Document Name"
-                      error={!!documentForm.formState.errors.name}
-                      helperText={documentForm.formState.errors.name?.message as string}
+                      label="Name"
+                      error={!!fieldState.error}
+                      helperText={fieldState.error?.message}
                     />
                   )}
                 />
               </Grid>
               <Grid item xs={12}>
                 <Controller
-                  name="stage"
-                  control={documentForm.control}
-                  rules={{ required: 'Stage is required' }}
-                  defaultValue="PENDING_MOL"
+                  name="description"
+                  control={costTypeControl}
+                  defaultValue=""
                   render={({ field }) => (
                     <TextField
                       {...field}
                       fullWidth
-                      select
-                      label="Application Stage"
-                      error={!!documentForm.formState.errors.stage}
-                      helperText={documentForm.formState.errors.stage?.message as string}
-                    >
-                      {applicationStages.map((stage: any) => (
-                        <MenuItem key={stage.value} value={stage.value}>
-                          {stage.label}
-                        </MenuItem>
-                      ))}
-                    </TextField>
+                      label="Description"
+                      multiline
+                      rows={2}
+                    />
+                  )}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Controller
+                  name="active"
+                  control={costTypeControl}
+                  defaultValue={true}
+                  render={({ field }) => (
+                    <FormControlLabel
+                      control={<Switch {...field} checked={field.value} />}
+                      label="Active"
+                    />
+                  )}
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setCostTypeDialog(false)}>Cancel</Button>
+            <Button type="submit" variant="contained">Save</Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      {/* Service Type Dialog */}
+      <Dialog open={serviceTypeDialog} onClose={() => setServiceTypeDialog(false)} maxWidth="sm" fullWidth>
+        <form onSubmit={handleServiceTypeSubmit(handleSaveServiceType)}>
+          <DialogTitle>{editingServiceType ? 'Edit Service Type' : 'Add Service Type'}</DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <Controller
+                  name="name"
+                  control={serviceTypeControl}
+                  defaultValue=""
+                  rules={{ required: 'Name is required' }}
+                  render={({ field, fieldState }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      label="Name"
+                      error={!!fieldState.error}
+                      helperText={fieldState.error?.message}
+                    />
+                  )}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Controller
+                  name="description"
+                  control={serviceTypeControl}
+                  defaultValue=""
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      label="Description"
+                      multiline
+                      rows={2}
+                    />
+                  )}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Controller
+                  name="active"
+                  control={serviceTypeControl}
+                  defaultValue={true}
+                  render={({ field }) => (
+                    <FormControlLabel
+                      control={<Switch {...field} checked={field.value} />}
+                      label="Active"
+                    />
+                  )}
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setServiceTypeDialog(false)}>Cancel</Button>
+            <Button type="submit" variant="contained">Save</Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      {/* Fee Template Dialog */}
+      <Dialog open={feeTemplateDialog} onClose={() => setFeeTemplateDialog(false)} maxWidth="sm" fullWidth>
+        <form onSubmit={handleFeeTemplateSubmit(handleSaveFeeTemplate)}>
+          <DialogTitle>{editingFeeTemplate ? 'Edit Fee Template' : 'Add Fee Template'}</DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <Controller
+                  name="name"
+                  control={feeTemplateControl}
+                  defaultValue=""
+                  rules={{ required: 'Name is required' }}
+                  render={({ field, fieldState }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      label="Name"
+                      error={!!fieldState.error}
+                      helperText={fieldState.error?.message}
+                    />
+                  )}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Controller
+                  name="description"
+                  control={feeTemplateControl}
+                  defaultValue=""
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      label="Description"
+                      multiline
+                      rows={2}
+                    />
+                  )}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Controller
+                  name="defaultPrice"
+                  control={feeTemplateControl}
+                  defaultValue=""
+                  rules={{ required: 'Default price is required' }}
+                  render={({ field, fieldState }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      label="Default Price"
+                      type="number"
+                      InputProps={{ startAdornment: '$' }}
+                      error={!!fieldState.error}
+                      helperText={fieldState.error?.message}
+                    />
+                  )}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Controller
+                  name="minPrice"
+                  control={feeTemplateControl}
+                  defaultValue=""
+                  rules={{ required: 'Min price is required' }}
+                  render={({ field, fieldState }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      label="Min Price"
+                      type="number"
+                      InputProps={{ startAdornment: '$' }}
+                      error={!!fieldState.error}
+                      helperText={fieldState.error?.message}
+                    />
+                  )}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Controller
+                  name="maxPrice"
+                  control={feeTemplateControl}
+                  defaultValue=""
+                  rules={{ required: 'Max price is required' }}
+                  render={({ field, fieldState }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      label="Max Price"
+                      type="number"
+                      InputProps={{ startAdornment: '$' }}
+                      error={!!fieldState.error}
+                      helperText={fieldState.error?.message}
+                    />
                   )}
                 />
               </Grid>
               <Grid item xs={12} md={6}>
                 <Controller
-                  name="requiredFrom"
-                  control={documentForm.control}
-                  defaultValue="office"
+                  name="nationality"
+                  control={feeTemplateControl}
+                  defaultValue=""
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      label="Nationality (Optional)"
+                      helperText="Specify if this template is for a specific nationality"
+                    />
+                  )}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Controller
+                  name="serviceType"
+                  control={feeTemplateControl}
+                  defaultValue=""
                   render={({ field }) => (
                     <TextField
                       {...field}
                       fullWidth
                       select
-                      label="Required From"
+                      label="Service Type (Optional)"
+                      SelectProps={{
+                        native: true,
+                      }}
                     >
-                      <MenuItem value="office">Office</MenuItem>
-                      <MenuItem value="client">Client</MenuItem>
+                      <option value="">None</option>
+                      {serviceTypes.filter(st => st.active).map((service) => (
+                        <option key={service.id} value={service.name}>
+                          {service.name}
+                        </option>
+                      ))}
                     </TextField>
+                  )}
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setFeeTemplateDialog(false)}>Cancel</Button>
+            <Button type="submit" variant="contained">Save</Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      {/* Document Template Dialog */}
+      <Dialog open={documentTemplateDialog} onClose={() => setDocumentTemplateDialog(false)} maxWidth="sm" fullWidth>
+        <form onSubmit={handleDocumentTemplateSubmit(handleSaveDocumentTemplate)}>
+          <DialogTitle>{editingDocumentTemplate ? 'Edit Document Template' : 'Add Document Template'}</DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <Controller
+                  name="stage"
+                  control={documentTemplateControl}
+                  defaultValue=""
+                  rules={{ required: 'Stage is required' }}
+                  render={({ field, fieldState }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      select
+                      label="Application Stage"
+                      error={!!fieldState.error}
+                      helperText={fieldState.error?.message}
+                      SelectProps={{
+                        native: true,
+                      }}
+                    >
+                      <option value="">Select a stage</option>
+                      <option value="PENDING_MOL">Pending MoL</option>
+                      <option value="MOL_AUTH_RECEIVED">MoL Auth Received</option>
+                      <option value="VISA_PROCESSING">Visa Processing</option>
+                      <option value="VISA_RECEIVED">Visa Received</option>
+                      <option value="WORKER_ARRIVED">Worker Arrived</option>
+                      <option value="LABOUR_PERMIT_PROCESSING">Labour Permit Processing</option>
+                      <option value="RESIDENCY_PERMIT_PROCESSING">Residency Permit Processing</option>
+                      <option value="ACTIVE_EMPLOYMENT">Active Employment</option>
+                    </TextField>
+                  )}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Controller
+                  name="name"
+                  control={documentTemplateControl}
+                  defaultValue=""
+                  rules={{ required: 'Document name is required' }}
+                  render={({ field, fieldState }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      label="Document Name"
+                      error={!!fieldState.error}
+                      helperText={fieldState.error?.message}
+                    />
                   )}
                 />
               </Grid>
               <Grid item xs={12} md={6}>
                 <Controller
                   name="order"
-                  control={documentForm.control}
+                  control={documentTemplateControl}
                   defaultValue={0}
                   render={({ field }) => (
                     <TextField
@@ -1262,21 +919,15 @@ const Settings = () => {
                   )}
                 />
               </Grid>
-              <Grid item xs={12}>
+              <Grid item xs={12} md={6}>
                 <Controller
                   name="required"
-                  control={documentForm.control}
+                  control={documentTemplateControl}
                   defaultValue={true}
                   render={({ field }) => (
                     <FormControlLabel
-                      control={
-                        <Checkbox
-                          {...field}
-                          checked={field.value === true}
-                          onChange={(e) => field.onChange(e.target.checked)}
-                        />
-                      }
-                      label="This document is required"
+                      control={<Switch {...field} checked={field.value} />}
+                      label="Required Document"
                     />
                   )}
                 />
@@ -1284,94 +935,10 @@ const Settings = () => {
             </Grid>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setDocumentDialog(false)}>Cancel</Button>
-            <Button type="submit" variant="contained">
-              {editingDocument ? 'Update' : 'Create'}
-            </Button>
+            <Button onClick={() => setDocumentTemplateDialog(false)}>Cancel</Button>
+            <Button type="submit" variant="contained">Save</Button>
           </DialogActions>
         </form>
-      </Dialog>
-
-      {/* Nationality Dialog */}
-      <Dialog open={nationalityDialog} onClose={() => setNationalityDialog(false)} maxWidth="sm" fullWidth>
-        <form onSubmit={nationalityForm.handleSubmit(handleSaveNationality)}>
-          <DialogTitle>
-            {editingNationality ? 'Edit Nationality' : 'Add Nationality'}
-          </DialogTitle>
-          <DialogContent>
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12}>
-                <Controller
-                  name="name"
-                  control={nationalityForm.control}
-                  rules={{ required: 'Nationality name is required' }}
-                  render={({ field }) => (
-                    <TextField
-                      {...field}
-                      fullWidth
-                      label="Nationality Name"
-                      error={!!nationalityForm.formState.errors.name}
-                      helperText={nationalityForm.formState.errors.name?.message as string}
-                    />
-                  )}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <Controller
-                  name="active"
-                  control={nationalityForm.control}
-                  defaultValue={true}
-                  render={({ field }) => (
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          {...field}
-                          checked={field.value === true}
-                          onChange={(e) => field.onChange(e.target.checked)}
-                        />
-                      }
-                      label="Active (available for selection)"
-                    />
-                  )}
-                />
-              </Grid>
-            </Grid>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setNationalityDialog(false)}>Cancel</Button>
-            <Button type="submit" variant="contained">
-              {editingNationality ? 'Update' : 'Add'}
-            </Button>
-          </DialogActions>
-        </form>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteConfirmDialog.open} onClose={() => setDeleteConfirmDialog({ open: false, type: '', id: null })}>
-        <DialogTitle>Confirm Delete</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Are you sure you want to delete this {deleteConfirmDialog.type}? This action cannot be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteConfirmDialog({ open: false, type: '', id: null })}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={() => {
-              if (deleteConfirmDialog.type === 'fee') {
-                handleDeleteFeeTemplate()
-              } else if (deleteConfirmDialog.type === 'document') {
-                handleDeleteDocumentTemplate()
-              }
-            }}
-            color="error"
-            variant="contained"
-          >
-            Delete
-          </Button>
-        </DialogActions>
       </Dialog>
     </Box>
   )
