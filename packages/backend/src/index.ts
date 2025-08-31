@@ -25,6 +25,9 @@ import documentTemplateRouter from './routes/documentTemplate.routes';
 import fileRouter from './routes/file.routes';
 import nationalitiesRouter from './routes/nationalities.routes';
 import companyRouter from './routes/company.routes';
+import costTypeRouter from './routes/costType.routes';
+import serviceTypeRouter from './routes/serviceType.routes';
+import candidatePdfRouter from './routes/candidatePdf.routes';
 
 // Import middleware
 import { errorHandler } from './middleware/error.middleware';
@@ -111,6 +114,9 @@ app.use('/api/document-templates', documentTemplateRouter);
 app.use('/api/files', fileRouter);
 app.use('/api/nationalities', nationalitiesRouter);
 app.use('/api/company', companyRouter);
+app.use('/api/cost-types', costTypeRouter);
+app.use('/api/service-types', serviceTypeRouter);
+app.use('/api/candidates/:id/export-pdf', candidatePdfRouter);
 
 // Error handling middleware
 app.use(notFound);

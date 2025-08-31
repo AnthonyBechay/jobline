@@ -34,6 +34,8 @@ model Company {
   feeTemplates  FeeTemplate[]
   files         File[]
   nationalities Nationality[]
+  serviceTypes  ServiceType[]
+  costTypes     CostTypeModel[]
 
   @@map("companies")
 }
@@ -105,6 +107,8 @@ model Candidate {
   education         String?
   skills            Json?
   experienceSummary String?          @map("experience_summary")
+  height            String?          @map("height")
+  weight            String?          @map("weight")
   status            CandidateStatus
   agentId           String?          @map("agent_id")
   agent             Agent?           @relation(fields: [agentId], references: [id])
@@ -226,7 +230,7 @@ model Cost {
   amount        Decimal     @db.Decimal(10, 2)
   currency      String      @default("USD")
   costDate      DateTime    @default(now()) @map("cost_date")
-  costType      CostType    @map("cost_type")
+  costType      String      @default("OTHER") @map("cost_type") // Changed from enum to string
   description   String?
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
@@ -235,15 +239,7 @@ model Cost {
   @@map("costs")
 }
 
-enum CostType {
-  AGENT_FEE
-  BROKER_FEE
-  GOV_FEE
-  TICKET
-  EXPEDITED_FEE
-  ATTORNEY_FEE
-  OTHER
-}
+
 
 // DocumentChecklistItem model for tracking document status
 model DocumentChecklistItem {
@@ -309,6 +305,7 @@ model FeeTemplate {
   maxPrice     Decimal       @map("max_price") @db.Decimal(10, 2)
   currency     String        @default("USD")
   nationality  String?       // Optional nationality for nationality-specific fees
+  serviceType  String?       @map("service_type") // New field for service type
   description  String?
   companyId    String        @map("company_id")
   company      Company       @relation(fields: [companyId], references: [id])
@@ -376,4 +373,36 @@ model Nationality {
   @@unique([companyId, code])
   @@index([companyId])
   @@map("nationalities")
+}
+
+// ServiceType model for managing service types
+model ServiceType {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  companyId   String   @map("company_id")
+  company     Company  @relation(fields: [companyId], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("service_types")
+}
+
+// CostTypeModel for managing cost types
+model CostTypeModel {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  companyId   String   @map("company_id")
+  company     Company  @relation(fields: [companyId], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("cost_types")
 }

@@ -63,7 +63,6 @@ import {
   DocumentStatus,
   Payment,
   Cost,
-  CostType,
   UserRole,
 } from '../shared/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -157,6 +156,7 @@ const ApplicationDetails = () => {
   const [payments, setPayments] = useState<Payment[]>([])
   const [costs, setCosts] = useState<Cost[]>([])
   const [feeTemplates, setFeeTemplates] = useState<any[]>([])
+  const [costTypes, setCostTypes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tabValue, setTabValue] = useState(0)
@@ -179,8 +179,11 @@ const ApplicationDetails = () => {
     if (id) {
       fetchApplicationDetails()
       fetchFeeTemplates()
+      if (user?.role === UserRole.SUPER_ADMIN) {
+        fetchCostTypes()
+      }
     }
-  }, [id])
+  }, [id, user])
 
   const fetchApplicationDetails = async () => {
     try {
@@ -216,6 +219,25 @@ const ApplicationDetails = () => {
     } catch (err) {
       console.error('Failed to fetch fee templates:', err)
       setFeeTemplates([])
+    }
+  }
+
+  const fetchCostTypes = async () => {
+    try {
+      const response = await api.get('/cost-types')
+      setCostTypes(response.data || [])
+    } catch (err) {
+      console.error('Failed to fetch cost types:', err)
+      // Use default cost types if API fails
+      setCostTypes([
+        { id: '1', name: 'Agent Fee', active: true },
+        { id: '2', name: 'Broker Fee', active: true },
+        { id: '3', name: 'Government Fee', active: true },
+        { id: '4', name: 'Ticket', active: true },
+        { id: '5', name: 'Expedited Fee', active: true },
+        { id: '6', name: 'Attorney Fee', active: true },
+        { id: '7', name: 'Other', active: true },
+      ])
     }
   }
 
@@ -683,7 +705,7 @@ const ApplicationDetails = () => {
                       {costs.map((cost) => (
                         <TableRow key={cost.id}>
                           <TableCell>{new Date(cost.costDate).toLocaleDateString()}</TableCell>
-                          <TableCell>{cost.costType.replace(/_/g, ' ')}</TableCell>
+                          <TableCell>{cost.costType}</TableCell>
                           <TableCell>${cost.amount}</TableCell>
                           <TableCell>{cost.description || '-'}</TableCell>
                         </TableRow>
@@ -811,9 +833,9 @@ const ApplicationDetails = () => {
                         error={!!costForm.formState.errors.costType}
                         helperText={costForm.formState.errors.costType?.message as string}
                       >
-                        {Object.values(CostType).map((type) => (
-                          <MenuItem key={type} value={type}>
-                            {type.replace(/_/g, ' ')}
+                        {costTypes.filter(ct => ct.active).map((type) => (
+                          <MenuItem key={type.id} value={type.name}>
+                            {type.name}
                           </MenuItem>
                         ))}
                       </TextField>

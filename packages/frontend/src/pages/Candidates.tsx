@@ -599,6 +599,8 @@ const CandidateForm = () => {
         photoUrl: candidate.photoUrl || '',
         facePhotoUrl: candidate.facePhotoUrl || '',
         fullBodyPhotoUrl: candidate.fullBodyPhotoUrl || '',
+        height: candidate.height || '',
+        weight: candidate.weight || '',
         agentId: candidate.agentId || '',
         skills: Array.isArray(candidate.skills) ? candidate.skills.join(', ') : '',
         dateOfBirth: candidate.dateOfBirth ? new Date(candidate.dateOfBirth).toISOString().split('T')[0] : '',
@@ -607,6 +609,8 @@ const CandidateForm = () => {
       // Set photo previews if exist
       if (candidate.facePhotoUrl) {
         setFacePhotoPreview(candidate.facePhotoUrl)
+      } else if (candidate.photoUrl) {
+        setFacePhotoPreview(candidate.photoUrl)
       }
       if (candidate.fullBodyPhotoUrl) {
         setBodyPhotoPreview(candidate.fullBodyPhotoUrl)
@@ -728,9 +732,11 @@ const CandidateForm = () => {
         status: data.status,
         education: data.education || null,
         experienceSummary: data.experienceSummary || null,
-        photoUrl: data.photoUrl || null,
-        facePhotoUrl: data.facePhotoUrl || null,
-        fullBodyPhotoUrl: data.fullBodyPhotoUrl || null,
+        photoUrl: data.photoUrl || facePhotoPreview || null,
+        facePhotoUrl: facePhotoPreview || data.facePhotoUrl || null,
+        fullBodyPhotoUrl: bodyPhotoPreview || data.fullBodyPhotoUrl || null,
+        height: data.height || null,
+        weight: data.weight || null,
         dateOfBirth: data.dateOfBirth || null,
       }
       
@@ -1011,6 +1017,36 @@ const CandidateForm = () => {
                     )}
                   />
                 </Grid>
+                <Grid item xs={12} md={3}>
+                  <Controller
+                    name="height"
+                    control={control}
+                    defaultValue=""
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        label="Height (cm)"
+                        placeholder="e.g., 165"
+                      />
+                    )}
+                  />
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Controller
+                    name="weight"
+                    control={control}
+                    defaultValue=""
+                    render={({ field }) => (
+                      <TextField
+                        {...field}
+                        fullWidth
+                        label="Weight (kg)"
+                        placeholder="e.g., 60"
+                      />
+                    )}
+                  />
+                </Grid>
                 <Grid item xs={12}>
                   <Controller
                     name="skills"
@@ -1160,19 +1196,21 @@ const CandidateDetails = () => {
         <Grid item xs={12} md={4}>
           <Card>
             {/* Display both photos if available */}
+            {/* Face Photo */}
             <CardMedia
               component="img"
-              height="250"
+              height="300"
               image={candidate.facePhotoUrl || candidate.photoUrl || '/placeholder-avatar.jpg'}
               alt={`${candidate.firstName} ${candidate.lastName} - Face`}
               sx={{ objectFit: 'cover' }}
             />
+            {/* Full Body Photo */}
             {candidate.fullBodyPhotoUrl && (
               <>
                 <Divider />
                 <CardMedia
                   component="img"
-                  height="300"
+                  height="400"
                   image={candidate.fullBodyPhotoUrl}
                   alt={`${candidate.firstName} ${candidate.lastName} - Full Body`}
                   sx={{ objectFit: 'cover' }}
@@ -1217,6 +1255,14 @@ const CandidateDetails = () => {
               <Grid item xs={6}>
                 <Typography color="textSecondary">Agent:</Typography>
                 <Typography>{candidate.agent?.name || 'N/A'}</Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography color="textSecondary">Height:</Typography>
+                <Typography>{candidate.height ? `${candidate.height} cm` : 'N/A'}</Typography>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography color="textSecondary">Weight:</Typography>
+                <Typography>{candidate.weight ? `${candidate.weight} kg` : 'N/A'}</Typography>
               </Grid>
             </Grid>
             

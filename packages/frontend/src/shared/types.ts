@@ -39,6 +39,8 @@ export interface Candidate {
   firstName: string;
   lastName: string;
   photoUrl?: string;
+  facePhotoUrl?: string;
+  fullBodyPhotoUrl?: string;
   dateOfBirth?: Date;
   nationality: string;
   education?: string;
@@ -49,6 +51,8 @@ export interface Candidate {
   agent?: Agent;
   applications?: Application[];
   companyId: string;
+  height?: string;
+  weight?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -124,17 +128,7 @@ export interface Payment {
   updatedAt: Date;
 }
 
-// Cost types
-export enum CostType {
-  AGENT_FEE = 'AGENT_FEE',
-  BROKER_FEE = 'BROKER_FEE',
-  GOV_FEE = 'GOV_FEE',
-  TICKET = 'TICKET',
-  EXPEDITED_FEE = 'EXPEDITED_FEE',
-  ATTORNEY_FEE = 'ATTORNEY_FEE',
-  OTHER = 'OTHER',
-}
-
+// Cost types - now dynamic string instead of enum
 export interface Cost {
   id: string;
   applicationId: string;
@@ -142,8 +136,30 @@ export interface Cost {
   amount: number;
   currency: string;
   costDate: Date;
-  costType: CostType;
+  costType: string; // Changed from enum to string for dynamic values
   description?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Cost Type management
+export interface CostTypeModel {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  companyId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Service Type management  
+export interface ServiceType {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  companyId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -208,6 +224,7 @@ export interface FeeTemplate {
   minPrice: number;
   maxPrice: number;
   nationality?: string;
+  serviceType?: string; // New field for service type
   companyId: string;
   createdAt: Date;
   updatedAt: Date;

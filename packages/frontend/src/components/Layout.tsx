@@ -87,7 +87,7 @@ const Layout = () => {
       background: 'linear-gradient(180deg, #1e3a5f 0%, #2c5282 100%)',
     }}>
       <Toolbar sx={{ 
-        minHeight: '64px !important', 
+        minHeight: '56px !important', 
         px: 2,
         background: 'transparent',
       }}>
@@ -191,8 +191,8 @@ const Layout = () => {
                 if (mobileOpen) setMobileOpen(false)
               }}
               sx={{
-                py: 0.8,
-                px: 2,
+                py: 0.6,
+                px: 1.5,
                 borderRadius: 2,
                 transition: 'all 0.3s',
                 color: alpha('#ffffff', 0.9),
@@ -213,7 +213,7 @@ const Layout = () => {
               }}
             >
               <ListItemIcon sx={{ 
-                minWidth: 40, 
+                minWidth: 36, 
                 color: location.pathname.startsWith(item.path) 
                   ? '#ffffff' 
                   : alpha('#ffffff', 0.7)
@@ -223,7 +223,7 @@ const Layout = () => {
               <ListItemText 
                 primary={item.text} 
                 primaryTypographyProps={{
-                  fontSize: '0.95rem',
+                  fontSize: '0.9rem',
                   fontWeight: location.pathname.startsWith(item.path) ? 600 : 400,
                   letterSpacing: '0.3px',
                 }}

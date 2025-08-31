@@ -121,6 +121,8 @@ const Settings = () => {
     bankIBAN: '',
   })
   const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [costTypes, setCostTypes] = useState<any[]>([])
+  const [serviceTypes, setServiceTypes] = useState<any[]>([])
 
   const feeForm = useForm<any>()
   const documentForm = useForm<any>()
@@ -130,6 +132,8 @@ const Settings = () => {
     fetchData()
     if (user?.role === UserRole.SUPER_ADMIN) {
       fetchCompanySettings()
+      fetchCostTypes()
+      fetchServiceTypes()
     }
   }, [user])
 
@@ -181,12 +185,47 @@ const Settings = () => {
     }
   }
 
+  const fetchCostTypes = async () => {
+    try {
+      const response = await api.get('/cost-types')
+      setCostTypes(response.data || [])
+    } catch (err) {
+      console.error('Failed to fetch cost types:', err)
+      // Set default cost types if API fails
+      setCostTypes([
+        { id: '1', name: 'Agent Fee', active: true },
+        { id: '2', name: 'Broker Fee', active: true },
+        { id: '3', name: 'Government Fee', active: true },
+        { id: '4', name: 'Ticket', active: true },
+        { id: '5', name: 'Expedited Fee', active: true },
+        { id: '6', name: 'Attorney Fee', active: true },
+        { id: '7', name: 'Other', active: true },
+      ])
+    }
+  }
+
+  const fetchServiceTypes = async () => {
+    try {
+      const response = await api.get('/service-types')
+      setServiceTypes(response.data || [])
+    } catch (err) {
+      console.error('Failed to fetch service types:', err)
+      // Set default service types if API fails
+      setServiceTypes([
+        { id: '1', name: 'Standard Processing', active: true },
+        { id: '2', name: 'Express Processing', active: true },
+        { id: '3', name: 'VIP Service', active: true },
+        { id: '4', name: 'Document Assistance', active: true },
+      ])
+    }
+  }
+
   const fetchCompanySettings = async () => {
     try {
       // First get the actual company data
       const companyRes = await api.get('/company')
       if (companyRes.data) {
-        setCompanySettings(prev => ({
+        setCompanySettings((prev: any) => ({
           ...prev,
           name: companyRes.data.name || '',
           email: companyRes.data.email || '',
@@ -200,7 +239,7 @@ const Settings = () => {
       // Then get additional settings from the settings table
       const settingsRes = await api.get('/settings/company')
       if (settingsRes.data) {
-        setCompanySettings(prev => ({
+        setCompanySettings((prev: any) => ({
           ...prev,
           ...settingsRes.data
         }))

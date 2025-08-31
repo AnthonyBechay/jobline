@@ -82,7 +82,6 @@ import {
   Broker,
   Payment,
   Cost,
-  CostType,
   UserRole
 } from '../shared/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -668,7 +667,7 @@ const ApplicationDetails = () => {
   const [costForm, setCostForm] = useState({
     amount: '',
     currency: 'USD',
-    costType: CostType.OTHER,
+    costType: 'OTHER',
     description: '',
   })
 
@@ -1441,13 +1440,15 @@ const ApplicationDetails = () => {
               <InputLabel>Cost Type</InputLabel>
               <Select
                 value={costForm.costType}
-                onChange={(e) => setCostForm({ ...costForm, costType: e.target.value as CostType })}
+                onChange={(e) => setCostForm({ ...costForm, costType: e.target.value })}
               >
-                {Object.values(CostType).map((type) => (
-                  <MenuItem key={type} value={type}>
-                    {type.replace(/_/g, ' ')}
-                  </MenuItem>
-                ))}
+                <MenuItem value="AGENT_FEE">Agent Fee</MenuItem>
+                <MenuItem value="BROKER_FEE">Broker Fee</MenuItem>
+                <MenuItem value="GOV_FEE">Government Fee</MenuItem>
+                <MenuItem value="TICKET">Ticket</MenuItem>
+                <MenuItem value="EXPEDITED_FEE">Expedited Fee</MenuItem>
+                <MenuItem value="ATTORNEY_FEE">Attorney Fee</MenuItem>
+                <MenuItem value="OTHER">Other</MenuItem>
               </Select>
             </FormControl>
             <TextField

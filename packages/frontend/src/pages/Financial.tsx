@@ -38,7 +38,7 @@ import {
 } from '@mui/icons-material'
 import { useForm, Controller } from 'react-hook-form'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts'
-import { Payment, Cost, CostType, Application, PaginatedResponse } from '../shared/types'
+import { Payment, Cost, CostTypeModel, Application, PaginatedResponse } from '../shared/types'
 import api from '../services/api'
 
 interface FinancialSummary {
@@ -101,6 +101,7 @@ const Financial = () => {
   const [tabValue, setTabValue] = useState(0)
   const [payments, setPayments] = useState<Payment[]>([])
   const [costs, setCosts] = useState<Cost[]>([])
+  const [costTypes, setCostTypes] = useState<CostTypeModel[]>([])
   const [summary, setSummary] = useState<FinancialSummary | null>(null)
   const [applications, setApplications] = useState<Application[]>([])
   const [loading, setLoading] = useState(false)
@@ -118,6 +119,7 @@ const Financial = () => {
   useEffect(() => {
     fetchFinancialData()
     fetchApplications()
+    fetchCostTypes()
   }, [selectedDateRange])
 
   const fetchFinancialData = async () => {
@@ -209,6 +211,23 @@ const Financial = () => {
     } catch (err) {
       console.error('Failed to fetch applications:', err)
       setApplications([])
+    }
+  }
+
+  const fetchCostTypes = async () => {
+    try {
+      const response = await api.get<CostTypeModel[]>('/cost-types')
+      setCostTypes(response.data)
+    } catch (err) {
+      console.error('Failed to fetch cost types:', err)
+      // Set default cost types if the endpoint fails
+      setCostTypes([
+        { id: '1', name: 'AGENT_FEE', description: 'Agent Fee', active: true, companyId: '', createdAt: new Date(), updatedAt: new Date() },
+        { id: '2', name: 'BROKER_FEE', description: 'Broker Fee', active: true, companyId: '', createdAt: new Date(), updatedAt: new Date() },
+        { id: '3', name: 'GOV_FEE', description: 'Government Fee', active: true, companyId: '', createdAt: new Date(), updatedAt: new Date() },
+        { id: '4', name: 'TICKET', description: 'Ticket', active: true, companyId: '', createdAt: new Date(), updatedAt: new Date() },
+        { id: '5', name: 'OTHER', description: 'Other', active: true, companyId: '', createdAt: new Date(), updatedAt: new Date() },
+      ])
     }
   }
 
@@ -694,9 +713,9 @@ const Financial = () => {
                       select
                       label="Cost Type"
                     >
-                      {Object.values(CostType).map((type) => (
-                        <MenuItem key={type} value={type}>
-                          {type.replace(/_/g, ' ')}
+                      {costTypes.filter(ct => ct.active).map((type) => (
+                        <MenuItem key={type.id} value={type.name}>
+                          {type.description || type.name.replace(/_/g, ' ')}
                         </MenuItem>
                       ))}
                     </TextField>
