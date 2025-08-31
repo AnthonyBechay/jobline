@@ -48,7 +48,7 @@ import {
   RadioButtonUnchecked as PendingIcon,
 } from '@mui/icons-material'
 import { useForm, Controller } from 'react-hook-form'
-import { DocumentTemplate, FeeTemplate, ServiceType, ApplicationStatus } from '../../shared/types'
+import { DocumentTemplate, FeeTemplate, ServiceType } from '../../shared/types'
 import api from '../../services/api'
 
 interface TabPanelProps {
@@ -257,7 +257,7 @@ const Templates = ({ onBack, onError, onSuccess }: TemplatesProps) => {
     })
 
     documentTemplates.forEach(doc => {
-      const source = doc.requiredFrom || 'office'
+      const source = (doc.requiredFrom || 'office') as 'office' | 'client'
       if (grouped[doc.stage]) {
         grouped[doc.stage][source].push(doc)
       }
@@ -325,7 +325,8 @@ const Templates = ({ onBack, onError, onSuccess }: TemplatesProps) => {
 
         {/* Fee Templates Tab */}
         <TabPanel value={tabValue} index={0}>
-          <Box display="flex" justifyContent="flex-end" mb={3}>
+          <Box sx={{ px: 2 }}>
+            <Box display="flex" justifyContent="flex-end" mb={3}>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
@@ -460,13 +461,15 @@ const Templates = ({ onBack, onError, onSuccess }: TemplatesProps) => {
                   </CardContent>
                 </Card>
               </Grid>
-            ))
-}</Grid>
+            ))}
+          </Grid>
+          </Box>
         </TabPanel>
 
         {/* Document Templates Tab */}
         <TabPanel value={tabValue} index={1}>
-          <Box display="flex" justifyContent="flex-end" mb={3}>
+          <Box sx={{ px: 2 }}>
+            <Box display="flex" justifyContent="flex-end" mb={3}>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
@@ -689,6 +692,7 @@ const Templates = ({ onBack, onError, onSuccess }: TemplatesProps) => {
                 </Card>
               )
             })}
+          </Box>
           </Box>
         </TabPanel>
       </Paper>
