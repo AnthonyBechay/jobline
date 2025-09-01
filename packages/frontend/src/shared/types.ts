@@ -235,7 +235,9 @@ export interface DocumentTemplate {
   id: string;
   stage: ApplicationStatus;
   name: string;
+  description?: string;
   required: boolean;
+  requiredFrom: string; // "office" or "client"
   order: number;
   companyId: string;
   createdAt: Date;
