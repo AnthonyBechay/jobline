@@ -426,9 +426,9 @@ const ApplicationDetails = () => {
     ]
   }
 
-  const calculateAge = (birthDate: string) => {
+  const calculateAge = (birthDate: string | Date) => {
     const today = new Date()
-    const birth = new Date(birthDate)
+    const birth = typeof birthDate === 'string' ? new Date(birthDate) : birthDate
     let age = today.getFullYear() - birth.getFullYear()
     const monthDiff = today.getMonth() - birth.getMonth()
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
@@ -635,10 +635,12 @@ const ApplicationDetails = () => {
                   <PhoneIcon sx={{ mr: 2, color: 'text.secondary', fontSize: 20 }} />
                   <Typography variant="body2">{application.client?.phone || 'No phone'}</Typography>
                 </Box>
-                <Box display="flex" alignItems="center">
-                  <EmailIcon sx={{ mr: 2, color: 'text.secondary', fontSize: 20 }} />
-                  <Typography variant="body2">{application.client?.email || 'No email'}</Typography>
-                </Box>
+                {(application.client as any)?.email && (
+                  <Box display="flex" alignItems="center">
+                    <EmailIcon sx={{ mr: 2, color: 'text.secondary', fontSize: 20 }} />
+                    <Typography variant="body2">{(application.client as any).email}</Typography>
+                  </Box>
+                )}
                 <Box display="flex" alignItems="flex-start">
                   <LocationIcon sx={{ mr: 2, color: 'text.secondary', fontSize: 20 }} />
                   <Typography variant="body2">{application.client?.address || 'No address'}</Typography>

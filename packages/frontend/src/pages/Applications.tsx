@@ -163,7 +163,12 @@ const statusWorkflow = {
 }
 
 // Predefined filter groups
-const filterPresets = {
+const filterPresets: Record<string, {
+  label: string
+  icon: React.ReactElement
+  description: string
+  statuses: ApplicationStatus[]
+}> = {
   'pre-arrival': {
     label: 'Pre-Arrival',
     icon: <FlightIcon />,
@@ -198,7 +203,7 @@ const filterPresets = {
     label: 'All Applications',
     icon: <ListIcon />,
     description: 'View all applications',
-    statuses: [],
+    statuses: [] as ApplicationStatus[],
   },
 }
 
@@ -321,6 +326,7 @@ const ApplicationList = () => {
   const [totalRows, setTotalRows] = useState(0)
   const [snackbarMessage, setSnackbarMessage] = useState('')
   const [snackbarOpen, setSnackbarOpen] = useState(false)
+  const [isChangingFilter, setIsChangingFilter] = useState(false)
 
   useEffect(() => {
     // Apply default filter on mount
@@ -348,7 +354,9 @@ const ApplicationList = () => {
 
   const fetchApplicationsWithPreset = async (statuses: ApplicationStatus[]) => {
     try {
-      setLoading(true)
+      if (!isChangingFilter) {
+        setLoading(true)
+      }
       const params = new URLSearchParams()
       params.append('page', (page + 1).toString())
       params.append('limit', pageSize.toString())
@@ -370,12 +378,15 @@ const ApplicationList = () => {
       setError(err.response?.data?.error || 'Failed to fetch applications')
     } finally {
       setLoading(false)
+      setIsChangingFilter(false)
     }
   }
 
   const fetchApplications = async () => {
     try {
-      setLoading(true)
+      if (!isChangingFilter) {
+        setLoading(true)
+      }
       const params = new URLSearchParams()
       params.append('page', (page + 1).toString())
       params.append('limit', pageSize.toString())
@@ -393,6 +404,7 @@ const ApplicationList = () => {
       setError(err.response?.data?.error || 'Failed to fetch applications')
     } finally {
       setLoading(false)
+      setIsChangingFilter(false)
     }
   }
 
@@ -404,6 +416,7 @@ const ApplicationList = () => {
   }
 
   const handlePresetChange = (preset: string) => {
+    setIsChangingFilter(true)
     setFilterPreset(preset)
     setStatusFilter('')
     setTypeFilter('')
@@ -665,13 +678,13 @@ const ApplicationList = () => {
       </Paper>
 
       {/* Applications Display */}
-      {loading ? (
+      {loading && !isChangingFilter ? (
         <Box sx={{ width: '100%' }}>
           <LinearProgress />
         </Box>
       ) : viewMode === 'grid' ? (
-        <Fade in={!loading}>
-          <Grid container spacing={3}>
+        <Fade in={!loading || isChangingFilter} timeout={300}>
+          <Grid container spacing={3} sx={{ minHeight: 400 }}>
             {applications.map((application) => (
               <Grid item xs={12} sm={6} md={4} lg={3} key={application.id}>
                 <ApplicationCard
