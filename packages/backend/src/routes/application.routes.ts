@@ -4,6 +4,7 @@ import { authenticate, adminOnly, AuthRequest } from '../middleware/auth.middlew
 import { validate } from '../middleware/validate.middleware';
 import { prisma } from '../index';
 import { v4 as uuidv4 } from 'uuid';
+import { generateApplicationPDF } from '../services/pdf.service';
 
 const router = Router();
 
@@ -14,17 +15,36 @@ router.use(adminOnly);
 // Get all applications with filters (company-specific)
 router.get('/', async (req: AuthRequest, res) => {
   try {
-    const { status, type, clientId, candidateId, page = 1, limit = 20 } = req.query;
+    const { status, type, clientId, candidateId, page = 1, limit = 20, search } = req.query;
     const companyId = req.user!.companyId;
     
     const where: any = {
       companyId, // Filter by company
     };
     
-    if (status) where.status = status;
+    // Handle multiple status filters (for preset filters)
+    if (status) {
+      const statuses = Array.isArray(status) ? status : [status];
+      if (statuses.length > 1) {
+        where.status = { in: statuses };
+      } else {
+        where.status = statuses[0];
+      }
+    }
+    
     if (type) where.type = type;
     if (clientId) where.clientId = clientId;
     if (candidateId) where.candidateId = candidateId;
+    
+    // Add search functionality
+    if (search && typeof search === 'string' && search.trim()) {
+      where.OR = [
+        { id: { contains: search, mode: 'insensitive' } },
+        { client: { name: { contains: search, mode: 'insensitive' } } },
+        { candidate: { firstName: { contains: search, mode: 'insensitive' } } },
+        { candidate: { lastName: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
     
     const skip = (Number(page) - 1) * Number(limit);
     
@@ -761,6 +781,57 @@ router.get('/:id/share-link', async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('Get share link error:', error);
     res.status(500).json({ error: 'Failed to get share link' });
+  }
+});
+
+// Generate PDF for an application
+router.get('/:id/pdf', async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.user!.companyId;
+    
+    // Fetch application with all necessary relations
+    const application = await prisma.application.findFirst({
+      where: { 
+        id,
+        companyId,
+      },
+      include: {
+        client: true,
+        candidate: {
+          include: {
+            agent: true,
+            company: true,
+          }
+        },
+        broker: true,
+        feeTemplate: true,
+        company: true,
+      }
+    });
+    
+    if (!application) {
+      res.status(404).json({ error: 'Application not found' });
+      return;
+    }
+    
+    // Generate PDF using the service
+    const pdfBuffer = await generateApplicationPDF(application);
+    
+    // Set response headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="application_${application.id.substring(0, 8)}.pdf"`
+    );
+    res.setHeader('Content-Length', pdfBuffer.length.toString());
+    
+    // Send the PDF buffer
+    res.send(pdfBuffer);
+    
+  } catch (error) {
+    console.error('Generate application PDF error:', error);
+    res.status(500).json({ error: 'Failed to generate PDF' });
   }
 });
 

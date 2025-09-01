@@ -15,35 +15,26 @@ import {
   DialogContent,
   DialogActions,
   Alert,
-  Stepper,
-  Step,
-  StepLabel,
   Card,
   CardContent,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
-  ListItemIcon,
-  CircularProgress,
-  Divider,
   FormControl,
   InputLabel,
   Select,
   Tooltip,
   LinearProgress,
-  Checkbox,
-  FormControlLabel,
-  Link,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Tabs,
-  Tab,
+  Stack,
+  ToggleButton,
+  ToggleButtonGroup,
   Badge,
+  alpha,
+  useTheme,
+  CardActionArea,
+  Avatar,
+  Divider,
+  InputAdornment,
+  Fade,
+  CircularProgress,
+  Snackbar,
 } from '@mui/material'
 import { DataGrid, GridColDef } from '@mui/x-data-grid'
 import {
@@ -67,6 +58,14 @@ import {
   Upload as UploadIcon,
   Download as DownloadIcon,
   InsertDriveFile as FileIcon,
+  FilterList as FilterIcon,
+  ViewList as ListIcon,
+  ViewModule as CardIcon,
+  LocalShipping as ArrivalIcon,
+  Assignment as PaperworkIcon,
+  CheckCircleOutline as CompleteIcon,
+  Search as SearchIcon,
+  ContentCopy as CopyIcon,
 } from '@mui/icons-material'
 import { useForm, Controller } from 'react-hook-form'
 import { 
@@ -87,87 +86,292 @@ import {
 } from '../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../services/api'
+import ApplicationDetails from '../components/ApplicationDetails'
 
 // Status workflow mapping
 const statusWorkflow = {
   [ApplicationStatus.PENDING_MOL]: {
     next: ApplicationStatus.MOL_AUTH_RECEIVED,
     label: 'MoL Pre-Authorization',
+    shortLabel: 'MoL Auth',
     icon: <DocumentIcon />,
     color: 'warning' as const,
   },
   [ApplicationStatus.MOL_AUTH_RECEIVED]: {
     next: ApplicationStatus.VISA_PROCESSING,
     label: 'MoL Authorization Received',
+    shortLabel: 'MoL Done',
     icon: <CheckIcon />,
     color: 'success' as const,
   },
   [ApplicationStatus.VISA_PROCESSING]: {
     next: ApplicationStatus.VISA_RECEIVED,
     label: 'Visa Processing',
+    shortLabel: 'Visa Process',
     icon: <DocumentIcon />,
     color: 'info' as const,
   },
   [ApplicationStatus.VISA_RECEIVED]: {
     next: ApplicationStatus.WORKER_ARRIVED,
     label: 'Visa Received',
+    shortLabel: 'Visa Done',
     icon: <FlightIcon />,
     color: 'success' as const,
   },
   [ApplicationStatus.WORKER_ARRIVED]: {
     next: ApplicationStatus.LABOUR_PERMIT_PROCESSING,
     label: 'Worker Arrived',
+    shortLabel: 'Arrived',
     icon: <HomeIcon />,
     color: 'success' as const,
   },
   [ApplicationStatus.LABOUR_PERMIT_PROCESSING]: {
     next: ApplicationStatus.RESIDENCY_PERMIT_PROCESSING,
     label: 'Labour Permit Processing',
+    shortLabel: 'Labour Permit',
     icon: <DocumentIcon />,
     color: 'info' as const,
   },
   [ApplicationStatus.RESIDENCY_PERMIT_PROCESSING]: {
     next: ApplicationStatus.ACTIVE_EMPLOYMENT,
     label: 'Residency Permit Processing',
+    shortLabel: 'Residency',
     icon: <DocumentIcon />,
     color: 'info' as const,
   },
   [ApplicationStatus.ACTIVE_EMPLOYMENT]: {
     next: null,
     label: 'Active Employment',
+    shortLabel: 'Active',
     icon: <CheckIcon />,
     color: 'success' as const,
   },
   [ApplicationStatus.CONTRACT_ENDED]: {
     next: null,
     label: 'Contract Ended',
+    shortLabel: 'Ended',
     icon: <CheckIcon />,
     color: 'default' as const,
   },
   [ApplicationStatus.RENEWAL_PENDING]: {
     next: ApplicationStatus.ACTIVE_EMPLOYMENT,
     label: 'Renewal Pending',
+    shortLabel: 'Renewal',
     icon: <WarningIcon />,
     color: 'warning' as const,
   },
+}
+
+// Predefined filter groups
+const filterPresets = {
+  'pre-arrival': {
+    label: 'Pre-Arrival',
+    icon: <FlightIcon />,
+    description: 'Applications before worker arrival',
+    statuses: [
+      ApplicationStatus.PENDING_MOL,
+      ApplicationStatus.MOL_AUTH_RECEIVED,
+      ApplicationStatus.VISA_PROCESSING,
+      ApplicationStatus.VISA_RECEIVED,
+    ],
+  },
+  'paperwork': {
+    label: 'Paperwork in Progress',
+    icon: <PaperworkIcon />,
+    description: 'Workers arrived, processing documents',
+    statuses: [
+      ApplicationStatus.WORKER_ARRIVED,
+      ApplicationStatus.LABOUR_PERMIT_PROCESSING,
+      ApplicationStatus.RESIDENCY_PERMIT_PROCESSING,
+    ],
+  },
+  'complete': {
+    label: 'Completed',
+    icon: <CompleteIcon />,
+    description: 'Active employment and completed',
+    statuses: [
+      ApplicationStatus.ACTIVE_EMPLOYMENT,
+      ApplicationStatus.CONTRACT_ENDED,
+    ],
+  },
+  'all': {
+    label: 'All Applications',
+    icon: <ListIcon />,
+    description: 'View all applications',
+    statuses: [],
+  },
+}
+
+// Application Card Component
+const ApplicationCard = ({ application, onView, onEdit, onCopyLink }: any) => {
+  const theme = useTheme()
+  const statusInfo = statusWorkflow[application.status as ApplicationStatus]
+  
+  return (
+    <Card 
+      sx={{ 
+        height: '100%', 
+        borderRadius: 2,
+        transition: 'all 0.3s',
+        '&:hover': {
+          boxShadow: 4,
+          transform: 'translateY(-2px)',
+        }
+      }}
+    >
+      <CardActionArea onClick={() => onView(application.id)}>
+        <CardContent>
+          <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary">
+                #{application.id.substring(0, 8).toUpperCase()}
+              </Typography>
+              <Chip
+                label={application.type.replace(/_/g, ' ')}
+                size="small"
+                color={application.type === ApplicationType.NEW_CANDIDATE ? 'primary' : 'secondary'}
+                sx={{ mt: 0.5 }}
+              />
+            </Box>
+            <Chip
+              label={statusInfo.shortLabel}
+              color={statusInfo.color}
+              size="small"
+              icon={statusInfo.icon}
+            />
+          </Box>
+          
+          <Divider sx={{ my: 2 }} />
+          
+          <Box display="flex" alignItems="center" mb={1}>
+            <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.light', mr: 1 }}>
+              <BusinessIcon fontSize="small" />
+            </Avatar>
+            <Box flex={1}>
+              <Typography variant="body2" fontWeight="medium">
+                {application.client?.name || 'Unknown Client'}
+              </Typography>
+            </Box>
+          </Box>
+          
+          <Box display="flex" alignItems="center" mb={2}>
+            <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.light', mr: 1 }}>
+              <PersonIcon fontSize="small" />
+            </Avatar>
+            <Box flex={1}>
+              <Typography variant="body2" fontWeight="medium">
+                {`${application.candidate?.firstName || ''} ${application.candidate?.lastName || ''}`}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {application.candidate?.nationality || 'Unknown'}
+              </Typography>
+            </Box>
+          </Box>
+          
+          <Box display="flex" alignItems="center" justifyContent="space-between">
+            <Typography variant="caption" color="text.secondary">
+              {new Date(application.createdAt).toLocaleDateString()}
+            </Typography>
+            <Stack direction="row" spacing={0.5}>
+              <Tooltip title="Copy client link">
+                <IconButton 
+                  size="small" 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onCopyLink(application.shareableLink)
+                  }}
+                >
+                  <LinkIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Edit">
+                <IconButton 
+                  size="small" 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onEdit(application.id)
+                  }}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          </Box>
+        </CardContent>
+      </CardActionArea>
+    </Card>
+  )
 }
 
 // Application List Component
 const ApplicationList = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const theme = useTheme()
   const [applications, setApplications] = useState<Application[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [filterPreset, setFilterPreset] = useState<string>('pre-arrival') // Default filter
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | ''>('')
   const [typeFilter, setTypeFilter] = useState<ApplicationType | ''>('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [page, setPage] = useState(0)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(12)
   const [totalRows, setTotalRows] = useState(0)
+  const [snackbarMessage, setSnackbarMessage] = useState('')
+  const [snackbarOpen, setSnackbarOpen] = useState(false)
 
   useEffect(() => {
-    fetchApplications()
-  }, [page, pageSize, statusFilter, typeFilter])
+    // Apply default filter on mount
+    const preset = filterPresets['pre-arrival']
+    fetchApplicationsWithPreset(preset.statuses)
+  }, [])
+
+  useEffect(() => {
+    if (filterPreset && filterPreset !== 'custom') {
+      const preset = filterPresets[filterPreset as keyof typeof filterPresets]
+      if (preset.statuses.length > 0) {
+        fetchApplicationsWithPreset(preset.statuses)
+      } else {
+        fetchApplications()
+      }
+    }
+  }, [filterPreset, page, pageSize])
+
+  useEffect(() => {
+    if (statusFilter || typeFilter || searchQuery) {
+      setFilterPreset('custom')
+      fetchApplications()
+    }
+  }, [statusFilter, typeFilter, searchQuery])
+
+  const fetchApplicationsWithPreset = async (statuses: ApplicationStatus[]) => {
+    try {
+      setLoading(true)
+      const params = new URLSearchParams()
+      params.append('page', (page + 1).toString())
+      params.append('limit', pageSize.toString())
+      
+      // Add multiple status filters
+      if (statuses.length > 0) {
+        statuses.forEach(status => {
+          params.append('status', status)
+        })
+      }
+
+      const response = await api.get<any>(`/applications?${params}`)
+      const applications = response.data.applications || response.data.data || []
+      const pagination = response.data.pagination || { total: 0 }
+      
+      setApplications(applications)
+      setTotalRows(pagination.total)
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to fetch applications')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const fetchApplications = async () => {
     try {
@@ -177,6 +381,7 @@ const ApplicationList = () => {
       params.append('limit', pageSize.toString())
       if (statusFilter) params.append('status', statusFilter)
       if (typeFilter) params.append('type', typeFilter)
+      if (searchQuery) params.append('search', searchQuery)
 
       const response = await api.get<any>(`/applications?${params}`)
       const applications = response.data.applications || response.data.data || []
@@ -194,6 +399,16 @@ const ApplicationList = () => {
   const handleCopyLink = (shareableLink: string) => {
     const fullUrl = `${window.location.origin}/status/${shareableLink}`
     navigator.clipboard.writeText(fullUrl)
+    setSnackbarMessage('Client link copied to clipboard')
+    setSnackbarOpen(true)
+  }
+
+  const handlePresetChange = (preset: string) => {
+    setFilterPreset(preset)
+    setStatusFilter('')
+    setTypeFilter('')
+    setSearchQuery('')
+    setPage(0)
   }
 
   const columns: GridColDef[] = [
@@ -201,7 +416,7 @@ const ApplicationList = () => {
       field: 'id',
       headerName: 'ID',
       width: 100,
-      renderCell: (params) => params.value.substring(0, 8)
+      renderCell: (params) => params.value.substring(0, 8).toUpperCase()
     },
     {
       field: 'client',
@@ -284,22 +499,118 @@ const ApplicationList = () => {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Applications</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => navigate('/applications/new')}
-        >
-          New Application
-        </Button>
-      </Box>
+      {/* Header */}
+      <Paper 
+        elevation={0} 
+        sx={{ 
+          p: 3, 
+          mb: 3, 
+          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.primary.light, 0.05)} 100%)`,
+          borderRadius: 3,
+        }}
+      >
+        <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Box>
+            <Typography variant="h4" fontWeight="bold" color="primary.dark">
+              Applications
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Manage all recruitment applications
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => navigate('/applications/new')}
+            sx={{ borderRadius: 2 }}
+          >
+            New Application
+          </Button>
+        </Box>
+      </Paper>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
-      <Paper sx={{ p: 2, mb: 2 }}>
+      {/* Filter Presets */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        {Object.entries(filterPresets).map(([key, preset]) => {
+          const isActive = filterPreset === key
+          const appCount = key === 'all' 
+            ? totalRows 
+            : applications.filter(app => preset.statuses.includes(app.status)).length
+          
+          return (
+            <Grid item xs={12} sm={6} md={3} key={key}>
+              <Card 
+                sx={{ 
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  border: isActive ? 2 : 1,
+                  borderColor: isActive ? 'primary.main' : 'divider',
+                  bgcolor: isActive ? alpha(theme.palette.primary.main, 0.05) : 'background.paper',
+                  '&:hover': {
+                    boxShadow: 2,
+                    borderColor: 'primary.main',
+                  }
+                }}
+                onClick={() => handlePresetChange(key)}
+              >
+                <CardContent sx={{ p: 2 }}>
+                  <Box display="flex" alignItems="center" justifyContent="space-between">
+                    <Box display="flex" alignItems="center">
+                      <Avatar 
+                        sx={{ 
+                          bgcolor: isActive ? 'primary.main' : 'action.hover',
+                          width: 40,
+                          height: 40,
+                          mr: 2
+                        }}
+                      >
+                        {preset.icon}
+                      </Avatar>
+                      <Box>
+                        <Typography variant="subtitle2" fontWeight="medium">
+                          {preset.label}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {preset.description}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    {loading ? (
+                      <CircularProgress size={20} />
+                    ) : (
+                      <Badge badgeContent={appCount} color="primary" />
+                    )}
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          )
+        })}
+      </Grid>
+
+      {/* Advanced Filters & Search */}
+      <Paper sx={{ p: 2, mb: 3, borderRadius: 2 }}>
         <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={3}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Search applications..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
             <FormControl fullWidth size="small">
               <InputLabel>Status Filter</InputLabel>
               <Select
@@ -307,7 +618,7 @@ const ApplicationList = () => {
                 label="Status Filter"
                 onChange={(e) => setStatusFilter(e.target.value as ApplicationStatus | '')}
               >
-                <MenuItem value="">All</MenuItem>
+                <MenuItem value="">All Statuses</MenuItem>
                 {Object.values(ApplicationStatus).map((status) => (
                   <MenuItem key={status} value={status}>
                     {statusWorkflow[status].label}
@@ -316,7 +627,7 @@ const ApplicationList = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={3}>
             <FormControl fullWidth size="small">
               <InputLabel>Type Filter</InputLabel>
               <Select
@@ -324,7 +635,7 @@ const ApplicationList = () => {
                 label="Type Filter"
                 onChange={(e) => setTypeFilter(e.target.value as ApplicationType | '')}
               >
-                <MenuItem value="">All</MenuItem>
+                <MenuItem value="">All Types</MenuItem>
                 {Object.values(ApplicationType).map((type) => (
                   <MenuItem key={type} value={type}>
                     {type.replace(/_/g, ' ')}
@@ -333,44 +644,85 @@ const ApplicationList = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} md={4}>
-            <Button fullWidth variant="contained" onClick={fetchApplications}>
-              Apply Filters
-            </Button>
+          <Grid item xs={12} md={3}>
+            <Box display="flex" justifyContent="flex-end" gap={1}>
+              <ToggleButtonGroup
+                value={viewMode}
+                exclusive
+                onChange={(e, newMode) => newMode && setViewMode(newMode)}
+                size="small"
+              >
+                <ToggleButton value="grid">
+                  <CardIcon />
+                </ToggleButton>
+                <ToggleButton value="list">
+                  <ListIcon />
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
           </Grid>
         </Grid>
       </Paper>
 
-      <Paper sx={{ height: 600, width: '100%' }}>
-        <DataGrid
-          rows={applications || []}
-          columns={columns}
-          paginationModel={{ page, pageSize }}
-          pageSizeOptions={[5, 10, 25, 50]}
-          onPaginationModelChange={(model) => {
-            setPage(model.page)
-            setPageSize(model.pageSize)
-          }}
-          loading={loading}
-          rowCount={totalRows}
-          paginationMode="server"
-          disableRowSelectionOnClick
-          onRowClick={(params) => navigate(`/applications/${params.row.id}`)}
-          sx={{
-            '& .MuiDataGrid-row': {
-              cursor: 'pointer',
-            },
-            '& .MuiDataGrid-row:hover': {
-              backgroundColor: 'rgba(0, 0, 0, 0.04)',
-            },
-          }}
-        />
-      </Paper>
+      {/* Applications Display */}
+      {loading ? (
+        <Box sx={{ width: '100%' }}>
+          <LinearProgress />
+        </Box>
+      ) : viewMode === 'grid' ? (
+        <Fade in={!loading}>
+          <Grid container spacing={3}>
+            {applications.map((application) => (
+              <Grid item xs={12} sm={6} md={4} lg={3} key={application.id}>
+                <ApplicationCard
+                  application={application}
+                  onView={(id: string) => navigate(`/applications/${id}`)}
+                  onEdit={(id: string) => navigate(`/applications/edit/${id}`)}
+                  onCopyLink={handleCopyLink}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        </Fade>
+      ) : (
+        <Paper sx={{ height: 600, width: '100%', borderRadius: 2 }}>
+          <DataGrid
+            rows={applications || []}
+            columns={columns}
+            paginationModel={{ page, pageSize }}
+            pageSizeOptions={[5, 10, 25, 50]}
+            onPaginationModelChange={(model) => {
+              setPage(model.page)
+              setPageSize(model.pageSize)
+            }}
+            loading={loading}
+            rowCount={totalRows}
+            paginationMode="server"
+            disableRowSelectionOnClick
+            onRowClick={(params) => navigate(`/applications/${params.row.id}`)}
+            sx={{
+              '& .MuiDataGrid-row': {
+                cursor: 'pointer',
+              },
+              '& .MuiDataGrid-row:hover': {
+                backgroundColor: alpha(theme.palette.primary.main, 0.04),
+              },
+            }}
+          />
+        </Paper>
+      )}
+    {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
+        onClose={() => setSnackbarOpen(false)}
+        message={snackbarMessage}
+      />
     </Box>
   )
 }
 
-// Application Form Component
+// Application Form Component (kept the same)
 const ApplicationForm = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -635,891 +987,6 @@ const ApplicationForm = () => {
           </Grid>
         </form>
       </Paper>
-    </Box>
-  )
-}
-
-// Enhanced Application Details Component
-const ApplicationDetails = () => {
-  const { id } = useParams()
-  const navigate = useNavigate()
-  const { user } = useAuth()
-  const [application, setApplication] = useState<Application | null>(null)
-  const [documents, setDocuments] = useState<any[]>([])
-  const [uploadedFiles, setUploadedFiles] = useState<any[]>([])
-  const [payments, setPayments] = useState<Payment[]>([])
-  const [costs, setCosts] = useState<Cost[]>([])
-  const [costTypes, setCostTypes] = useState<CostTypeModel[]>([])
-  const [feeTemplates, setFeeTemplates] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [updateStatusDialog, setUpdateStatusDialog] = useState(false)
-  const [paymentDialog, setPaymentDialog] = useState(false)
-  const [costDialog, setCostDialog] = useState(false)
-  const [feeDialog, setFeeDialog] = useState(false)
-  const [documentTab, setDocumentTab] = useState(0)
-  const [selectedFeeTemplate, setSelectedFeeTemplate] = useState<any>(null)
-  const [finalFeeAmount, setFinalFeeAmount] = useState('')
-  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null)
-  const [paymentForm, setPaymentForm] = useState({
-    amount: '',
-    currency: 'USD',
-    notes: '',
-  })
-  const [costForm, setCostForm] = useState({
-    amount: '',
-    currency: 'USD',
-    costType: 'OTHER',
-    description: '',
-  })
-
-  useEffect(() => {
-    if (id) {
-      fetchApplicationDetails()
-      fetchFeeTemplates()
-      fetchUploadedFiles()
-      fetchCostTypes()
-    }
-  }, [id])
-
-  const fetchApplicationDetails = async () => {
-    try {
-      const [appRes, docsRes, paymentsRes] = await Promise.all([
-        api.get<Application>(`/applications/${id}`),
-        api.get<any[]>(`/applications/${id}/documents`),
-        api.get<Payment[]>(`/applications/${id}/payments`),
-      ])
-      
-      setApplication(appRes.data)
-      setDocuments(docsRes.data || [])
-      setPayments(paymentsRes.data || [])
-      
-      // Set initial fee values if available
-      if (appRes.data.feeTemplate) {
-        setSelectedFeeTemplate(appRes.data.feeTemplate)
-        setFinalFeeAmount(appRes.data.finalFeeAmount?.toString() || appRes.data.feeTemplate.defaultPrice?.toString() || '')
-      }
-      
-      if (user?.role === UserRole.SUPER_ADMIN) {
-        try {
-          const costsRes = await api.get<Cost[]>(`/applications/${id}/costs`)
-          setCosts(costsRes.data || [])
-        } catch {
-          setCosts([])
-        }
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to fetch application details')
-      setDocuments([])
-      setPayments([])
-      setCosts([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchFeeTemplates = async () => {
-    try {
-      const response = await api.get('/applications/fee-templates/available')
-      setFeeTemplates(response.data || [])
-    } catch (err) {
-      console.error('Failed to fetch fee templates:', err)
-      setFeeTemplates([])
-    }
-  }
-
-  const fetchCostTypes = async () => {
-    try {
-      const response = await api.get<CostTypeModel[]>('/cost-types')
-      setCostTypes(response.data || [])
-    } catch (err) {
-      console.error('Failed to fetch cost types:', err)
-      // Provide default cost types if API fails
-      setCostTypes([
-        { id: '1', name: 'AGENT_FEE', description: 'Agent Fee', active: true, companyId: '', createdAt: new Date(), updatedAt: new Date() },
-        { id: '2', name: 'BROKER_FEE', description: 'Broker Fee', active: true, companyId: '', createdAt: new Date(), updatedAt: new Date() },
-        { id: '3', name: 'GOV_FEE', description: 'Government Fee', active: true, companyId: '', createdAt: new Date(), updatedAt: new Date() },
-        { id: '4', name: 'TICKET', description: 'Ticket', active: true, companyId: '', createdAt: new Date(), updatedAt: new Date() },
-        { id: '5', name: 'OTHER', description: 'Other', active: true, companyId: '', createdAt: new Date(), updatedAt: new Date() },
-      ])
-    }
-  }
-
-  const fetchUploadedFiles = async () => {
-    try {
-      const response = await api.get(`/files?entityType=application&entityId=${id}`)
-      setUploadedFiles(response.data || [])
-    } catch (err) {
-      console.error('Failed to fetch uploaded files:', err)
-      setUploadedFiles([])
-    }
-  }
-
-  const handleFileUpload = async (documentId: string, event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      setError('File size should be less than 10MB')
-      return
-    }
-
-    try {
-      setUploadingDoc(documentId)
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('entityType', 'application')
-      formData.append('entityId', id || '')
-
-      const response = await api.post('/files/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
-
-      // Update document status to received
-      await handleUpdateDocumentStatus(documentId, DocumentStatus.RECEIVED)
-      
-      // Refresh uploaded files list
-      await fetchUploadedFiles()
-      
-      // Reset the file input
-      event.target.value = ''
-    } catch (err: any) {
-      console.error('File upload error:', err)
-      setError('Failed to upload document')
-    } finally {
-      setUploadingDoc(null)
-    }
-  }
-
-  const handleUpdateDocumentStatus = async (documentId: string, status: DocumentStatus) => {
-    try {
-      await api.patch(`/document-items/${documentId}`, { status })
-      await fetchApplicationDetails()
-    } catch (err) {
-      console.error('Failed to update document status:', err)
-    }
-  }
-
-  const handleUpdateApplicationStatus = async (newStatus: ApplicationStatus) => {
-    try {
-      await api.patch(`/applications/${id}`, { status: newStatus })
-      setUpdateStatusDialog(false)
-      await fetchApplicationDetails()
-    } catch (err: any) {
-      console.error('Failed to update application status:', err)
-      const errorData = err.response?.data
-      if (errorData?.userFriendly && errorData?.scrollToDocuments) {
-        setError(errorData.message || errorData.error)
-        setUpdateStatusDialog(false)
-        // Scroll to documents section
-        setTimeout(() => {
-          const docSection = document.getElementById('document-checklist')
-          if (docSection) {
-            docSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          }
-        }, 100)
-      } else {
-        setError(errorData?.error || 'Failed to update status')
-      }
-    }
-  }
-
-  const handleAddPayment = async () => {
-    try {
-      await api.post(`/payments`, {
-        ...paymentForm,
-        applicationId: id,
-        clientId: application?.clientId,
-        amount: parseFloat(paymentForm.amount),
-      })
-      setPaymentDialog(false)
-      setPaymentForm({ amount: '', currency: 'USD', notes: '' })
-      await fetchApplicationDetails()
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to add payment')
-    }
-  }
-
-  const handleAddCost = async () => {
-    try {
-      await api.post(`/costs`, {
-        ...costForm,
-        applicationId: id,
-        amount: parseFloat(costForm.amount),
-      })
-      setCostDialog(false)
-      setCostForm({ amount: '', currency: 'USD', costType: 'OTHER', description: '' })
-      await fetchApplicationDetails()
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to add cost')
-    }
-  }
-
-  const handleSetFee = async () => {
-    try {
-      await api.patch(`/applications/${id}`, {
-        feeTemplateId: selectedFeeTemplate?.id,
-        finalFeeAmount: parseFloat(finalFeeAmount),
-      })
-      setFeeDialog(false)
-      await fetchApplicationDetails()
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to set fee')
-    }
-  }
-
-  const handleCopyShareableLink = () => {
-    if (application) {
-      const fullUrl = `${window.location.origin}/status/${application.shareableLink}`
-      navigator.clipboard.writeText(fullUrl)
-    }
-  }
-
-  const handleEditClient = () => {
-    if (application?.client) {
-      navigate(`/clients/edit/${application.client.id}`)
-    }
-  }
-
-  const handleEditCandidate = () => {
-    if (application?.candidate) {
-      navigate(`/candidates/edit/${application.candidate.id}`)
-    }
-  }
-
-  const getStatusSteps = () => {
-    const steps = [
-      ApplicationStatus.PENDING_MOL,
-      ApplicationStatus.MOL_AUTH_RECEIVED,
-      ApplicationStatus.VISA_PROCESSING,
-      ApplicationStatus.VISA_RECEIVED,
-      ApplicationStatus.WORKER_ARRIVED,
-      ApplicationStatus.LABOUR_PERMIT_PROCESSING,
-      ApplicationStatus.RESIDENCY_PERMIT_PROCESSING,
-      ApplicationStatus.ACTIVE_EMPLOYMENT,
-    ]
-    return steps
-  }
-
-  if (loading) return <Box>Loading...</Box>
-  if (error) return <Alert severity="error">{error}</Alert>
-  if (!application) return <Alert severity="info">Application not found</Alert>
-
-  const statusInfo = statusWorkflow[application.status]
-  const steps = getStatusSteps()
-  const activeStep = steps.indexOf(application.status)
-
-  // Separate documents by type
-  const officeDocuments = documents.filter(d => d.requiredFrom === 'office')
-  const clientDocuments = documents.filter(d => d.requiredFrom === 'client')
-  
-  const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0)
-  const totalCosts = costs.reduce((sum, c) => sum + c.amount, 0)
-  const profit = totalRevenue - totalCosts
-
-  return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">
-          Application #{application.id.substring(0, 8)}
-        </Typography>
-        <Box display="flex" gap={2}>
-          <Tooltip title="Copy shareable link for client">
-            <Button
-              variant="outlined"
-              startIcon={<LinkIcon />}
-              onClick={handleCopyShareableLink}
-            >
-              Copy Client Link
-            </Button>
-          </Tooltip>
-          <Button variant="outlined" onClick={() => navigate('/applications')}>
-            Back to List
-          </Button>
-        </Box>
-      </Box>
-
-      {/* Status Progress */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" gutterBottom>Application Progress</Typography>
-        <Stepper activeStep={activeStep} alternativeLabel>
-          {steps.map((step) => (
-            <Step key={step}>
-              <StepLabel>{statusWorkflow[step].label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
-        <Box display="flex" justifyContent="center" mt={2}>
-          <Chip
-            label={statusInfo.label}
-            color={statusInfo.color}
-            icon={statusInfo.icon}
-          />
-          {statusInfo.next && (
-            <Button
-              sx={{ ml: 2 }}
-              variant="contained"
-              size="small"
-              onClick={() => setUpdateStatusDialog(true)}
-            >
-              Move to Next Stage
-            </Button>
-          )}
-        </Box>
-      </Paper>
-
-      <Grid container spacing={3}>
-        {/* Client & Candidate Info with Edit Buttons */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">
-                  <PersonIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                  Client Details
-                </Typography>
-                <IconButton size="small" onClick={handleEditClient} color="primary">
-                  <EditIcon />
-                </IconButton>
-              </Box>
-              <List dense>
-                <ListItem>
-                  <ListItemText primary="Name" secondary={application.client?.name} />
-                </ListItem>
-                <ListItem>
-                  <ListItemText primary="Phone" secondary={application.client?.phone} />
-                </ListItem>
-                <ListItem>
-                  <ListItemText primary="Address" secondary={application.client?.address || 'N/A'} />
-                </ListItem>
-              </List>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">
-                  <BusinessIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                  Candidate Details
-                </Typography>
-                <IconButton size="small" onClick={handleEditCandidate} color="primary">
-                  <EditIcon />
-                </IconButton>
-              </Box>
-              <List dense>
-                <ListItem>
-                  <ListItemText 
-                    primary="Name" 
-                    secondary={`${application.candidate?.firstName} ${application.candidate?.lastName}`} 
-                  />
-                </ListItem>
-                <ListItem>
-                  <ListItemText primary="Nationality" secondary={application.candidate?.nationality} />
-                </ListItem>
-                <ListItem>
-                  <ListItemText 
-                    primary="Status" 
-                    secondary={
-                      <Chip 
-                        label={application.candidate?.status.replace(/_/g, ' ')} 
-                        size="small" 
-                        color="primary" 
-                      />
-                    } 
-                  />
-                </ListItem>
-              </List>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Fee Management Section */}
-        <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">
-                  <ReceiptIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                  Application Fee
-                </Typography>
-                <Button
-                  variant="contained"
-                  size="small"
-                  onClick={() => setFeeDialog(true)}
-                  disabled={!user || (user.role !== UserRole.SUPER_ADMIN && !!application.feeTemplate)}
-                >
-                  {application.feeTemplate ? 'Update Fee' : 'Set Fee'}
-                </Button>
-              </Box>
-              {application.feeTemplate ? (
-                <Box>
-                  <Typography variant="body2" color="textSecondary">
-                    Template: {application.feeTemplate.name}
-                  </Typography>
-                  <Typography variant="h6" color="primary">
-                    Agreed Fee: ${application.finalFeeAmount || application.feeTemplate.defaultPrice}
-                  </Typography>
-                </Box>
-              ) : (
-                <Typography color="textSecondary">No fee set for this application</Typography>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Document Checklist with Tabs */}
-        <Grid item xs={12}>
-          <Card id="document-checklist">
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                <DocumentIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Document Checklist
-              </Typography>
-              <Tabs value={documentTab} onChange={(e, v) => setDocumentTab(v)} sx={{ mb: 2 }}>
-                <Tab 
-                  label={
-                    <Badge badgeContent={officeDocuments.filter(d => d.status === 'PENDING').length} color="error">
-                      Office Documents
-                    </Badge>
-                  } 
-                />
-                <Tab 
-                  label={
-                    <Badge badgeContent={clientDocuments.filter(d => d.status === 'PENDING').length} color="warning">
-                      Client Requirements
-                    </Badge>
-                  } 
-                />
-              </Tabs>
-              
-              {documentTab === 0 ? (
-                <List>
-                  {officeDocuments.map((doc) => (
-                    <ListItem key={doc.id} divider>
-                      <ListItemText
-                        primary={
-                          <Box display="flex" alignItems="center" gap={1}>
-                            {doc.documentName}
-                            {doc.required && (
-                              <Chip label="Required" size="small" color="error" variant="outlined" />
-                            )}
-                          </Box>
-                        }
-                        secondary={`Stage: ${doc.stage.replace(/_/g, ' ')}`}
-                      />
-                      <ListItemSecondaryAction>
-                        <Box display="flex" alignItems="center" gap={1}>
-                          <input
-                            type="file"
-                            id={`file-upload-${doc.id}`}
-                            style={{ display: 'none' }}
-                            onChange={(e) => handleFileUpload(doc.id, e)}
-                            accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
-                          />
-                          <label htmlFor={`file-upload-${doc.id}`}>
-                            <IconButton
-                              component="span"
-                              size="small"
-                              color="primary"
-                              disabled={uploadingDoc === doc.id}
-                            >
-                              {uploadingDoc === doc.id ? (
-                                <CircularProgress size={20} />
-                              ) : (
-                                <UploadIcon />
-                              )}
-                            </IconButton>
-                          </label>
-                          <FormControl size="small" sx={{ minWidth: 120 }}>
-                            <Select
-                              value={doc.status}
-                              onChange={(e) => handleUpdateDocumentStatus(doc.id, e.target.value as DocumentStatus)}
-                            >
-                              <MenuItem value={DocumentStatus.PENDING}>Pending</MenuItem>
-                              <MenuItem value={DocumentStatus.RECEIVED}>Received</MenuItem>
-                              <MenuItem value={DocumentStatus.SUBMITTED}>Submitted</MenuItem>
-                            </Select>
-                          </FormControl>
-                        </Box>
-                      </ListItemSecondaryAction>
-                    </ListItem>
-                  ))}
-                  {officeDocuments.length === 0 && (
-                    <Typography color="textSecondary" align="center">No office documents required</Typography>
-                  )}
-                </List>
-              ) : (
-                <List>
-                  {clientDocuments.map((doc) => (
-                    <ListItem key={doc.id} divider>
-                      <ListItemText
-                        primary={
-                          <Box display="flex" alignItems="center" gap={1}>
-                            {doc.documentName}
-                            {doc.required && (
-                              <Chip label="Required" size="small" color="error" variant="outlined" />
-                            )}
-                          </Box>
-                        }
-                        secondary={`Stage: ${doc.stage.replace(/_/g, ' ')}`}
-                      />
-                      <ListItemSecondaryAction>
-                        <Box display="flex" alignItems="center" gap={1}>
-                          <input
-                            type="file"
-                            id={`file-upload-client-${doc.id}`}
-                            style={{ display: 'none' }}
-                            onChange={(e) => handleFileUpload(doc.id, e)}
-                            accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
-                          />
-                          <label htmlFor={`file-upload-client-${doc.id}`}>
-                            <IconButton
-                              component="span"
-                              size="small"
-                              color="primary"
-                              disabled={uploadingDoc === doc.id}
-                            >
-                              {uploadingDoc === doc.id ? (
-                                <CircularProgress size={20} />
-                              ) : (
-                                <UploadIcon />
-                              )}
-                            </IconButton>
-                          </label>
-                          <Chip
-                            label={doc.status}
-                            size="small"
-                            color={doc.status === DocumentStatus.PENDING ? 'warning' : 'success'}
-                          />
-                        </Box>
-                      </ListItemSecondaryAction>
-                    </ListItem>
-                  ))}
-                  {clientDocuments.length === 0 && (
-                    <Typography color="textSecondary" align="center">No client documents required</Typography>
-                  )}
-                </List>
-              )}
-              
-              {/* Uploaded Files Section */}
-              {uploadedFiles.length > 0 && (
-                <Box mt={3}>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Uploaded Files
-                  </Typography>
-                  <List dense>
-                    {uploadedFiles.map((file) => (
-                      <ListItem key={file.id}>
-                        <ListItemIcon>
-                          <FileIcon />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={file.originalName}
-                          secondary={`Uploaded on ${new Date(file.uploadedAt).toLocaleDateString()} by ${file.uploadedBy}`}
-                        />
-                        <ListItemSecondaryAction>
-                          <IconButton
-                            size="small"
-                            component="a"
-                            href={file.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <DownloadIcon />
-                          </IconButton>
-                        </ListItemSecondaryAction>
-                      </ListItem>
-                    ))}
-                  </List>
-                </Box>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Enhanced Financial Summary */}
-        <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">
-                  <AccountBalanceIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                  Financial Summary
-                </Typography>
-                <Box>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    startIcon={<MoneyIcon />}
-                    onClick={() => setPaymentDialog(true)}
-                    sx={{ mr: 1 }}
-                  >
-                    Add Payment
-                  </Button>
-                  {user?.role === UserRole.SUPER_ADMIN && (
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={() => setCostDialog(true)}
-                    >
-                      Add Cost
-                    </Button>
-                  )}
-                </Box>
-              </Box>
-
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={user?.role === UserRole.SUPER_ADMIN ? 4 : 12}>
-                  <Typography variant="subtitle1" gutterBottom>Payments (Revenue)</Typography>
-                  <TableContainer>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Date</TableCell>
-                          <TableCell align="right">Amount</TableCell>
-                          <TableCell>Notes</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {payments.map((payment) => (
-                          <TableRow key={payment.id}>
-                            <TableCell>{new Date(payment.paymentDate).toLocaleDateString()}</TableCell>
-                            <TableCell align="right">${payment.amount}</TableCell>
-                            <TableCell>{payment.notes || '-'}</TableCell>
-                          </TableRow>
-                        ))}
-                        {payments.length === 0 && (
-                          <TableRow>
-                            <TableCell colSpan={3} align="center">No payments recorded</TableCell>
-                          </TableRow>
-                        )}
-                        <TableRow>
-                          <TableCell><strong>Total</strong></TableCell>
-                          <TableCell align="right"><strong>${totalRevenue}</strong></TableCell>
-                          <TableCell></TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </Grid>
-
-                {user?.role === UserRole.SUPER_ADMIN && (
-                  <>
-                    <Grid item xs={12} md={4}>
-                      <Typography variant="subtitle1" gutterBottom>Costs</Typography>
-                      <TableContainer>
-                        <Table size="small">
-                          <TableHead>
-                            <TableRow>
-                              <TableCell>Type</TableCell>
-                              <TableCell align="right">Amount</TableCell>
-                              <TableCell>Description</TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {costs.map((cost) => (
-                              <TableRow key={cost.id}>
-                                <TableCell>{cost.costType.replace(/_/g, ' ')}</TableCell>
-                                <TableCell align="right">${cost.amount}</TableCell>
-                                <TableCell>{cost.description || '-'}</TableCell>
-                              </TableRow>
-                            ))}
-                            {costs.length === 0 && (
-                              <TableRow>
-                                <TableCell colSpan={3} align="center">No costs recorded</TableCell>
-                              </TableRow>
-                            )}
-                            <TableRow>
-                              <TableCell><strong>Total</strong></TableCell>
-                              <TableCell align="right"><strong>${totalCosts}</strong></TableCell>
-                              <TableCell></TableCell>
-                            </TableRow>
-                          </TableBody>
-                        </Table>
-                      </TableContainer>
-                    </Grid>
-
-                    <Grid item xs={12} md={4}>
-                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: profit >= 0 ? 'success.light' : 'error.light' }}>
-                        <Typography variant="subtitle1" gutterBottom>Net Profit</Typography>
-                        <Typography variant="h4" color={profit >= 0 ? 'success.dark' : 'error.dark'}>
-                          ${profit}
-                        </Typography>
-                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                          Revenue: ${totalRevenue} - Costs: ${totalCosts}
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                  </>
-                )}
-              </Grid>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Fee Dialog */}
-      <Dialog open={feeDialog} onClose={() => setFeeDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Set Application Fee</DialogTitle>
-        <DialogContent>
-          <FormControl fullWidth sx={{ mt: 2, mb: 2 }}>
-            <InputLabel>Fee Template</InputLabel>
-            <Select
-              value={selectedFeeTemplate?.id || ''}
-              onChange={(e) => {
-                const template = feeTemplates.find((t: any) => t.id === e.target.value)
-                setSelectedFeeTemplate(template)
-                setFinalFeeAmount(template?.defaultPrice?.toString() || '')
-              }}
-            >
-              <MenuItem value="">Select template</MenuItem>
-              {feeTemplates.map((template) => (
-                <MenuItem key={template.id} value={template.id}>
-                  {template.name} 
-                  {template.nationality && ` (${template.nationality})`}
-                  - ${template.defaultPrice}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          {selectedFeeTemplate && (
-            <>
-              <Typography variant="body2" color="textSecondary" gutterBottom>
-                Range: ${selectedFeeTemplate.minPrice} - ${selectedFeeTemplate.maxPrice}
-              </Typography>
-              <TextField
-                fullWidth
-                label="Final Fee Amount"
-                type="number"
-                value={finalFeeAmount}
-                onChange={(e) => setFinalFeeAmount(e.target.value)}
-                InputProps={{
-                  startAdornment: '$',
-                }}
-                helperText={`Must be between $${selectedFeeTemplate.minPrice} and $${selectedFeeTemplate.maxPrice}`}
-              />
-            </>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setFeeDialog(false)}>Cancel</Button>
-          <Button onClick={handleSetFee} variant="contained" disabled={!selectedFeeTemplate || !finalFeeAmount}>
-            Set Fee
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Payment Dialog */}
-      <Dialog open={paymentDialog} onClose={() => setPaymentDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Payment</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Amount"
-            type="number"
-            value={paymentForm.amount}
-            onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-            sx={{ mt: 2, mb: 2 }}
-            InputProps={{
-              startAdornment: '$',
-            }}
-          />
-          <TextField
-            fullWidth
-            label="Notes"
-            multiline
-            rows={2}
-            value={paymentForm.notes}
-            onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPaymentDialog(false)}>Cancel</Button>
-          <Button 
-            onClick={handleAddPayment} 
-            variant="contained"
-            disabled={!paymentForm.amount || parseFloat(paymentForm.amount) <= 0}
-          >
-            Add Payment
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Cost Dialog (Super Admin Only) */}
-      {user?.role === UserRole.SUPER_ADMIN && (
-        <Dialog open={costDialog} onClose={() => setCostDialog(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>Add Cost</DialogTitle>
-          <DialogContent>
-            <FormControl fullWidth sx={{ mt: 2, mb: 2 }}>
-              <InputLabel>Cost Type</InputLabel>
-              <Select
-                value={costForm.costType}
-                onChange={(e) => setCostForm({ ...costForm, costType: e.target.value })}
-              >
-                {costTypes.filter(ct => ct.active).map((type) => (
-                  <MenuItem key={type.id} value={type.name}>
-                    {type.description || type.name.replace(/_/g, ' ')}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <TextField
-              fullWidth
-              label="Amount"
-              type="number"
-              value={costForm.amount}
-              onChange={(e) => setCostForm({ ...costForm, amount: e.target.value })}
-              sx={{ mb: 2 }}
-              InputProps={{
-                startAdornment: '$',
-              }}
-            />
-            <TextField
-              fullWidth
-              label="Description"
-              multiline
-              rows={2}
-              value={costForm.description}
-              onChange={(e) => setCostForm({ ...costForm, description: e.target.value })}
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setCostDialog(false)}>Cancel</Button>
-            <Button 
-              onClick={handleAddCost} 
-              variant="contained"
-              disabled={!costForm.amount || parseFloat(costForm.amount) <= 0}
-            >
-              Add Cost
-            </Button>
-          </DialogActions>
-        </Dialog>
-      )}
-
-      {/* Update Status Dialog */}
-      <Dialog open={updateStatusDialog} onClose={() => setUpdateStatusDialog(false)}>
-        <DialogTitle>Update Application Status</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Move application to: {statusInfo.next && statusWorkflow[statusInfo.next].label}?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setUpdateStatusDialog(false)}>Cancel</Button>
-          <Button 
-            onClick={() => statusInfo.next && handleUpdateApplicationStatus(statusInfo.next)} 
-            variant="contained"
-          >
-            Update
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   )
 }

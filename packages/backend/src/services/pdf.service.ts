@@ -1,5 +1,5 @@
 import PDFDocument from 'pdfkit';
-import { Candidate } from '@prisma/client';
+import { Candidate, Application } from '@prisma/client';
 import fetch from 'node-fetch';
 import { getSignedUrlForB2 } from './backblaze.service';
 import { prisma } from '../index';
@@ -42,6 +42,365 @@ async function fetchImageBuffer(url: string): Promise<Buffer | null> {
     console.error('Error fetching image:', error);
     return null;
   }
+}
+
+export async function generateApplicationPDF(application: any): Promise<Buffer> {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const doc = new PDFDocument({
+        size: 'A4',
+        margin: 50,
+        info: {
+          Title: `Application #${application.id.substring(0, 8)} - ${application.candidate.firstName} ${application.candidate.lastName}`,
+          Author: 'Jobline Recruitment Platform',
+          Subject: 'Application Details',
+          Keywords: 'recruitment, application, domestic worker'
+        }
+      });
+      
+      const buffers: Buffer[] = [];
+      doc.on('data', buffers.push.bind(buffers));
+      doc.on('end', () => {
+        const pdfData = Buffer.concat(buffers);
+        resolve(pdfData);
+      });
+      
+      // Header section
+      let yPosition = 50;
+      
+      // Application header
+      doc.fontSize(24)
+         .font('Helvetica-Bold')
+         .fillColor('#1e3a5f')
+         .text(`Application #${application.id.substring(0, 8).toUpperCase()}`, 50, yPosition)
+         .fillColor('black');
+      
+      yPosition += 35;
+      
+      // Application type and status
+      const statusColor = getStatusColor(application.status);
+      doc.fontSize(12)
+         .font('Helvetica')
+         .fillColor('#666666')
+         .text(`Type: ${application.type.replace(/_/g, ' ')}`, 50, yPosition)
+         .fillColor(statusColor)
+         .text(`Status: ${application.status.replace(/_/g, ' ')}`, 250, yPosition)
+         .fillColor('black');
+      
+      yPosition += 20;
+      
+      // Creation date
+      doc.fontSize(10)
+         .fillColor('#666666')
+         .text(`Created: ${new Date(application.createdAt).toLocaleDateString('en-US', { 
+           year: 'numeric', 
+           month: 'long', 
+           day: 'numeric' 
+         })}`, 50, yPosition)
+         .fillColor('black');
+      
+      yPosition += 30;
+      
+      // Separator line
+      doc.moveTo(50, yPosition)
+         .lineTo(545, yPosition)
+         .stroke('#e0e0e0');
+      
+      yPosition += 30;
+      
+      // Client Information Section
+      doc.fontSize(18)
+         .font('Helvetica-Bold')
+         .fillColor('#1e3a5f')
+         .text('Client Information', 50, yPosition)
+         .fillColor('black');
+      
+      yPosition += 30;
+      
+      // Client details
+      const client = application.client;
+      doc.fontSize(11).font('Helvetica');
+      
+      addInfoField(doc, 'Name', client.name, 50, yPosition);
+      yPosition += 35;
+      
+      if (client.phone) {
+        addInfoField(doc, 'Phone', client.phone, 50, yPosition);
+        yPosition += 35;
+      }
+      
+      if (client.email) {
+        addInfoField(doc, 'Email', client.email, 50, yPosition);
+        yPosition += 35;
+      }
+      
+      if (client.address) {
+        addInfoField(doc, 'Address', client.address, 50, yPosition);
+        yPosition += 35;
+      }
+      
+      yPosition += 20;
+      
+      // Separator line
+      doc.moveTo(50, yPosition)
+         .lineTo(545, yPosition)
+         .stroke('#e0e0e0');
+      
+      yPosition += 30;
+      
+      // Candidate Information Section
+      doc.fontSize(18)
+         .font('Helvetica-Bold')
+         .fillColor('#1e3a5f')
+         .text('Candidate Information', 50, yPosition)
+         .fillColor('black');
+      
+      yPosition += 30;
+      
+      // Try to embed candidate photos in a side panel
+      const candidate = application.candidate;
+      let photoAreaUsed = false;
+      
+      // Try to embed face photo
+      const facePhotoUrl = candidate.facePhotoUrl || candidate.photoUrl;
+      if (facePhotoUrl) {
+        const imageBuffer = await fetchImageBuffer(facePhotoUrl);
+        if (imageBuffer) {
+          try {
+            doc.image(imageBuffer, 450, yPosition, { 
+              width: 90,
+              height: 110,
+              fit: [90, 110],
+              align: 'center',
+              valign: 'center'
+            });
+            photoAreaUsed = true;
+          } catch (imgError) {
+            console.error('Error embedding face photo:', imgError);
+            doc.rect(450, yPosition, 90, 110).stroke('#cccccc');
+            doc.fontSize(9)
+               .fillColor('#999999')
+               .text('Photo', 475, yPosition + 50, { width: 40, align: 'center' })
+               .fillColor('black');
+            photoAreaUsed = true;
+          }
+        }
+      }
+      
+      // Candidate details (left side)
+      const leftColumnX = 50;
+      const rightColumnX = 250;
+      let leftY = yPosition;
+      let rightY = yPosition;
+      
+      // Name
+      doc.fontSize(14)
+         .font('Helvetica-Bold')
+         .fillColor('#333333')
+         .text(`${candidate.firstName} ${candidate.lastName}`, leftColumnX, leftY)
+         .fillColor('black');
+      leftY += 25;
+      
+      // Status
+      doc.fontSize(11)
+         .font('Helvetica-Bold')
+         .fillColor(getStatusColor(candidate.status))
+         .text(candidate.status.replace(/_/g, ' '), leftColumnX, leftY)
+         .fillColor('black');
+      leftY += 30;
+      
+      // Personal details - Left column
+      doc.fontSize(11).font('Helvetica');
+      
+      addInfoField(doc, 'Nationality', candidate.nationality || 'Not specified', leftColumnX, leftY);
+      leftY += 35;
+      
+      if (candidate.dateOfBirth) {
+        const age = calculateAge(new Date(candidate.dateOfBirth));
+        addInfoField(doc, 'Date of Birth', 
+          `${new Date(candidate.dateOfBirth).toLocaleDateString()} (${age} years)`, 
+          leftColumnX, leftY);
+        leftY += 35;
+      }
+      
+      // Height
+      if (candidate.height) {
+        addInfoField(doc, 'Height', candidate.height, leftColumnX, leftY);
+        leftY += 35;
+      }
+      
+      // Weight
+      if (candidate.weight) {
+        addInfoField(doc, 'Weight', candidate.weight, leftColumnX, leftY);
+        leftY += 35;
+      }
+      
+      // Right column
+      addInfoField(doc, 'Education', candidate.education || 'Not specified', rightColumnX, rightY);
+      rightY += 35;
+      
+      // Skills
+      if (candidate.skills && candidate.skills.length > 0) {
+        doc.fontSize(9)
+           .font('Helvetica')
+           .fillColor('#666666')
+           .text('SKILLS', rightColumnX, rightY)
+           .fontSize(11)
+           .font('Helvetica-Bold')
+           .fillColor('#333333');
+        
+        rightY += 12;
+        const skillsText = candidate.skills.join(', ');
+        doc.text(skillsText, rightColumnX, rightY, { width: 180 });
+        rightY += doc.heightOfString(skillsText, { width: 180 }) + 20;
+      }
+      
+      yPosition = Math.max(leftY, rightY, photoAreaUsed ? yPosition + 120 : yPosition);
+      
+      // Experience Summary
+      if (candidate.experienceSummary) {
+        yPosition += 20;
+        doc.fontSize(12)
+           .font('Helvetica-Bold')
+           .fillColor('#1e3a5f')
+           .text('Experience Summary', 50, yPosition)
+           .fillColor('black');
+        
+        yPosition += 20;
+        
+        doc.fontSize(10)
+           .font('Helvetica')
+           .text(candidate.experienceSummary, 50, yPosition, {
+             width: 495,
+             align: 'justify',
+             lineGap: 3
+           });
+        
+        yPosition += doc.heightOfString(candidate.experienceSummary, { width: 495 }) + 20;
+      }
+      
+      // Check if we need a new page
+      if (yPosition > 650) {
+        doc.addPage();
+        yPosition = 50;
+      }
+      
+      // Financial Information Section (if fee is set)
+      if (application.finalFeeAmount || application.feeTemplate) {
+        yPosition += 20;
+        
+        // Separator line
+        doc.moveTo(50, yPosition)
+           .lineTo(545, yPosition)
+           .stroke('#e0e0e0');
+        
+        yPosition += 30;
+        
+        doc.fontSize(18)
+           .font('Helvetica-Bold')
+           .fillColor('#1e3a5f')
+           .text('Fee Information', 50, yPosition)
+           .fillColor('black');
+        
+        yPosition += 30;
+        
+        if (application.feeTemplate) {
+          addInfoField(doc, 'Fee Template', application.feeTemplate.name, 50, yPosition);
+          yPosition += 35;
+        }
+        
+        if (application.finalFeeAmount) {
+          doc.fontSize(9)
+             .font('Helvetica')
+             .fillColor('#666666')
+             .text('AGREED FEE', 50, yPosition)
+             .fontSize(16)
+             .font('Helvetica-Bold')
+             .fillColor('#4CAF50')
+             .text(`$${application.finalFeeAmount}`, 50, yPosition + 12)
+             .fillColor('black');
+          yPosition += 45;
+        }
+      }
+      
+      // Broker Information (if assigned)
+      if (application.broker) {
+        if (yPosition > 650) {
+          doc.addPage();
+          yPosition = 50;
+        }
+        
+        yPosition += 20;
+        
+        // Separator line
+        doc.moveTo(50, yPosition)
+           .lineTo(545, yPosition)
+           .stroke('#e0e0e0');
+        
+        yPosition += 30;
+        
+        doc.fontSize(18)
+           .font('Helvetica-Bold')
+           .fillColor('#1e3a5f')
+           .text('Broker Information', 50, yPosition)
+           .fillColor('black');
+        
+        yPosition += 30;
+        
+        addInfoField(doc, 'Broker Name', application.broker.name, 50, yPosition);
+        yPosition += 35;
+        
+        if (application.broker.contactDetails) {
+          addInfoField(doc, 'Contact', application.broker.contactDetails, 50, yPosition);
+          yPosition += 35;
+        }
+      }
+      
+      // Footer on every page
+      const pages = doc.bufferedPageRange();
+      for (let i = 0; i < pages.count; i++) {
+        doc.switchToPage(i);
+        
+        // Footer line
+        doc.moveTo(50, doc.page.height - 120)
+           .lineTo(doc.page.width - 50, doc.page.height - 120)
+           .stroke('#e0e0e0');
+        
+        // Get company info
+        const companyName = application.company?.name || 'Jobline Recruitment Platform';
+        
+        // Footer text
+        doc.fontSize(9)
+           .font('Helvetica')
+           .fillColor('#888888')
+           .text(
+             `Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`,
+             50,
+             doc.page.height - 100,
+             { align: 'center', width: doc.page.width - 100 }
+           )
+           .text(
+             `Page ${i + 1} of ${pages.count}`,
+             50,
+             doc.page.height - 85,
+             { align: 'center', width: doc.page.width - 100 }
+           )
+           .text(
+             `© ${new Date().getFullYear()} ${companyName} - Confidential`,
+             50,
+             doc.page.height - 70,
+             { align: 'center', width: doc.page.width - 100 }
+           );
+      }
+      
+      // Finalize PDF
+      doc.end();
+      
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      reject(error);
+    }
+  });
 }
 
 export async function generateCandidatePDF(candidate: any): Promise<Buffer> {
@@ -433,6 +792,17 @@ function getStatusColor(status: string): string {
       return '#2196F3'; // Blue
     case 'CONTRACT_ENDED':
       return '#757575'; // Grey
+    case 'PENDING_MOL':
+    case 'RENEWAL_PENDING':
+      return '#FF9800'; // Orange
+    case 'MOL_AUTH_RECEIVED':
+    case 'VISA_RECEIVED':
+    case 'WORKER_ARRIVED':
+      return '#4CAF50'; // Green
+    case 'VISA_PROCESSING':
+    case 'LABOUR_PERMIT_PROCESSING':
+    case 'RESIDENCY_PERMIT_PROCESSING':
+      return '#2196F3'; // Blue
     default:
       return '#000000'; // Black
   }
