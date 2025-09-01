@@ -13,11 +13,9 @@ import Clients from './pages/Clients'
 import Applications from './pages/Applications'
 import Financial from './pages/Financial'
 import Settings from './pages/Settings'
-import Users from './pages/Users'
 import Agents from './pages/Agents'
 import Brokers from './pages/Brokers'
 import ClientStatus from './pages/ClientStatus'
-import Reminders from './pages/Reminders'
 
 function App() {
   const { user } = useAuth()
@@ -48,11 +46,6 @@ function App() {
               <Settings />
             </ProtectedRoute>
           } />
-          <Route path="/users" element={
-            <ProtectedRoute requiredRole={UserRole.SUPER_ADMIN}>
-              <Users />
-            </ProtectedRoute>
-          } />
           <Route path="/agents" element={
             <ProtectedRoute requiredRole={UserRole.SUPER_ADMIN}>
               <Agents />
@@ -61,11 +54,6 @@ function App() {
           <Route path="/brokers" element={
             <ProtectedRoute requiredRole={UserRole.SUPER_ADMIN}>
               <Brokers />
-            </ProtectedRoute>
-          } />
-          <Route path="/reminders" element={
-            <ProtectedRoute requiredRole={UserRole.SUPER_ADMIN}>
-              <Reminders />
             </ProtectedRoute>
           } />
         </Route>
