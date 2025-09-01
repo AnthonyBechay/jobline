@@ -17,6 +17,7 @@ import {
   Description as TemplatesIcon,
   List as ListIcon,
   NotificationsActive as RemindersIcon,
+  FolderOpen as DocumentsIcon,
   NavigateNext as NavigateNextIcon,
 } from '@mui/icons-material'
 import { useAuth } from '../../contexts/AuthContext'
@@ -28,8 +29,9 @@ import CompanyManagement from './CompanyManagement'
 import Templates from './Templates'
 import ListOfValues from './ListOfValues'
 import RemindersSettings from './RemindersSettings'
+import DocumentManagement from './DocumentManagement'
 
-type SettingsSection = 'main' | 'users' | 'company' | 'templates' | 'lists' | 'reminders'
+type SettingsSection = 'main' | 'users' | 'company' | 'templates' | 'lists' | 'reminders' | 'documents'
 
 interface SettingsCard {
   id: SettingsSection
@@ -91,6 +93,13 @@ const Settings = () => {
       description: 'Configure system reminders and notifications',
       icon: <RemindersIcon sx={{ fontSize: 40 }} />,
       color: '#d32f2f',
+    },
+    {
+      id: 'documents',
+      title: 'Document Management',
+      description: 'Search, manage, and organize all uploaded documents',
+      icon: <DocumentsIcon sx={{ fontSize: 40 }} />,
+      color: '#0288d1',
     },
   ]
 
@@ -238,6 +247,14 @@ const Settings = () => {
 
       {currentSection === 'reminders' && (
         <RemindersSettings 
+          onBack={handleBack}
+          onError={setError}
+          onSuccess={setSuccess}
+        />
+      )}
+
+      {currentSection === 'documents' && (
+        <DocumentManagement 
           onBack={handleBack}
           onError={setError}
           onSuccess={setSuccess}

@@ -28,6 +28,7 @@ import companyRouter from './routes/company.routes';
 import costTypeRouter from './routes/costType.routes';
 import serviceTypeRouter from './routes/serviceType.routes';
 import candidatePdfRouter from './routes/candidatePdf.routes';
+import documentSearchRouter from './routes/documentSearch.routes';
 
 // Import middleware
 import { errorHandler } from './middleware/error.middleware';
@@ -99,6 +100,7 @@ app.get('/api/health', (req: Request, res: Response) => {
 app.use('/api/auth', authRouter);
 app.use('/api/users', userRouter);
 app.use('/api/candidates', candidateRouter);
+app.use('/api/documents', documentSearchRouter);
 app.use('/api/clients', clientRouter);
 app.use('/api/applications', applicationRouter);
 app.use('/api/payments', paymentRouter);

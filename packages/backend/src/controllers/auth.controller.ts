@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../index';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { UserRole } from '@prisma/client';
+import { seedCompanyData } from '../scripts/seedCompany';
 
 // Generate JWT token
 const generateToken = (user: { id: string; name: string; email: string; role: UserRole; companyId: string }): string => {
@@ -64,29 +65,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
           email: companyEmail || null,
         },
       });
-      
-      // Create nationalities setting
-      const defaultNationalities = [
-        { code: 'ET', name: 'Ethiopia', active: true },
-        { code: 'KE', name: 'Kenya', active: true },
-        { code: 'UG', name: 'Uganda', active: true },
-        { code: 'PH', name: 'Philippines', active: true },
-        { code: 'BD', name: 'Bangladesh', active: true },
-        { code: 'LK', name: 'Sri Lanka', active: true },
-        { code: 'IN', name: 'India', active: true },
-        { code: 'NP', name: 'Nepal', active: true },
-        { code: 'SY', name: 'Syria', active: true },
-        { code: 'EG', name: 'Egypt', active: true },
-      ];
-      
-      for (const nationality of defaultNationalities) {
-        await tx.nationality.create({
-          data: {
-            ...nationality,
-            companyId: company.id,
-          },
-        });
-      }
 
       // Create the super admin user
       const user = await tx.user.create({
@@ -99,52 +77,18 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         },
       });
 
-      // Create default document templates for this company
-      const defaultTemplates = [
-        // MoL Pre-Authorization documents
-        { stage: 'PENDING_MOL', name: 'Passport Copy', order: 1 },
-        { stage: 'PENDING_MOL', name: 'Medical Certificate', order: 2 },
-        { stage: 'PENDING_MOL', name: 'Criminal Record', order: 3 },
-        // Visa documents
-        { stage: 'VISA_PROCESSING', name: 'Visa Application Form', order: 1 },
-        { stage: 'VISA_PROCESSING', name: 'Sponsor ID', order: 2 },
-        // Post-arrival documents
-        { stage: 'LABOUR_PERMIT_PROCESSING', name: 'Work Permit Application', order: 1 },
-        { stage: 'RESIDENCY_PERMIT_PROCESSING', name: 'Residency Application', order: 1 },
-      ];
-
-      for (const template of defaultTemplates) {
-        await tx.documentTemplate.create({
-          data: {
-            ...template,
-            stage: template.stage as any,
-            required: true,
-            companyId: company.id,
-          },
-        });
-      }
-
-      // Create default settings
-      await tx.setting.create({
-        data: {
-          key: 'office_commission',
-          value: { amount: 1500, currency: 'USD' },
-          description: 'Default office commission fee',
-          companyId: company.id,
-        },
-      });
-
-      await tx.setting.create({
-        data: {
-          key: 'renewal_reminder_days',
-          value: 60,
-          description: 'Days before permit expiry to show renewal reminder',
-          companyId: company.id,
-        },
-      });
-
       return { user, company };
     });
+
+    // Seed default data for the new company (outside transaction)
+    try {
+      await seedCompanyData(result.company.id);
+      console.log(`Successfully seeded data for company: ${result.company.name}`);
+    } catch (seedError) {
+      console.error('Failed to seed company data:', seedError);
+      // Don't fail the registration if seeding fails
+      // The company can still be seeded later using the script
+    }
 
     // Generate token
     const token = generateToken({

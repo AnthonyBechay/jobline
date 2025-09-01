@@ -2,6 +2,7 @@ import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, Head
 import { getSignedUrl as getS3SignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
+import { prisma } from '../index';
 
 // Configure Backblaze B2 using S3-compatible API with AWS SDK v3
 const s3Client = new S3Client({
@@ -33,68 +34,121 @@ interface UploadResult {
 
 /**
  * Generate organized file path based on entity type and metadata
- * Structure:
- * - /company-{companyId}/
- *   - /clients/{clientName}-{clientId}/
- *     - /documents/{year}/{month}/{docType}/{filename}
- *   - /candidates/{candidateName}-{candidateId}/
- *     - /profile/photo.jpg
- *     - /documents/{year}/{month}/{docType}/{filename}
- *   - /applications/{appNumber}-{clientName}-{candidateName}/
- *     - /documents/{stage}/{docType}/{filename}
- *     - /payments/{year}/{month}/receipt-{date}.pdf
- *     - /costs/{year}/{month}/invoice-{date}.pdf
+ * 
+ * Improved structure:
+ * /jobline-companies/
+ *   /{company-name}-{company-id}/
+ *     /candidates/
+ *       /{firstname}-{lastname}-{id}/
+ *         /photos/
+ *           /face-{date}.jpg
+ *           /full-body-{date}.jpg
+ *         /documents/
+ *           /{year}/{month}/{doctype}/
+ *     /clients/
+ *       /{client-name}-{id}/
+ *         /documents/{year}/{month}/{doctype}/
+ *     /applications/
+ *       /{year}/{month}/
+ *         /{app-number}-{client}-{candidate}/
+ *           /documents/{stage}/{doctype}/
+ *           /payments/receipt-{date}.pdf
+ *           /costs/invoice-{date}.pdf
+ *     /company-documents/
+ *       /branding/logo.png
+ *       /certificates/{year}/
+ *       /legal-documents/{year}/
  */
-const generateOrganizedPath = (
+const generateOrganizedPath = async (
   entityType: string,
   entityId: string,
   originalName: string,
   metadata?: Record<string, string>
-): string => {
+): Promise<string> => {
   const date = new Date();
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
-  const timestamp = date.toISOString().split('T')[0]; // YYYY-MM-DD
+  const timestamp = `${year}${month}${day}`; // YYYYMMDD format for better sorting
   
   // Clean filename: remove special characters, keep extension
   const fileExt = path.extname(originalName).toLowerCase();
   const baseName = path.basename(originalName, fileExt)
     .replace(/[^a-z0-9]/gi, '-')
     .replace(/-+/g, '-')
+    .toLowerCase()
     .substring(0, 50); // Limit filename length
   
-  // Generate unique but readable filename
-  const uniqueId = uuidv4().split('-')[0]; // Just first 8 chars for readability
+  // Generate unique but readable ID (8 chars)
+  const uniqueId = uuidv4().split('-')[0];
   
-  const companyId = metadata?.companyId || 'unknown';
-  const companyFolder = `company-${companyId}`;
+  // Get company information
+  let companyName = 'unknown-company';
+  let companyId = metadata?.companyId || 'unknown';
+  
+  try {
+    if (metadata?.companyId) {
+      const company = await prisma.company.findUnique({
+        where: { id: metadata.companyId }
+      });
+      if (company?.name) {
+        companyName = company.name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching company info:', error);
+  }
+  
+  // Root folder for all companies
+  const rootFolder = 'jobline-companies';
+  const companyFolder = `${companyName}-${companyId.substring(0, 8)}`;
   
   let filePath = '';
   
   switch (entityType) {
     case 'candidate': {
-      const candidateName = metadata?.candidateName || 'unnamed';
-      const cleanCandidateName = candidateName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-      const candidateFolder = `candidates/${cleanCandidateName}-${entityId.substring(0, 8)}`;
+      const candidateName = metadata?.candidateName || 'unnamed-candidate';
+      const [firstName, ...lastNameParts] = candidateName.split(' ');
+      const lastName = lastNameParts.join(' ') || '';
       
-      // Check if it's a profile photo
-      if (metadata?.documentType === 'photo' || originalName.match(/photo|profile|picture/i)) {
-        filePath = `${companyFolder}/${candidateFolder}/profile/photo-${timestamp}${fileExt}`;
+      const cleanFirstName = firstName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      const cleanLastName = lastName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      const candidateId = entityId === 'temp' ? 'temp' : entityId.substring(0, 8);
+      
+      const candidateFolder = `${cleanFirstName}-${cleanLastName}-${candidateId}`.replace(/-+/g, '-');
+      
+      // Check if it's a photo
+      const isPhoto = metadata?.documentType === 'photo' || 
+                     metadata?.documentType === 'face-photo' || 
+                     metadata?.documentType === 'full-body-photo' ||
+                     originalName.match(/photo|picture|image|jpg|jpeg|png/i);
+      
+      if (isPhoto) {
+        // Determine photo type
+        let photoType = 'general';
+        if (metadata?.documentType === 'face-photo' || originalName.match(/face|portrait|head/i)) {
+          photoType = 'face';
+        } else if (metadata?.documentType === 'full-body-photo' || originalName.match(/full|body/i)) {
+          photoType = 'full-body';
+        }
+        
+        filePath = `${rootFolder}/${companyFolder}/candidates/${candidateFolder}/photos/${photoType}-${timestamp}-${uniqueId}${fileExt}`;
       } else {
+        // Regular document
         const docType = metadata?.documentType || 'general';
-        filePath = `${companyFolder}/${candidateFolder}/documents/${year}/${month}/${docType}/${baseName}-${uniqueId}${fileExt}`;
+        filePath = `${rootFolder}/${companyFolder}/candidates/${candidateFolder}/documents/${year}/${month}/${docType}/${baseName}-${uniqueId}${fileExt}`;
       }
       break;
     }
     
     case 'client': {
-      const clientName = metadata?.clientName || 'unnamed';
+      const clientName = metadata?.clientName || 'unnamed-client';
       const cleanClientName = clientName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-      const clientFolder = `clients/${cleanClientName}-${entityId.substring(0, 8)}`;
+      const clientId = entityId.substring(0, 8);
+      const clientFolder = `${cleanClientName}-${clientId}`;
       
       const docType = metadata?.documentType || 'general';
-      filePath = `${companyFolder}/${clientFolder}/documents/${year}/${month}/${docType}/${baseName}-${uniqueId}${fileExt}`;
+      filePath = `${rootFolder}/${companyFolder}/clients/${clientFolder}/documents/${year}/${month}/${docType}/${baseName}-${uniqueId}${fileExt}`;
       break;
     }
     
@@ -102,39 +156,47 @@ const generateOrganizedPath = (
       const appNumber = metadata?.applicationNumber || entityId.substring(0, 8);
       const clientName = metadata?.clientName || 'client';
       const candidateName = metadata?.candidateName || 'candidate';
-      const cleanClientName = clientName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-      const cleanCandidateName = candidateName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
       
-      const appFolder = `applications/${appNumber}-${cleanClientName}-${cleanCandidateName}`;
+      const cleanClientName = clientName.replace(/[^a-z0-9]/gi, '-').toLowerCase().substring(0, 20);
+      const cleanCandidateName = candidateName.replace(/[^a-z0-9]/gi, '-').toLowerCase().substring(0, 20);
+      
+      const appFolder = `${appNumber}-${cleanClientName}-${cleanCandidateName}`;
       
       // Organize by document category
-      if (metadata?.documentCategory === 'payment') {
-        filePath = `${companyFolder}/${appFolder}/payments/${year}/${month}/receipt-${timestamp}-${uniqueId}${fileExt}`;
-      } else if (metadata?.documentCategory === 'cost') {
-        filePath = `${companyFolder}/${appFolder}/costs/${year}/${month}/invoice-${timestamp}-${uniqueId}${fileExt}`;
+      if (metadata?.documentCategory === 'payment' || originalName.match(/payment|receipt/i)) {
+        filePath = `${rootFolder}/${companyFolder}/applications/${year}/${month}/${appFolder}/payments/receipt-${timestamp}-${uniqueId}${fileExt}`;
+      } else if (metadata?.documentCategory === 'cost' || originalName.match(/invoice|cost|bill/i)) {
+        filePath = `${rootFolder}/${companyFolder}/applications/${year}/${month}/${appFolder}/costs/invoice-${timestamp}-${uniqueId}${fileExt}`;
       } else {
-        const stage = metadata?.stage || 'general';
+        const stage = metadata?.stage?.toLowerCase().replace(/_/g, '-') || 'general';
         const docType = metadata?.documentType || 'document';
-        filePath = `${companyFolder}/${appFolder}/documents/${stage}/${docType}/${baseName}-${uniqueId}${fileExt}`;
+        filePath = `${rootFolder}/${companyFolder}/applications/${year}/${month}/${appFolder}/documents/${stage}/${docType}/${baseName}-${uniqueId}${fileExt}`;
       }
       break;
     }
     
     case 'company': {
-      // Company documents like logo, certificates, etc.
       const docType = metadata?.documentType || 'general';
-      if (docType === 'logo') {
-        filePath = `${companyFolder}/branding/logo-${timestamp}${fileExt}`;
+      
+      if (docType === 'logo' || originalName.match(/logo/i)) {
+        filePath = `${rootFolder}/${companyFolder}/company-documents/branding/logo-${timestamp}${fileExt}`;
+      } else if (docType === 'certificate' || originalName.match(/certificate|license/i)) {
+        filePath = `${rootFolder}/${companyFolder}/company-documents/certificates/${year}/${baseName}-${uniqueId}${fileExt}`;
+      } else if (docType === 'legal' || originalName.match(/legal|contract|agreement/i)) {
+        filePath = `${rootFolder}/${companyFolder}/company-documents/legal-documents/${year}/${baseName}-${uniqueId}${fileExt}`;
       } else {
-        filePath = `${companyFolder}/documents/${year}/${month}/${docType}/${baseName}-${uniqueId}${fileExt}`;
+        filePath = `${rootFolder}/${companyFolder}/company-documents/${year}/${month}/${docType}/${baseName}-${uniqueId}${fileExt}`;
       }
       break;
     }
     
     default:
       // Fallback for any other entity types
-      filePath = `${companyFolder}/misc/${entityType}/${year}/${month}/${baseName}-${uniqueId}${fileExt}`;
+      filePath = `${rootFolder}/${companyFolder}/misc/${entityType}/${year}/${month}/${baseName}-${uniqueId}${fileExt}`;
   }
+  
+  // Ensure no double slashes and clean up the path
+  filePath = filePath.replace(/\/+/g, '/').replace(/-+/g, '-');
   
   return filePath;
 };
@@ -192,17 +254,6 @@ export const uploadToB2 = async (
     // Ensure the key is properly formatted (no extra characters)
     keyId = keyId.replace(/[^a-zA-Z0-9]/g, '');
 
-    // Log credentials (partially, for debugging)
-    console.log('B2 Configuration Check:', {
-      keyIdLength: keyId.length,
-      keyIdPrefix: keyId.substring(0, 4),
-      keyIdSuffix: keyId.substring(keyId.length - 2),
-      hasAppKey: !!process.env.B2_APPLICATION_KEY,
-      appKeyLength: process.env.B2_APPLICATION_KEY?.length,
-      endpoint: process.env.B2_ENDPOINT,
-      bucket: BUCKET_NAME
-    });
-    
     // Create a new S3 client with the corrected credentials
     const s3ClientCorrected = new S3Client({
       endpoint: process.env.B2_ENDPOINT || 'https://s3.eu-central-003.backblazeb2.com',
@@ -219,7 +270,7 @@ export const uploadToB2 = async (
     if (options.metadata) {
       // Use new organized structure if metadata is provided
       const [entityType, entityId] = (options.folder || 'misc/unknown').split('/');
-      key = generateOrganizedPath(
+      key = await generateOrganizedPath(
         options.metadata.entityType || entityType,
         options.metadata.entityId || entityId,
         originalName,
@@ -241,7 +292,6 @@ export const uploadToB2 = async (
       key,
       contentType: options.contentType || getMimeType(originalName),
       size: buffer.length,
-      metadata: options.metadata
     });
     
     // Prepare upload parameters
@@ -253,7 +303,11 @@ export const uploadToB2 = async (
       Metadata: {
         originalName: originalName,
         uploadDate: new Date().toISOString(),
-        ...options.metadata,
+        companyId: options.metadata?.companyId || '',
+        entityType: options.metadata?.entityType || '',
+        entityId: options.metadata?.entityId || '',
+        uploadedBy: options.metadata?.uploadedBy || '',
+        documentType: options.metadata?.documentType || '',
       },
     });
     
@@ -263,7 +317,7 @@ export const uploadToB2 = async (
     // Generate a signed URL for the file
     const url = await getSignedUrlForB2Internal(s3ClientCorrected, key);
     
-    console.log('Upload successful:', { key, url });
+    console.log('Upload successful:', { key, bucket: BUCKET_NAME });
     
     return {
       key,
@@ -279,8 +333,6 @@ export const uploadToB2 = async (
       requestId: error.$metadata?.requestId,
       bucket: BUCKET_NAME,
       endpoint: process.env.B2_ENDPOINT,
-      keyIdConfigured: !!process.env.B2_KEY_ID,
-      appKeyConfigured: !!process.env.B2_APPLICATION_KEY
     });
     
     // Provide more specific error messages
@@ -309,6 +361,7 @@ export const deleteFromB2 = async (key: string): Promise<void> => {
     });
     
     await s3Client.send(command);
+    console.log('File deleted from B2:', { key, bucket: BUCKET_NAME });
   } catch (error) {
     console.error('B2 delete error:', error);
     throw new Error('Failed to delete file from Backblaze B2');
@@ -342,6 +395,7 @@ export { getSignedUrlForB2 as getSignedUrl };
 
 /**
  * Get a permanent public URL (only for public buckets)
+ * Note: This should only be used if the bucket is public
  */
 export const getPublicUrl = (key: string): string => {
   const bucketId = process.env.B2_BUCKET_ID;
@@ -366,17 +420,41 @@ export const fileExists = async (key: string): Promise<boolean> => {
 };
 
 /**
- * List files in a folder
+ * List files in a folder/prefix
+ * Useful for finding old documents or browsing the structure
  */
-export const listFiles = async (prefix: string): Promise<any[]> => {
+export const listFiles = async (
+  prefix: string,
+  maxKeys: number = 1000
+): Promise<{
+  files: Array<{
+    key: string;
+    size: number;
+    lastModified: Date;
+  }>;
+  hasMore: boolean;
+  nextToken?: string;
+}> => {
   try {
     const command = new ListObjectsV2Command({
       Bucket: BUCKET_NAME,
       Prefix: prefix,
+      MaxKeys: maxKeys,
     });
     
     const result = await s3Client.send(command);
-    return result.Contents || [];
+    
+    const files = (result.Contents || []).map(item => ({
+      key: item.Key!,
+      size: item.Size!,
+      lastModified: item.LastModified!,
+    }));
+    
+    return {
+      files,
+      hasMore: result.IsTruncated || false,
+      nextToken: result.NextContinuationToken,
+    };
   } catch (error) {
     console.error('B2 list files error:', error);
     throw new Error('Failed to list files from Backblaze B2');
@@ -384,19 +462,146 @@ export const listFiles = async (prefix: string): Promise<any[]> => {
 };
 
 /**
+ * Search for files across different time periods and entities
+ * Useful for finding old application documents
+ */
+export const searchFiles = async (
+  companyId: string,
+  searchParams: {
+    entityType?: 'application' | 'client' | 'candidate' | 'company';
+    entityName?: string;
+    year?: number;
+    month?: number;
+    documentType?: string;
+  }
+): Promise<Array<{ key: string; size: number; lastModified: Date }>> => {
+  try {
+    // Get company info for building the search prefix
+    const company = await prisma.company.findUnique({
+      where: { id: companyId }
+    });
+    
+    if (!company) {
+      throw new Error('Company not found');
+    }
+    
+    const companyName = company.name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+    const companyFolder = `${companyName}-${companyId.substring(0, 8)}`;
+    
+    // Build search prefix based on parameters
+    let searchPrefix = `jobline-companies/${companyFolder}/`;
+    
+    if (searchParams.entityType) {
+      searchPrefix += `${searchParams.entityType}s/`;
+      
+      if (searchParams.entityType === 'application' && searchParams.year) {
+        searchPrefix += `${searchParams.year}/`;
+        if (searchParams.month) {
+          searchPrefix += `${String(searchParams.month).padStart(2, '0')}/`;
+        }
+      }
+      
+      if (searchParams.entityName) {
+        const cleanName = searchParams.entityName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+        // This will match any folder containing the name
+        // Note: For more precise matching, we'd need to list and filter
+      }
+    }
+    
+    const result = await listFiles(searchPrefix, 1000);
+    
+    // Filter results if entity name was provided
+    let files = result.files;
+    if (searchParams.entityName) {
+      const cleanName = searchParams.entityName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      files = files.filter(file => file.key.toLowerCase().includes(cleanName));
+    }
+    
+    // Filter by document type if provided
+    if (searchParams.documentType) {
+      const docType = searchParams.documentType.toLowerCase();
+      files = files.filter(file => file.key.toLowerCase().includes(docType));
+    }
+    
+    return files;
+  } catch (error) {
+    console.error('B2 search files error:', error);
+    throw new Error('Failed to search files in Backblaze B2');
+  }
+};
+
+/**
  * Get file metadata
  */
-export const getFileMetadata = async (key: string): Promise<any> => {
+export const getFileMetadata = async (key: string): Promise<{
+  size: number;
+  contentType: string;
+  lastModified: Date;
+  metadata: Record<string, string>;
+}> => {
   try {
     const command = new HeadObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
     });
     
-    return await s3Client.send(command);
+    const result = await s3Client.send(command);
+    
+    return {
+      size: result.ContentLength || 0,
+      contentType: result.ContentType || 'application/octet-stream',
+      lastModified: result.LastModified || new Date(),
+      metadata: result.Metadata || {},
+    };
   } catch (error) {
     console.error('B2 metadata error:', error);
     throw new Error('Failed to get file metadata');
+  }
+};
+
+/**
+ * Move/rename a file in B2
+ * Note: B2 doesn't support move directly, so we copy and delete
+ */
+export const moveFile = async (oldKey: string, newKey: string): Promise<void> => {
+  try {
+    // First, get the file
+    const getCommand = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: oldKey,
+    });
+    
+    const file = await s3Client.send(getCommand);
+    
+    if (!file.Body) {
+      throw new Error('File not found');
+    }
+    
+    // Convert stream to buffer
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of file.Body as any) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
+    
+    // Upload to new location
+    const putCommand = new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: newKey,
+      Body: buffer,
+      ContentType: file.ContentType,
+      Metadata: file.Metadata,
+    });
+    
+    await s3Client.send(putCommand);
+    
+    // Delete old file
+    await deleteFromB2(oldKey);
+    
+    console.log('File moved successfully:', { from: oldKey, to: newKey });
+  } catch (error) {
+    console.error('B2 move file error:', error);
+    throw new Error('Failed to move file in Backblaze B2');
   }
 };
 
@@ -415,6 +620,7 @@ const getMimeType = (fileName: string): string => {
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',
     '.gif': 'image/gif',
+    '.webp': 'image/webp',
     '.txt': 'text/plain',
     '.csv': 'text/csv',
   };
@@ -429,5 +635,7 @@ export default {
   getPublicUrl,
   fileExists,
   listFiles,
+  searchFiles,
   getFileMetadata,
+  moveFile,
 };

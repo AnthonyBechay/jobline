@@ -1,5 +1,48 @@
 import PDFDocument from 'pdfkit';
 import { Candidate } from '@prisma/client';
+import fetch from 'node-fetch';
+import { getSignedUrlForB2 } from './backblaze.service';
+import { prisma } from '../index';
+
+/**
+ * Fetch image from URL and convert to buffer for embedding in PDF
+ */
+async function fetchImageBuffer(url: string): Promise<Buffer | null> {
+  try {
+    // If it's a B2 file, generate a fresh signed URL
+    if (url && url.includes('backblaze')) {
+      // Extract the key from the URL if needed
+      const urlParts = url.split('/');
+      const key = urlParts.slice(-1)[0]; // Get the last part as key
+      
+      // Try to find the file in database to get the actual key
+      const file = await prisma.file.findFirst({
+        where: {
+          OR: [
+            { url: url },
+            { fileName: key }
+          ]
+        }
+      });
+      
+      if (file) {
+        url = await getSignedUrlForB2(file.fileName, 3600);
+      }
+    }
+    
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+      return null;
+    }
+    
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch (error) {
+    console.error('Error fetching image:', error);
+    return null;
+  }
+}
 
 export async function generateCandidatePDF(candidate: any): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
@@ -22,31 +65,77 @@ export async function generateCandidatePDF(candidate: any): Promise<Buffer> {
         resolve(pdfData);
       });
       
-      // Header section with photo placeholder
+      // Header section with actual photos
       let yPosition = 50;
+      let photoAreaUsed = false;
       
-      // Add photo placeholder (in production, you'd fetch and embed actual images)
-      if (candidate.facePhotoUrl || candidate.photoUrl) {
-        // Draw photo frame
-        doc.rect(450, 50, 100, 120)
-           .stroke('#cccccc');
-        
-        // Add photo placeholder text
-        doc.fontSize(10)
-           .fillColor('#999999')
-           .text('Face Photo', 465, 105, { width: 70, align: 'center' })
-           .fillColor('black');
+      // Try to embed face photo
+      const facePhotoUrl = candidate.facePhotoUrl || candidate.photoUrl;
+      if (facePhotoUrl) {
+        const imageBuffer = await fetchImageBuffer(facePhotoUrl);
+        if (imageBuffer) {
+          try {
+            // Add the image to PDF (100x120 for face photo)
+            doc.image(imageBuffer, 450, 50, { 
+              width: 100,
+              height: 120,
+              fit: [100, 120],
+              align: 'center',
+              valign: 'center'
+            });
+            photoAreaUsed = true;
+          } catch (imgError) {
+            console.error('Error embedding face photo:', imgError);
+            // Draw placeholder frame if image fails
+            doc.rect(450, 50, 100, 120).stroke('#cccccc');
+            doc.fontSize(10)
+               .fillColor('#999999')
+               .text('Face Photo', 465, 105, { width: 70, align: 'center' })
+               .fillColor('black');
+            photoAreaUsed = true;
+          }
+        } else {
+          // Draw placeholder frame if image not found
+          doc.rect(450, 50, 100, 120).stroke('#cccccc');
+          doc.fontSize(10)
+             .fillColor('#999999')
+             .text('Face Photo', 465, 105, { width: 70, align: 'center' })
+             .fillColor('black');
+          photoAreaUsed = true;
+        }
       }
       
-      // If full body photo exists, add second frame
+      // Try to embed full body photo
       if (candidate.fullBodyPhotoUrl) {
-        doc.rect(450, 180, 100, 140)
-           .stroke('#cccccc');
-        
-        doc.fontSize(10)
-           .fillColor('#999999')
-           .text('Full Body', 465, 245, { width: 70, align: 'center' })
-           .fillColor('black');
+        const imageBuffer = await fetchImageBuffer(candidate.fullBodyPhotoUrl);
+        if (imageBuffer) {
+          try {
+            // Add the image to PDF (100x140 for full body)
+            doc.image(imageBuffer, 450, 180, { 
+              width: 100,
+              height: 140,
+              fit: [100, 140],
+              align: 'center',
+              valign: 'center'
+            });
+            photoAreaUsed = true;
+          } catch (imgError) {
+            console.error('Error embedding full body photo:', imgError);
+            // Draw placeholder frame if image fails
+            doc.rect(450, 180, 100, 140).stroke('#cccccc');
+            doc.fontSize(10)
+               .fillColor('#999999')
+               .text('Full Body', 465, 245, { width: 70, align: 'center' })
+               .fillColor('black');
+          }
+        } else if (photoAreaUsed) {
+          // Only show full body placeholder if we already have a face photo area
+          doc.rect(450, 180, 100, 140).stroke('#cccccc');
+          doc.fontSize(10)
+             .fillColor('#999999')
+             .text('Full Body', 465, 245, { width: 70, align: 'center' })
+             .fillColor('black');
+        }
       }
       
       // Candidate name
@@ -114,6 +203,18 @@ export async function generateCandidatePDF(candidate: any): Promise<Buffer> {
       
       if (candidate.dateOfBirth) {
         addInfoField(doc, 'Age', `${calculateAge(new Date(candidate.dateOfBirth))} years`, leftColumnX, leftY);
+        leftY += 35;
+      }
+      
+      // Add Height
+      if (candidate.height) {
+        addInfoField(doc, 'Height', candidate.height, leftColumnX, leftY);
+        leftY += 35;
+      }
+      
+      // Add Weight
+      if (candidate.weight) {
+        addInfoField(doc, 'Weight', candidate.weight, leftColumnX, leftY);
         leftY += 35;
       }
       
@@ -269,6 +370,9 @@ export async function generateCandidatePDF(candidate: any): Promise<Buffer> {
            .lineTo(doc.page.width - 50, doc.page.height - 120)
            .stroke('#e0e0e0');
         
+        // Get company info from candidate
+        const companyName = candidate.company?.name || 'Jobline Recruitment Platform';
+        
         // Footer text
         doc.fontSize(9)
            .font('Helvetica')
@@ -286,7 +390,7 @@ export async function generateCandidatePDF(candidate: any): Promise<Buffer> {
              { align: 'center', width: doc.page.width - 100 }
            )
            .text(
-             `© ${new Date().getFullYear()} Jobline Recruitment Platform - Confidential`,
+             `© ${new Date().getFullYear()} ${companyName} - Confidential`,
              50,
              doc.page.height - 70,
              { align: 'center', width: doc.page.width - 100 }
@@ -297,6 +401,7 @@ export async function generateCandidatePDF(candidate: any): Promise<Buffer> {
       doc.end();
       
     } catch (error) {
+      console.error('PDF generation error:', error);
       reject(error);
     }
   });
