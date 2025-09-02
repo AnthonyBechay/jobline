@@ -98,6 +98,7 @@ const Templates = ({ onBack, onError, onSuccess }: TemplatesProps) => {
   const [feeTemplateDialog, setFeeTemplateDialog] = useState(false)
   const [editingFeeTemplate, setEditingFeeTemplate] = useState<FeeTemplate | null>(null)
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([])
+  const [nationalities, setNationalities] = useState<any[]>([])
 
   // Document Templates State
   const [documentTemplates, setDocumentTemplates] = useState<DocumentTemplate[]>([])
@@ -118,11 +119,21 @@ const Templates = ({ onBack, onError, onSuccess }: TemplatesProps) => {
         fetchFeeTemplates(),
         fetchDocumentTemplates(),
         fetchServiceTypes(),
+        fetchNationalities()
       ])
     } catch (err) {
       onError('Failed to fetch templates data')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchNationalities = async () => {
+    try {
+      const response = await api.get('/nationalities')
+      setNationalities(response.data || [])
+    } catch (err) {
+      console.error('Failed to fetch nationalities:', err)
     }
   }
 
@@ -802,9 +813,17 @@ const Templates = ({ onBack, onError, onSuccess }: TemplatesProps) => {
                     <TextField
                       {...field}
                       fullWidth
+                      select
                       label="Nationality (Optional)"
                       helperText="Specify if this template is for a specific nationality"
-                    />
+                    >
+                      <MenuItem value="">All Nationalities</MenuItem>
+                      {nationalities.map((nationality) => (
+                        <MenuItem key={nationality.id} value={nationality.name}>
+                          {nationality.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
                   )}
                 />
               </Grid>

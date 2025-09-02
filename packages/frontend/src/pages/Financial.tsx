@@ -40,6 +40,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts'
 import { Payment, Cost, CostTypeModel, Application, PaginatedResponse } from '../shared/types'
 import api from '../services/api'
+import OfficeOverheadCosts from '../components/OfficeOverheadCosts'
 
 interface FinancialSummary {
   totalRevenue: number
@@ -428,6 +429,7 @@ const Financial = () => {
             <Tab label="Payments (Revenue)" />
             <Tab label="Costs" />
             <Tab label="Application Profitability" />
+            <Tab label="Office Overhead Costs" />
           </Tabs>
         </Box>
 
@@ -577,6 +579,13 @@ const Financial = () => {
                 </TableBody>
               </Table>
             </TableContainer>
+          </Box>
+        )}
+
+        {/* Office Overhead Costs Tab */}
+        {tabValue === 3 && (
+          <Box>
+            <OfficeOverheadCosts />
           </Box>
         )}
       </Paper>

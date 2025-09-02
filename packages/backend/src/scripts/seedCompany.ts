@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { seedBusinessSettings } from './seedBusinessSettings';
 
 const prisma = new PrismaClient();
 
@@ -356,6 +357,22 @@ export async function seedCompanyData(companyId: string) {
       success: true,
       message: `Successfully seeded data for company ${company.name}`,
       stats: {
+        nationalities: DEFAULT_SEED_DATA.nationalities.length,
+        costTypes: DEFAULT_SEED_DATA.costTypes.length,
+        serviceTypes: DEFAULT_SEED_DATA.serviceTypes.length,
+        feeTemplates: DEFAULT_SEED_DATA.feeTemplates.length,
+        documentTemplates: DEFAULT_SEED_DATA.documentTemplates.length,
+        settings: DEFAULT_SEED_DATA.settings.length,
+      },
+    };
+
+    // Seed business settings
+    await seedBusinessSettings(companyId);
+
+    return {
+      success: true,
+      companyId,
+      seededData: {
         nationalities: DEFAULT_SEED_DATA.nationalities.length,
         costTypes: DEFAULT_SEED_DATA.costTypes.length,
         serviceTypes: DEFAULT_SEED_DATA.serviceTypes.length,

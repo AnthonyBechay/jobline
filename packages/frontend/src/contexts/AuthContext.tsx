@@ -40,10 +40,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const fetchCurrentUser = async () => {
     try {
+      console.log('🔄 Fetching current user...')
       const response = await api.get<User>('/auth/me')
       setUser(response.data)
+      console.log('✅ Current user loaded:', response.data.name, 'role:', response.data.role)
     } catch (error) {
-      console.error('Failed to fetch current user:', error)
+      console.error('❌ Failed to fetch current user:', error)
       localStorage.removeItem('token')
       delete api.defaults.headers.common['Authorization']
     } finally {
@@ -52,15 +54,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }
 
   const login = async (credentials: LoginRequest) => {
-    const response = await api.post<LoginResponse>('/auth/login', credentials)
-    const { token, user } = response.data
+    console.log('🔐 Attempting login for:', credentials.email, 'at company:', credentials.companyName)
     
-    localStorage.setItem('token', token)
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`
-    setUser(user)
+    try {
+      const response = await api.post<LoginResponse>('/auth/login', credentials)
+      const { token, user } = response.data
+      
+      console.log('✅ Login successful for user:', user.name, 'role:', user.role)
+      
+      localStorage.setItem('token', token)
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+      setUser(user)
+    } catch (error: any) {
+      console.error('❌ Login failed:', error.response?.data?.error || error.message)
+      throw error
+    }
   }
 
   const logout = () => {
+    console.log('🚪 Logging out user:', user?.name)
     localStorage.removeItem('token')
     delete api.defaults.headers.common['Authorization']
     setUser(null)

@@ -5,7 +5,7 @@
  * This script starts both backend and frontend servers concurrently
  */
 
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 const path = require('path');
 
 // Colors for console output
@@ -64,10 +64,76 @@ function runCommand(command, args, options, label, color) {
   return proc;
 }
 
+// Function to kill process on port 5000
+function killPort5000() {
+  return new Promise((resolve) => {
+    log('🔍 Checking for existing processes on port 5000...', colors.yellow);
+    
+    // Windows command to find and kill process on port 5000
+    const command = process.platform === 'win32' 
+      ? 'netstat -ano | findstr :5000'
+      : 'lsof -ti:5000';
+    
+    exec(command, (error, stdout, stderr) => {
+      if (stdout && stdout.trim()) {
+        if (process.platform === 'win32') {
+          // Parse Windows netstat output
+          const lines = stdout.trim().split('\n');
+          const pids = new Set();
+          
+          lines.forEach(line => {
+            const parts = line.trim().split(/\s+/);
+            if (parts.length >= 5 && parts[1].includes(':5000')) {
+              pids.add(parts[4]);
+            }
+          });
+          
+          if (pids.size > 0) {
+            log(`🛑 Found ${pids.size} process(es) on port 5000, killing...`, colors.red);
+            pids.forEach(pid => {
+              exec(`taskkill /PID ${pid} /F`, (killError) => {
+                if (!killError) {
+                  log(`✅ Killed process ${pid}`, colors.green);
+                }
+              });
+            });
+            setTimeout(resolve, 2000); // Wait 2 seconds for processes to be killed
+          } else {
+            resolve();
+          }
+        } else {
+          // Unix/Linux/Mac
+          const pids = stdout.trim().split('\n');
+          if (pids.length > 0 && pids[0]) {
+            log(`🛑 Found ${pids.length} process(es) on port 5000, killing...`, colors.red);
+            pids.forEach(pid => {
+              exec(`kill -9 ${pid}`, (killError) => {
+                if (!killError) {
+                  log(`✅ Killed process ${pid}`, colors.green);
+                }
+              });
+            });
+            setTimeout(resolve, 2000);
+          } else {
+            resolve();
+          }
+        }
+      } else {
+        log('✅ No existing processes found on port 5000', colors.green);
+        resolve();
+      }
+    });
+  });
+}
+
 async function main() {
   log('========================================', colors.bright);
   log('       Jobline Development Server       ', colors.bright);
   log('========================================', colors.bright);
+  log('');
+
+  // Kill any existing processes on port 5000
+  await killPort5000();
   log('');
 
   const processes = [];

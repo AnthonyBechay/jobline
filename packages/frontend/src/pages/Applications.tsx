@@ -160,6 +160,27 @@ const statusWorkflow = {
     icon: <WarningIcon />,
     color: 'warning' as const,
   },
+  [ApplicationStatus.CANCELLED_PRE_ARRIVAL]: {
+    next: null,
+    label: 'Cancelled (Pre-Arrival)',
+    shortLabel: 'Cancelled',
+    icon: <WarningIcon />,
+    color: 'error' as const,
+  },
+  [ApplicationStatus.CANCELLED_POST_ARRIVAL]: {
+    next: null,
+    label: 'Cancelled (Post-Arrival)',
+    shortLabel: 'Cancelled',
+    icon: <WarningIcon />,
+    color: 'error' as const,
+  },
+  [ApplicationStatus.CANCELLED_CANDIDATE]: {
+    next: null,
+    label: 'Cancelled (Candidate)',
+    shortLabel: 'Cancelled',
+    icon: <WarningIcon />,
+    color: 'error' as const,
+  },
 }
 
 // Predefined filter groups
@@ -168,6 +189,7 @@ const filterPresets: Record<string, {
   icon: React.ReactElement
   description: string
   statuses: ApplicationStatus[]
+  dateFilter?: { days: number } // Added date filter option
 }> = {
   'pre-arrival': {
     label: 'Pre-Arrival',
@@ -198,24 +220,41 @@ const filterPresets: Record<string, {
       ApplicationStatus.ACTIVE_EMPLOYMENT,
       ApplicationStatus.CONTRACT_ENDED,
     ],
+    dateFilter: { days: 30 } // Last 30 days by default
   },
+
   'all': {
-    label: 'All Applications',
+    label: 'All Active Applications',
     icon: <ListIcon />,
-    description: 'View all applications',
-    statuses: [] as ApplicationStatus[],
+    description: 'View all active applications (excluding cancelled)',
+    statuses: [
+      ApplicationStatus.PENDING_MOL,
+      ApplicationStatus.MOL_AUTH_RECEIVED,
+      ApplicationStatus.VISA_PROCESSING,
+      ApplicationStatus.VISA_RECEIVED,
+      ApplicationStatus.WORKER_ARRIVED,
+      ApplicationStatus.LABOUR_PERMIT_PROCESSING,
+      ApplicationStatus.RESIDENCY_PERMIT_PROCESSING,
+      ApplicationStatus.ACTIVE_EMPLOYMENT,
+      ApplicationStatus.CONTRACT_ENDED,
+      ApplicationStatus.RENEWAL_PENDING,
+    ],
+    dateFilter: { days: 30 } // Last 30 days by default
   },
 }
 
 // Application Card Component
 const ApplicationCard = ({ application, onView, onEdit, onCopyLink }: any) => {
   const theme = useTheme()
-  const statusInfo = statusWorkflow[application.status as ApplicationStatus]
+  const statusInfo = statusWorkflow[application.status as ApplicationStatus] || {
+    shortLabel: 'Unknown',
+    color: 'default' as const,
+    icon: <WarningIcon />,
+  }
   
   return (
     <Card 
       sx={{ 
-        height: '100%', 
         borderRadius: 2,
         transition: 'all 0.3s',
         '&:hover': {
@@ -225,17 +264,17 @@ const ApplicationCard = ({ application, onView, onEdit, onCopyLink }: any) => {
       }}
     >
       <CardActionArea onClick={() => onView(application.id)}>
-        <CardContent>
-          <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+        <CardContent sx={{ p: 2 }}>
+          <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1.5}>
             <Box>
-              <Typography variant="subtitle2" color="text.secondary">
+              <Typography variant="subtitle2" color="text.secondary" fontSize="0.75rem">
                 #{application.id.substring(0, 8).toUpperCase()}
               </Typography>
               <Chip
                 label={application.type.replace(/_/g, ' ')}
                 size="small"
                 color={application.type === ApplicationType.NEW_CANDIDATE ? 'primary' : 'secondary'}
-                sx={{ mt: 0.5 }}
+                sx={{ mt: 0.5, height: 20, fontSize: '0.7rem' }}
               />
             </Box>
             <Chip
@@ -243,38 +282,39 @@ const ApplicationCard = ({ application, onView, onEdit, onCopyLink }: any) => {
               color={statusInfo.color}
               size="small"
               icon={statusInfo.icon}
+              sx={{ height: 24 }}
             />
           </Box>
           
-          <Divider sx={{ my: 2 }} />
+          <Divider sx={{ my: 1.5 }} />
           
-          <Box display="flex" alignItems="center" mb={1}>
-            <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.light', mr: 1 }}>
-              <BusinessIcon fontSize="small" />
+          <Box display="flex" alignItems="center" mb={0.75}>
+            <Avatar sx={{ width: 28, height: 28, bgcolor: 'primary.light', mr: 1 }}>
+              <BusinessIcon sx={{ fontSize: 16 }} />
             </Avatar>
-            <Box flex={1}>
-              <Typography variant="body2" fontWeight="medium">
+            <Box flex={1} overflow="hidden">
+              <Typography variant="body2" fontWeight="medium" noWrap>
                 {application.client?.name || 'Unknown Client'}
               </Typography>
             </Box>
           </Box>
           
-          <Box display="flex" alignItems="center" mb={2}>
-            <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.light', mr: 1 }}>
-              <PersonIcon fontSize="small" />
+          <Box display="flex" alignItems="center" mb={1.5}>
+            <Avatar sx={{ width: 28, height: 28, bgcolor: 'secondary.light', mr: 1 }}>
+              <PersonIcon sx={{ fontSize: 16 }} />
             </Avatar>
-            <Box flex={1}>
-              <Typography variant="body2" fontWeight="medium">
+            <Box flex={1} overflow="hidden">
+              <Typography variant="body2" fontWeight="medium" noWrap>
                 {`${application.candidate?.firstName || ''} ${application.candidate?.lastName || ''}`}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" color="text.secondary" fontSize="0.7rem">
                 {application.candidate?.nationality || 'Unknown'}
               </Typography>
             </Box>
           </Box>
           
           <Box display="flex" alignItems="center" justifyContent="space-between">
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" fontSize="0.7rem">
               {new Date(application.createdAt).toLocaleDateString()}
             </Typography>
             <Stack direction="row" spacing={0.5}>
@@ -285,8 +325,9 @@ const ApplicationCard = ({ application, onView, onEdit, onCopyLink }: any) => {
                     e.stopPropagation()
                     onCopyLink(application.shareableLink)
                   }}
+                  sx={{ p: 0.5 }}
                 >
-                  <LinkIcon fontSize="small" />
+                  <LinkIcon sx={{ fontSize: 18 }} />
                 </IconButton>
               </Tooltip>
               <Tooltip title="Edit">
@@ -296,8 +337,9 @@ const ApplicationCard = ({ application, onView, onEdit, onCopyLink }: any) => {
                     e.stopPropagation()
                     onEdit(application.id)
                   }}
+                  sx={{ p: 0.5 }}
                 >
-                  <EditIcon fontSize="small" />
+                  <EditIcon sx={{ fontSize: 18 }} />
                 </IconButton>
               </Tooltip>
             </Stack>
@@ -331,14 +373,14 @@ const ApplicationList = () => {
   useEffect(() => {
     // Apply default filter on mount
     const preset = filterPresets['pre-arrival']
-    fetchApplicationsWithPreset(preset.statuses)
+    fetchApplicationsWithPreset(preset.statuses, preset.dateFilter)
   }, [])
 
   useEffect(() => {
     if (filterPreset && filterPreset !== 'custom') {
       const preset = filterPresets[filterPreset as keyof typeof filterPresets]
-      if (preset.statuses.length > 0) {
-        fetchApplicationsWithPreset(preset.statuses)
+      if (preset.statuses.length > 0 || preset.dateFilter) {
+        fetchApplicationsWithPreset(preset.statuses, preset.dateFilter)
       } else {
         fetchApplications()
       }
@@ -352,7 +394,7 @@ const ApplicationList = () => {
     }
   }, [statusFilter, typeFilter, searchQuery])
 
-  const fetchApplicationsWithPreset = async (statuses: ApplicationStatus[]) => {
+  const fetchApplicationsWithPreset = async (statuses: ApplicationStatus[], dateFilter?: { days: number }) => {
     try {
       if (!isChangingFilter) {
         setLoading(true)
@@ -363,9 +405,16 @@ const ApplicationList = () => {
       
       // Add multiple status filters
       if (statuses.length > 0) {
-        statuses.forEach(status => {
+        statuses.filter(status => status && status !== 'undefined').forEach(status => {
           params.append('status', status)
         })
+      }
+
+      // Add date filter if specified
+      if (dateFilter) {
+        const fromDate = new Date()
+        fromDate.setDate(fromDate.getDate() - dateFilter.days)
+        params.append('fromDate', fromDate.toISOString())
       }
 
       const response = await api.get<any>(`/applications?${params}`)
@@ -463,7 +512,11 @@ const ApplicationList = () => {
       headerName: 'Status',
       width: 200,
       renderCell: (params) => {
-        const statusInfo = statusWorkflow[params.value as ApplicationStatus]
+        const statusInfo = statusWorkflow[params.value as ApplicationStatus] || {
+          label: 'Unknown',
+          color: 'default' as const,
+          icon: <WarningIcon />,
+        }
         return (
           <Chip
             label={statusInfo.label}
@@ -480,7 +533,13 @@ const ApplicationList = () => {
       width: 100,
       renderCell: (params) => (
         <Tooltip title="Copy client status link">
-          <IconButton size="small" onClick={() => handleCopyLink(params.value)}>
+          <IconButton 
+            size="small" 
+            onClick={(e) => {
+              e.stopPropagation()
+              handleCopyLink(params.value)
+            }}
+          >
             <LinkIcon />
           </IconButton>
         </Tooltip>
@@ -491,22 +550,6 @@ const ApplicationList = () => {
       headerName: 'Created',
       width: 120,
       renderCell: (params) => new Date(params.value).toLocaleDateString()
-    },
-    {
-      field: 'actions',
-      headerName: 'Actions',
-      width: 120,
-      sortable: false,
-      renderCell: (params) => (
-        <Box>
-          <IconButton size="small" onClick={() => navigate(`/applications/${params.row.id}`)}>
-            <ViewIcon />
-          </IconButton>
-          <IconButton size="small" onClick={() => navigate(`/applications/edit/${params.row.id}`)}>
-            <EditIcon />
-          </IconButton>
-        </Box>
-      ),
     },
   ]
 
@@ -570,31 +613,43 @@ const ApplicationList = () => {
                 onClick={() => handlePresetChange(key)}
               >
                 <CardContent sx={{ p: 2 }}>
-                  <Box display="flex" alignItems="center" justifyContent="space-between">
-                    <Box display="flex" alignItems="center">
-                      <Avatar 
-                        sx={{ 
-                          bgcolor: isActive ? 'primary.main' : 'action.hover',
-                          width: 40,
-                          height: 40,
-                          mr: 2
+                  <Box display="flex" alignItems="center">
+                    <Box display="flex" flexDirection="column" alignItems="center" mr={2}>
+                      <Badge 
+                        badgeContent={loading ? 0 : appCount} 
+                        color="primary"
+                        overlap="circular"
+                        anchorOrigin={{
+                          vertical: 'bottom',
+                          horizontal: 'right',
                         }}
                       >
-                        {preset.icon}
-                      </Avatar>
-                      <Box>
-                        <Typography variant="subtitle2" fontWeight="medium">
-                          {preset.label}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {preset.description}
-                        </Typography>
-                      </Box>
+                        <Avatar 
+                          sx={{ 
+                            bgcolor: isActive ? 'primary.main' : 'action.hover',
+                            width: 40,
+                            height: 40,
+                          }}
+                        >
+                          {preset.icon}
+                        </Avatar>
+                      </Badge>
                     </Box>
-                    {loading ? (
-                      <CircularProgress size={20} />
-                    ) : (
-                      <Badge badgeContent={appCount} color="primary" />
+                    <Box flex={1}>
+                      <Typography variant="subtitle2" fontWeight="medium">
+                        {preset.label}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {preset.description}
+                      </Typography>
+                      {preset.dateFilter && (
+                        <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+                          Last {preset.dateFilter.days} days
+                        </Typography>
+                      )}
+                    </Box>
+                    {loading && (
+                      <CircularProgress size={20} sx={{ ml: 1 }} />
                     )}
                   </Box>
                 </CardContent>
@@ -603,6 +658,27 @@ const ApplicationList = () => {
           )
         })}
       </Grid>
+
+      {/* Show Cancelled Button */}
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
+        <Button
+          variant="outlined"
+          color="error"
+          startIcon={<WarningIcon />}
+          onClick={() => {
+            const cancelledStatuses = [
+              ApplicationStatus.CANCELLED_PRE_ARRIVAL,
+              ApplicationStatus.CANCELLED_POST_ARRIVAL,
+              ApplicationStatus.CANCELLED_CANDIDATE,
+            ]
+            fetchApplicationsWithPreset(cancelledStatuses)
+            setFilterPreset('custom')
+          }}
+          sx={{ borderRadius: 2 }}
+        >
+          Show Cancelled Applications
+        </Button>
+      </Box>
 
       {/* Advanced Filters & Search */}
       <Paper sx={{ p: 2, mb: 3, borderRadius: 2 }}>
@@ -634,7 +710,7 @@ const ApplicationList = () => {
                 <MenuItem value="">All Statuses</MenuItem>
                 {Object.values(ApplicationStatus).map((status) => (
                   <MenuItem key={status} value={status}>
-                    {statusWorkflow[status].label}
+                    {statusWorkflow[status]?.label || status.replace(/_/g, ' ')}
                   </MenuItem>
                 ))}
               </Select>
@@ -724,7 +800,7 @@ const ApplicationList = () => {
           />
         </Paper>
       )}
-    {/* Snackbar for notifications */}
+      {/* Snackbar for notifications */}
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={3000}
@@ -735,7 +811,7 @@ const ApplicationList = () => {
   )
 }
 
-// Application Form Component (kept the same)
+// Application Form Component (updated)
 const ApplicationForm = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -743,9 +819,17 @@ const ApplicationForm = () => {
   const [error, setError] = useState('')
   const [clients, setClients] = useState<Client[]>([])
   const [candidates, setCandidates] = useState<Candidate[]>([])
+  const [availableInLebanonCandidates, setAvailableInLebanonCandidates] = useState<Candidate[]>([])
   const [brokers, setBrokers] = useState<Broker[]>([])
   const [feeTemplates, setFeeTemplates] = useState<any[]>([])
-  const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<any>()
+  const [clientSearchTerm, setClientSearchTerm] = useState('')
+  const [fromClientSearchTerm, setFromClientSearchTerm] = useState('')
+  const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<any>({
+    defaultValues: {
+      createdAt: new Date().toISOString().split('T')[0], // Default to today
+      type: ApplicationType.NEW_CANDIDATE,
+    }
+  })
 
   const selectedType = watch('type')
   const selectedCandidateId = watch('candidateId')
@@ -766,12 +850,14 @@ const ApplicationForm = () => {
 
   const fetchData = async () => {
     try {
-      const [clientsRes, candidatesRes] = await Promise.all([
+      const [clientsRes, candidatesRes, candidatesInLebanonRes] = await Promise.all([
         api.get<PaginatedResponse<Client>>('/clients?limit=100'),
         api.get<PaginatedResponse<Candidate>>('/candidates?limit=100&status=' + CandidateStatus.AVAILABLE_ABROAD),
+        api.get<PaginatedResponse<Candidate>>('/candidates?limit=100&status=' + CandidateStatus.AVAILABLE_IN_LEBANON),
       ])
       setClients(clientsRes.data?.data || [])
       setCandidates(candidatesRes.data?.data || [])
+      setAvailableInLebanonCandidates(candidatesInLebanonRes.data?.data || [])
       
       if (user?.role === UserRole.SUPER_ADMIN) {
         try {
@@ -785,6 +871,7 @@ const ApplicationForm = () => {
       console.error('Failed to fetch data:', err)
       setClients([])
       setCandidates([])
+      setAvailableInLebanonCandidates([])
       setBrokers([])
     }
   }
@@ -840,11 +927,29 @@ const ApplicationForm = () => {
       <Paper sx={{ p: 3 }}>
         <form onSubmit={handleSubmit(onSubmit)}>
           <Grid container spacing={3}>
+            {/* Date Field */}
+            <Grid item xs={12} md={6}>
+              <Controller
+                name="createdAt"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    fullWidth
+                    type="date"
+                    label="Application Date"
+                    InputLabelProps={{ shrink: true }}
+                    helperText="Set a custom date for backdated applications"
+                  />
+                )}
+              />
+            </Grid>
+            
+            {/* Application Type */}
             <Grid item xs={12} md={6}>
               <Controller
                 name="type"
                 control={control}
-                defaultValue={ApplicationType.NEW_CANDIDATE}
                 rules={{ required: 'Application type is required' }}
                 render={({ field }) => (
                   <TextField
@@ -864,71 +969,164 @@ const ApplicationForm = () => {
                 )}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
+            
+            {/* Client Selection - For New Candidate or To Client for Guarantor Change */}
+            <Grid item xs={12} md={selectedType === ApplicationType.GUARANTOR_CHANGE ? 6 : 12}>
               <Controller
                 name="clientId"
                 control={control}
-                rules={{ required: 'Client is required' }}
+                rules={{ required: selectedType === ApplicationType.GUARANTOR_CHANGE ? 'To Client is required' : 'Client is required' }}
                 render={({ field }) => (
                   <TextField
                     {...field}
                     fullWidth
                     select
-                    label="Client"
+                    label={selectedType === ApplicationType.GUARANTOR_CHANGE ? "To Client (New Guarantor)" : "Client"}
+                    placeholder="Type to search..."
+                    value={field.value || ''}
+                    onChange={(e) => {
+                      field.onChange(e.target.value)
+                      setClientSearchTerm('')
+                    }}
                     error={!!errors.clientId}
                     helperText={errors.clientId?.message as string}
+                    SelectProps={{
+                      displayEmpty: true,
+                      renderValue: (value) => {
+                        if (!value) return ''
+                        const client = clients.find(c => c.id === value)
+                        return client ? client.name : ''
+                      }
+                    }}
                   >
-                    <MenuItem value="">Select a client</MenuItem>
-                    {clients && clients.length > 0 && clients.map((client) => (
-                      <MenuItem key={client.id} value={client.id}>
-                        {client.name}
-                      </MenuItem>
-                    ))}
+                    <MenuItem value="">
+                      <em>Select a client</em>
+                    </MenuItem>
+                    {clients
+                      .filter(client => 
+                        !clientSearchTerm || 
+                        client.name.toLowerCase().includes(clientSearchTerm.toLowerCase())
+                      )
+                      .map((client) => (
+                        <MenuItem key={client.id} value={client.id}>
+                          {client.name}
+                        </MenuItem>
+                      ))}
                   </TextField>
                 )}
               />
             </Grid>
+            
+            {/* From Client - Only for Guarantor Change */}
+            {selectedType === ApplicationType.GUARANTOR_CHANGE && (
+              <Grid item xs={12} md={6}>
+                <Controller
+                  name="fromClientId"
+                  control={control}
+                  rules={{ required: 'From Client is required' }}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      select
+                      label="From Client (Previous Guarantor)"
+                      placeholder="Type to search..."
+                      value={field.value || ''}
+                      onChange={(e) => {
+                        field.onChange(e.target.value)
+                        setFromClientSearchTerm('')
+                      }}
+                      error={!!errors.fromClientId}
+                      helperText={errors.fromClientId?.message as string}
+                      SelectProps={{
+                        displayEmpty: true,
+                        renderValue: (value) => {
+                          if (!value) return ''
+                          const client = clients.find(c => c.id === value)
+                          return client ? client.name : ''
+                        }
+                      }}
+                    >
+                      <MenuItem value="">
+                        <em>Select a client</em>
+                      </MenuItem>
+                      {clients
+                        .filter(client => 
+                          !fromClientSearchTerm || 
+                          client.name.toLowerCase().includes(fromClientSearchTerm.toLowerCase())
+                        )
+                        .map((client) => (
+                          <MenuItem key={client.id} value={client.id}>
+                            {client.name}
+                          </MenuItem>
+                        ))}
+                    </TextField>
+                  )}
+                />
+              </Grid>
+            )}
+            
+            {/* Candidate Selection */}
             <Grid item xs={12} md={6}>
               <Controller
                 name="candidateId"
                 control={control}
                 rules={{ required: 'Candidate is required' }}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    select
-                    label="Candidate"
-                    error={!!errors.candidateId}
-                    helperText={errors.candidateId?.message as string}
-                  >
-                    <MenuItem value="">Select a candidate</MenuItem>
-                    {candidates && candidates.length > 0 && candidates.map((candidate) => (
-                      <MenuItem key={candidate.id} value={candidate.id}>
-                        {candidate.firstName} {candidate.lastName} - {candidate.nationality}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                )}
+                render={({ field }) => {
+                  const candidateList = selectedType === ApplicationType.GUARANTOR_CHANGE 
+                    ? availableInLebanonCandidates 
+                    : candidates
+                  
+                  return (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      select
+                      label={selectedType === ApplicationType.GUARANTOR_CHANGE 
+                        ? "Candidate (Available in Lebanon)" 
+                        : "Candidate"}
+                      error={!!errors.candidateId}
+                      helperText={errors.candidateId?.message as string}
+                    >
+                      <MenuItem value="">Select a candidate</MenuItem>
+                      {candidateList.map((candidate) => (
+                        <MenuItem key={candidate.id} value={candidate.id}>
+                          {candidate.firstName} {candidate.lastName} - {candidate.nationality}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  )
+                }}
               />
             </Grid>
+            
+            {/* Broker Selection - Optional */}
             {user?.role === UserRole.SUPER_ADMIN && (
               <Grid item xs={12} md={6}>
                 <Controller
-                name="brokerId"
-                control={control}
-                defaultValue=""
-                render={({ field }) => (
-                <TextField
-                {...field}
-                fullWidth
-                select
-                label="Broker (Optional)"
-                value={field.value || ''}
-                  onChange={(e) => field.onChange(e.target.value || null)}
-                      >
-                      <MenuItem value="">None</MenuItem>
-                      {brokers && brokers.length > 0 && brokers.map((broker) => (
+                  name="brokerId"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      select
+                      label="Broker (Optional)"
+                      value={field.value || ''}
+                      onChange={(e) => field.onChange(e.target.value || null)}
+                      SelectProps={{
+                        displayEmpty: true,
+                        renderValue: (value) => {
+                          if (!value) return ''
+                          const broker = brokers.find(b => b.id === value)
+                          return broker ? broker.name : ''
+                        }
+                      }}
+                    >
+                      <MenuItem value="">
+                        <em>No broker selected</em>
+                      </MenuItem>
+                      {brokers.map((broker) => (
                         <MenuItem key={broker.id} value={broker.id}>
                           {broker.name}
                         </MenuItem>
@@ -936,6 +1134,17 @@ const ApplicationForm = () => {
                     </TextField>
                   )}
                 />
+              </Grid>
+            )}
+            
+            {/* Note about Brokers */}
+            {user?.role === UserRole.SUPER_ADMIN && (
+              <Grid item xs={12}>
+                <Alert severity="info" sx={{ borderRadius: 2 }}>
+                  <Typography variant="body2">
+                    Brokers can be assigned now or later when editing the application. This is optional and can be changed at any time.
+                  </Typography>
+                </Alert>
               </Grid>
             )}
             

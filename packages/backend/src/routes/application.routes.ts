@@ -124,7 +124,18 @@ router.get('/:id', async (req: AuthRequest, res) => {
 // Create new application (company-specific)
 router.post('/', async (req: AuthRequest, res) => {
   try {
-    const { clientId, candidateId, type, feeTemplateId, finalFeeAmount, brokerId } = req.body;
+    const { 
+      clientId, 
+      candidateId, 
+      type, 
+      feeTemplateId, 
+      finalFeeAmount, 
+      brokerId, 
+      fromClientId,
+      lawyerServiceRequested,
+      lawyerFeeCost,
+      lawyerFeeCharge
+    } = req.body;
     const companyId = req.user!.companyId;
     
     // Generate unique shareable link
@@ -159,6 +170,31 @@ router.post('/', async (req: AuthRequest, res) => {
     if (!client) {
       res.status(404).json({ error: 'Client not found' });
       return;
+    }
+    
+    // For guarantor change applications, validate fromClientId
+    if (type === 'GUARANTOR_CHANGE') {
+      if (!fromClientId) {
+        res.status(400).json({ error: 'From Client ID is required for guarantor change applications' });
+        return;
+      }
+      
+      const fromClient = await prisma.client.findFirst({
+        where: { 
+          id: fromClientId,
+          companyId, // Ensure from client belongs to user's company
+        },
+      });
+      
+      if (!fromClient) {
+        res.status(404).json({ error: 'From Client not found' });
+        return;
+      }
+      
+      if (fromClientId === clientId) {
+        res.status(400).json({ error: 'From Client and To Client cannot be the same' });
+        return;
+      }
     }
     
     // Auto-select fee template based on nationality if not provided
@@ -221,6 +257,10 @@ router.post('/', async (req: AuthRequest, res) => {
           feeTemplateId: selectedFeeTemplateId,
           finalFeeAmount: selectedFinalFeeAmount,
           brokerId: brokerId && brokerId !== '' ? brokerId : null, // Handle empty string as null
+          fromClientId: type === 'GUARANTOR_CHANGE' ? fromClientId : null,
+          lawyerServiceRequested: lawyerServiceRequested || false,
+          lawyerFeeCost: lawyerServiceRequested ? lawyerFeeCost : null,
+          lawyerFeeCharge: lawyerServiceRequested ? lawyerFeeCharge : null,
           companyId, // Set company ID
         },
         include: {
@@ -228,6 +268,7 @@ router.post('/', async (req: AuthRequest, res) => {
           candidate: true,
           feeTemplate: true,
           broker: true,
+          fromClient: true,
         },
       }),
       prisma.candidate.update({
@@ -263,7 +304,7 @@ router.post('/', async (req: AuthRequest, res) => {
   }
 });
 
-// Update application status (company-specific)
+// Update application status (company-specific) - DEPRECATED: Use /api/applications/:id/status instead
 router.patch('/:id/status', async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;

@@ -19,6 +19,7 @@ import {
   NotificationsActive as RemindersIcon,
   FolderOpen as DocumentsIcon,
   NavigateNext as NavigateNextIcon,
+  AccountBalance as BusinessSettingsIcon,
 } from '@mui/icons-material'
 import { useAuth } from '../../contexts/AuthContext'
 import { UserRole } from '../../shared/types'
@@ -30,8 +31,9 @@ import Templates from './Templates'
 import ListOfValues from './ListOfValues'
 import RemindersSettings from './RemindersSettings'
 import DocumentManagement from './DocumentManagement'
+import BusinessSettings from '../../components/BusinessSettings'
 
-type SettingsSection = 'main' | 'users' | 'company' | 'templates' | 'lists' | 'reminders' | 'documents'
+type SettingsSection = 'main' | 'users' | 'company' | 'templates' | 'lists' | 'reminders' | 'documents' | 'business'
 
 interface SettingsCard {
   id: SettingsSection
@@ -100,6 +102,13 @@ const Settings = () => {
       description: 'Search, manage, and organize all uploaded documents',
       icon: <DocumentsIcon sx={{ fontSize: 40 }} />,
       color: '#0288d1',
+    },
+    {
+      id: 'business',
+      title: 'Business Settings',
+      description: 'Configure cancellation policies, lawyer services, and business workflows',
+      icon: <BusinessSettingsIcon sx={{ fontSize: 40 }} />,
+      color: '#7b1fa2',
     },
   ]
 
@@ -255,6 +264,14 @@ const Settings = () => {
 
       {currentSection === 'documents' && (
         <DocumentManagement 
+          onBack={handleBack}
+          onError={setError}
+          onSuccess={setSuccess}
+        />
+      )}
+
+      {currentSection === 'business' && (
+        <BusinessSettings 
           onBack={handleBack}
           onError={setError}
           onSuccess={setSuccess}

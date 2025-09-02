@@ -109,6 +109,8 @@ export interface Application {
   id: string;
   clientId: string;
   client?: Client;
+  fromClientId?: string;
+  fromClient?: Client;
   candidateId: string;
   candidate?: Candidate;
   status: ApplicationStatus;
@@ -138,7 +140,9 @@ export interface Payment {
   amount: number;
   currency: string;
   paymentDate: Date;
+  paymentType: string;
   notes?: string;
+  isRefundable: boolean;
   companyId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -334,4 +338,44 @@ export interface CostTypeModel {
   companyId: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface GuarantorChange {
+  id: string;
+  originalApplicationId: string;
+  originalApplication?: Application;
+  newApplicationId?: string;
+  newApplication?: Application;
+  fromClientId: string;
+  fromClient?: Client;
+  toClientId: string;
+  toClient?: Client;
+  candidateId: string;
+  candidate?: Candidate;
+  changeDate: Date;
+  reason?: string;
+  refundAmount?: number;
+  refundCurrency: string;
+  refundProcessed: boolean;
+  refundProcessedDate?: Date;
+  candidateStatusBefore: string;
+  candidateStatusAfter: string;
+  notes?: string;
+  companyId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface RefundCalculation {
+  totalPaid: number;
+  refundableAmount: number;
+  nonRefundableAmount: number;
+  calculatedRefund: number;
+  finalRefund: number;
+  refundBreakdown: {
+    paymentType: string;
+    amount: number;
+    isRefundable: boolean;
+    refundAmount: number;
+  }[];
 }

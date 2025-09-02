@@ -39,6 +39,7 @@ import {
   Tabs,
   Checkbox,
   FormControlLabel,
+  Switch,
   ListItemIcon,
   Avatar,
   Snackbar,
@@ -77,9 +78,13 @@ import {
   Assessment as AssessmentIcon,
   Download as DownloadIcon,
   ContentCopy as CopyIcon,
+  CloudUpload as CloudUploadIcon,
+  SwapHoriz as SwapHorizIcon,
   CheckCircleOutline as CheckCircleOutlineIcon,
   ErrorOutline as ErrorIcon,
   HourglassEmpty as PendingIcon,
+  Visibility as ViewIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material'
 import { useForm, Controller } from 'react-hook-form'
 import {
@@ -93,6 +98,8 @@ import {
 } from '../shared/types'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../services/api'
+import FileUpload, { UploadedFile } from './FileUpload'
+import ApplicationCancellationDialog from './ApplicationCancellationDialog'
 
 // Status workflow mapping with enhanced styling
 const statusWorkflow = {
@@ -204,12 +211,16 @@ const ApplicationDetails = () => {
   const [costs, setCosts] = useState<Cost[]>([])
   const [feeTemplates, setFeeTemplates] = useState<any[]>([])
   const [costTypes, setCostTypes] = useState<any[]>([])
+  const [paymentTypes, setPaymentTypes] = useState<any[]>([])
+  const [brokers, setBrokers] = useState<any[]>([])
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tabValue, setTabValue] = useState(0)
   const [snackbarOpen, setSnackbarOpen] = useState(false)
   const [snackbarMessage, setSnackbarMessage] = useState('')
   const [downloadingPdf, setDownloadingPdf] = useState(false)
+
   
   // Dialog states
   const [updateStatusDialog, setUpdateStatusDialog] = useState(false)
@@ -218,17 +229,22 @@ const ApplicationDetails = () => {
   const [feeDialog, setFeeDialog] = useState(false)
   const [editClientDialog, setEditClientDialog] = useState(false)
   const [editCandidateDialog, setEditCandidateDialog] = useState(false)
+  const [editBrokerDialog, setEditBrokerDialog] = useState(false)
+  const [cancellationDialogOpen, setCancellationDialogOpen] = useState(false)
   const [validationError, setValidationError] = useState<string>('')
   
   // Form controls for dialogs
   const paymentForm = useForm<any>()
   const costForm = useForm<any>()
   const feeForm = useForm<any>()
+  const brokerForm = useForm<any>()
 
   useEffect(() => {
     if (id) {
       fetchApplicationDetails()
       fetchFeeTemplates()
+      fetchPaymentTypes()
+      fetchBrokers()
       if (user?.role === UserRole.SUPER_ADMIN) {
         fetchCostTypes()
       }
@@ -237,15 +253,17 @@ const ApplicationDetails = () => {
 
   const fetchApplicationDetails = async () => {
     try {
-      const [appRes, docsRes, paymentsRes] = await Promise.all([
+      const [appRes, docsRes, paymentsRes, filesRes] = await Promise.all([
         api.get<Application>(`/applications/${id}`),
         api.get<DocumentChecklistItem[]>(`/applications/${id}/documents`),
         api.get<Payment[]>(`/applications/${id}/payments`),
+        api.get<UploadedFile[]>(`/files?entityType=application&entityId=${id}`),
       ])
       
       setApplication(appRes.data)
       setDocuments(docsRes.data || [])
       setPayments(paymentsRes.data || [])
+      setUploadedFiles(filesRes.data || [])
       
       if (user?.role === UserRole.SUPER_ADMIN) {
         try {
@@ -290,6 +308,33 @@ const ApplicationDetails = () => {
     }
   }
 
+  const fetchPaymentTypes = async () => {
+    try {
+      const response = await api.get('/payments/types')
+      setPaymentTypes(response.data || [])
+    } catch (err) {
+      console.error('Failed to fetch payment types:', err)
+      // Fallback to predefined types if API fails
+      setPaymentTypes([
+        { id: 'fee', name: 'Application Fee', isRefundable: true },
+        { id: 'insurance', name: 'Insurance', isRefundable: false },
+        { id: 'visa', name: 'Visa Fee', isRefundable: false },
+        { id: 'medical', name: 'Medical Checkup', isRefundable: false },
+        { id: 'transport', name: 'Transportation', isRefundable: false },
+        { id: 'other', name: 'Other', isRefundable: true }
+      ])
+    }
+  }
+
+  const fetchBrokers = async () => {
+    try {
+      const response = await api.get('/brokers')
+      setBrokers(response.data || [])
+    } catch (err) {
+      console.error('Failed to fetch brokers:', err)
+    }
+  }
+
   const handleUpdateDocumentStatus = async (documentId: string, status: DocumentStatus) => {
     try {
       await api.patch(`/document-items/${documentId}`, { status })
@@ -299,6 +344,77 @@ const ApplicationDetails = () => {
     } catch (err) {
       console.error('Failed to update document status:', err)
     }
+  }
+
+  const handleUploadDocument = async (doc: DocumentChecklistItem) => {
+    try {
+      // Create a file input element
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = '.pdf,.doc,.docx,.jpg,.jpeg,.png'
+      input.onchange = async (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0]
+        if (!file) return
+
+        // Get upload URL from backend
+        const uploadResponse = await api.post('/files/upload-url', {
+          fileName: file.name,
+          fileType: file.type,
+          entityType: 'application',
+          entityId: id,
+          documentType: doc.documentName,
+          stage: doc.stage
+        })
+
+        const { uploadUrl, fileKey } = uploadResponse.data
+
+        // Upload file to Backblaze
+        const uploadResult = await fetch(uploadUrl, {
+          method: 'PUT',
+          body: file,
+          headers: {
+            'Content-Type': file.type,
+          },
+        })
+
+        if (!uploadResult.ok) {
+          throw new Error('Failed to upload file')
+        }
+
+        // Update document status to received
+        await api.patch(`/document-items/${doc.id}`, { 
+          status: DocumentStatus.RECEIVED 
+        })
+
+        // Refresh application details
+        await fetchApplicationDetails()
+        
+        setSnackbarMessage('Document uploaded successfully')
+        setSnackbarOpen(true)
+      }
+      input.click()
+    } catch (error) {
+      console.error('Failed to upload document:', error)
+      setSnackbarMessage('Failed to upload document')
+      setSnackbarOpen(true)
+    }
+  }
+
+  const handleFileUploadComplete = (files: UploadedFile[]) => {
+    setUploadedFiles(files)
+    setSnackbarMessage('Files uploaded successfully')
+    setSnackbarOpen(true)
+  }
+
+  const handleGuarantorChangeSuccess = (message: string) => {
+    setSnackbarMessage(message)
+    setSnackbarOpen(true)
+    fetchApplicationDetails() // Refresh application details
+  }
+
+  const handleGuarantorChangeError = (message: string) => {
+    setSnackbarMessage(message)
+    setSnackbarOpen(true)
   }
 
   const handleUpdateApplicationStatus = async (newStatus: ApplicationStatus) => {
@@ -327,10 +443,12 @@ const ApplicationDetails = () => {
 
   const handleAddPayment = async (data: any) => {
     try {
+      const paymentType = paymentTypes.find(pt => pt.id === data.paymentType)
       await api.post('/payments', {
         ...data,
         applicationId: id,
         clientId: application?.clientId,
+        isRefundable: paymentType?.isRefundable ?? true
       })
       setPaymentDialog(false)
       paymentForm.reset()
@@ -371,6 +489,36 @@ const ApplicationDetails = () => {
       setSnackbarOpen(true)
     } catch (err: any) {
       console.error('Failed to set fee:', err)
+    }
+  }
+
+  const handleUpdateBroker = async (data: any) => {
+    try {
+      await api.patch(`/applications/${id}`, {
+        brokerId: data.brokerId || null,
+      })
+      setEditBrokerDialog(false)
+      brokerForm.reset()
+      await fetchApplicationDetails()
+      setSnackbarMessage('Broker updated successfully')
+      setSnackbarOpen(true)
+    } catch (err: any) {
+      console.error('Failed to update broker:', err)
+    }
+  }
+
+  const handleToggleLawyerService = async (enabled: boolean) => {
+    try {
+      await api.patch(`/applications/${id}`, {
+        lawyerServiceRequested: enabled,
+        lawyerFeeCost: enabled ? 500 : 0, // Default cost
+        lawyerFeeCharge: enabled ? 750 : 0, // Default charge
+      })
+      await fetchApplicationDetails()
+      setSnackbarMessage(`Lawyer service ${enabled ? 'enabled' : 'disabled'} successfully`)
+      setSnackbarOpen(true)
+    } catch (err: any) {
+      console.error('Failed to toggle lawyer service:', err)
     }
   }
 
@@ -530,6 +678,18 @@ const ApplicationDetails = () => {
                 Copy Link
               </Button>
             </Tooltip>
+            {application?.status === ApplicationStatus.ACTIVE_EMPLOYMENT && (
+              <Tooltip title="Process guarantor change">
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  startIcon={<SwapHorizIcon />}
+                  onClick={() => {/* Removed guarantor change functionality */}}
+                >
+                  Guarantor Change
+                </Button>
+              </Tooltip>
+            )}
             <Button 
               variant="contained" 
               onClick={() => navigate('/applications')}
@@ -646,6 +806,66 @@ const ApplicationDetails = () => {
                   <Typography variant="body2">{application.client?.address || 'No address'}</Typography>
                 </Box>
               </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Broker Information Card */}
+        <Grid item xs={12} lg={6}>
+          <Card sx={{ height: '100%', borderRadius: 3, position: 'relative', overflow: 'visible' }}>
+            <Box 
+              sx={{ 
+                position: 'absolute',
+                top: -10,
+                left: 20,
+                bgcolor: 'background.paper',
+                px: 2,
+                py: 0.5,
+                borderRadius: 2,
+                boxShadow: 2,
+              }}
+            >
+              <Typography variant="caption" color="primary" fontWeight="bold">
+                BROKER INFORMATION
+              </Typography>
+            </Box>
+            <CardContent sx={{ pt: 4 }}>
+              <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
+                <Box display="flex" alignItems="center">
+                  <Avatar sx={{ bgcolor: 'secondary.light', mr: 2, width: 56, height: 56 }}>
+                    <BusinessIcon />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h6" fontWeight="bold">
+                      {application.broker?.name || 'No Broker Assigned'}
+                    </Typography>
+                    {application.broker && (
+                      <Typography variant="body2" color="text.secondary">
+                        Broker ID: {application.broker.id.substring(0, 8).toUpperCase()}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+                <IconButton 
+                  size="small" 
+                  onClick={() => setEditBrokerDialog(true)}
+                  sx={{ 
+                    bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                    '&:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.2) }
+                  }}
+                >
+                  <EditIcon />
+                </IconButton>
+              </Box>
+              
+              {application.broker && (
+                <Stack spacing={2}>
+                  <Box display="flex" alignItems="center">
+                    <PhoneIcon sx={{ mr: 2, color: 'text.secondary', fontSize: 20 }} />
+                    <Typography variant="body2">{application.broker.contactDetails || 'No contact details'}</Typography>
+                  </Box>
+                </Stack>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -777,6 +997,27 @@ const ApplicationDetails = () => {
                   )}
                 </Alert>
               )}
+              
+              {/* Lawyer Service Toggle */}
+              <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={application.lawyerServiceRequested || false}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleToggleLawyerService(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label="Lawyer Service"
+                />
+                {application.lawyerServiceRequested && (
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="body2" color="textSecondary">
+                      Cost: ${application.lawyerFeeCost || 0} | Charge: ${application.lawyerFeeCharge || 0}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
             </CardContent>
           </Card>
         </Grid>
@@ -808,6 +1049,17 @@ const ApplicationDetails = () => {
                       sx={{ borderRadius: 2 }}
                     >
                       Add Cost
+                    </Button>
+                  )}
+                  {application && !['CONTRACT_ENDED', 'CANCELLED_PRE_ARRIVAL', 'CANCELLED_POST_ARRIVAL', 'CANCELLED_CANDIDATE'].includes(application.status) && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      onClick={() => setCancellationDialogOpen(true)}
+                      sx={{ borderRadius: 2 }}
+                    >
+                      Cancel Application
                     </Button>
                   )}
                 </Stack>
@@ -897,6 +1149,13 @@ const ApplicationDetails = () => {
                     </Badge>
                   } 
                 />
+                <Tab 
+                  label={
+                    <Badge badgeContent={uploadedFiles.length} color="info">
+                      Uploaded Documents
+                    </Badge>
+                  } 
+                />
                 <Tab label="Payments" />
                 {user?.role === UserRole.SUPER_ADMIN && <Tab label="Costs" />}
               </Tabs>
@@ -930,17 +1189,27 @@ const ApplicationDetails = () => {
                           secondary={`Stage: ${doc.stage.replace(/_/g, ' ')}`}
                         />
                         <ListItemSecondaryAction>
-                          <FormControl size="small" sx={{ minWidth: 120 }}>
-                            <Select
-                              value={doc.status}
-                              onChange={(e) => handleUpdateDocumentStatus(doc.id, e.target.value as DocumentStatus)}
-                              sx={{ borderRadius: 2 }}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleUploadDocument(doc)}
+                              color="primary"
+                              title="Upload Document"
                             >
-                              <MenuItem value={DocumentStatus.PENDING}>Pending</MenuItem>
-                              <MenuItem value={DocumentStatus.RECEIVED}>Received</MenuItem>
-                              <MenuItem value={DocumentStatus.SUBMITTED}>Submitted</MenuItem>
-                            </Select>
-                          </FormControl>
+                              <CloudUploadIcon />
+                            </IconButton>
+                            <FormControl size="small" sx={{ minWidth: 120 }}>
+                              <Select
+                                value={doc.status}
+                                onChange={(e) => handleUpdateDocumentStatus(doc.id, e.target.value as DocumentStatus)}
+                                sx={{ borderRadius: 2 }}
+                              >
+                                <MenuItem value={DocumentStatus.PENDING}>Pending</MenuItem>
+                                <MenuItem value={DocumentStatus.RECEIVED}>Received</MenuItem>
+                                <MenuItem value={DocumentStatus.SUBMITTED}>Submitted</MenuItem>
+                              </Select>
+                            </FormControl>
+                          </Box>
                         </ListItemSecondaryAction>
                       </ListItem>
                     ))}
@@ -997,6 +1266,68 @@ const ApplicationDetails = () => {
               </TabPanel>
 
               <TabPanel value={tabValue} index={2}>
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Upload Documents
+                  </Typography>
+                  <FileUpload
+                    entityType="application"
+                    entityId={id!}
+                    fileType="document"
+                    maxFiles={10}
+                    maxSizeMB={10}
+                    onUploadComplete={handleFileUploadComplete}
+                    existingFiles={uploadedFiles}
+                  />
+                </Box>
+                
+                {uploadedFiles.length > 0 && (
+                  <Box>
+                    <Typography variant="h6" gutterBottom>
+                      Uploaded Documents ({uploadedFiles.length})
+                    </Typography>
+                    <List>
+                      {uploadedFiles
+                        .sort((a, b) => {
+                          // Sort submitted documents to the end, non-submitted to the top
+                          const aSubmitted = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0
+                          const bSubmitted = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0
+                          return aSubmitted - bSubmitted
+                        })
+                        .map((file) => (
+                        <ListItem 
+                          key={file.id}
+                          sx={{ 
+                            mb: 1,
+                            borderRadius: 2,
+                            bgcolor: 'action.hover',
+                            '&:hover': { bgcolor: 'action.selected' }
+                          }}
+                        >
+                          <ListItemIcon>
+                            <DocumentIcon />
+                          </ListItemIcon>
+                          <ListItemText
+                            primary={file.originalName}
+                            secondary={`Uploaded: ${new Date(file.uploadedAt).toLocaleDateString()} by ${file.uploadedBy || 'Unknown'}`}
+                          />
+                          <ListItemSecondaryAction>
+                            <IconButton 
+                              edge="end" 
+                              onClick={() => window.open(file.url, '_blank')}
+                              size="small"
+                            >
+                              <ViewIcon />
+                            </IconButton>
+                          </ListItemSecondaryAction>
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                )}
+              </TabPanel>
+
+              <TabPanel value={tabValue} index={3}>
                 <TableContainer>
                   <Table size="small">
                     <TableHead>
@@ -1029,7 +1360,7 @@ const ApplicationDetails = () => {
               </TabPanel>
 
               {user?.role === UserRole.SUPER_ADMIN && (
-                <TabPanel value={tabValue} index={3}>
+                <TabPanel value={tabValue} index={4}>
                   <TableContainer>
                     <Table size="small">
                       <TableHead>
@@ -1110,7 +1441,30 @@ const ApplicationDetails = () => {
                   )}
                 />
               </Grid>
-              <Grid item xs={12}>
+              <Grid item xs={12} md={6}>
+                <Controller
+                  name="paymentType"
+                  control={paymentForm.control}
+                  rules={{ required: 'Payment type is required' }}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      label="Payment Type"
+                      select
+                      error={!!paymentForm.formState.errors.paymentType}
+                      helperText={paymentForm.formState.errors.paymentType?.message as string}
+                    >
+                      {paymentTypes.map((type) => (
+                        <MenuItem key={type.id} value={type.id}>
+                          {type.name} {!type.isRefundable && '(Non-refundable)'}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  )}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
                 <Controller
                   name="currency"
                   control={paymentForm.control}
@@ -1338,6 +1692,67 @@ const ApplicationDetails = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+
+
+      {/* Edit Broker Dialog */}
+      <Dialog open={editBrokerDialog} onClose={() => setEditBrokerDialog(false)} maxWidth="sm" fullWidth>
+        <form onSubmit={brokerForm.handleSubmit(handleUpdateBroker)}>
+          <DialogTitle>Edit Broker</DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <Controller
+                  name="brokerId"
+                  control={brokerForm.control}
+                  defaultValue={application?.brokerId || ''}
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      fullWidth
+                      select
+                      label="Broker"
+                    >
+                      <MenuItem value="">No Broker</MenuItem>
+                      {brokers.map((broker) => (
+                        <MenuItem key={broker.id} value={broker.id}>
+                          {broker.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  )}
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setEditBrokerDialog(false)}>Cancel</Button>
+            <Button type="submit" variant="contained">Update Broker</Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      {/* Application Cancellation Dialog */}
+      {application && (
+        <ApplicationCancellationDialog
+          open={cancellationDialogOpen}
+          onClose={() => setCancellationDialogOpen(false)}
+          applicationId={application.id}
+          applicationStatus={application.status}
+          candidateName={`${application.candidate?.firstName} ${application.candidate?.lastName}`}
+          clientName={application.client?.name || ''}
+          onSuccess={() => {
+            setCancellationDialogOpen(false)
+            fetchApplicationDetails()
+            setSnackbarMessage('Application cancelled successfully')
+            setSnackbarOpen(true)
+          }}
+          onError={(error) => {
+            setSnackbarMessage(error)
+            setSnackbarOpen(true)
+          }}
+        />
+      )}
 
       {/* Snackbar for notifications */}
       <Snackbar

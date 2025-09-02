@@ -26,11 +26,25 @@ const Login = () => {
     setError('');
     setLoading(true);
 
+    console.log('📝 Login form submitted for:', formData.email);
+
     try {
       await login(formData);
+      console.log('🎉 Login successful, navigating to dashboard...');
       navigate('/dashboard');
     } catch (error: any) {
-      setError(error.response?.data?.error || 'Login failed. Please try again.');
+      const errorMessage = error.response?.data?.error || 'Login failed. Please try again.';
+      console.error('💥 Login error:', errorMessage);
+      setError(errorMessage);
+      
+      // Don't redirect on login errors - just show the error message
+      if (error.response?.status === 401) {
+        setError('Invalid email or password. Please try again.');
+      } else if (error.response?.status === 404) {
+        setError('Company not found. Please check your company name.');
+      } else if (error.code === 'ERR_NETWORK') {
+        setError('Cannot connect to server. Please check your connection.');
+      }
     } finally {
       setLoading(false);
     }

@@ -47,6 +47,11 @@ model Company {
   nationalities Nationality[]
   serviceTypes  ServiceType[]
   costTypes     CostTypeModel[]
+  guarantorChanges GuarantorChange[]
+  lifecycleHistory ApplicationLifecycleHistory[]
+  overheadCosts OfficeOverheadCost[]
+  cancellationSettings CancellationSetting[]
+  lawyerServiceSettings LawyerServiceSetting[]
 
   @@map("companies")
 }
@@ -65,6 +70,8 @@ model User {
   
   // Relations
   uploadedFiles File[]
+  lifecycleHistory ApplicationLifecycleHistory[]
+  overheadCosts OfficeOverheadCost[]
 
   @@index([companyId])
   @@map("users")
@@ -128,6 +135,7 @@ model Candidate {
   createdAt         DateTime         @default(now()) @map("created_at")
   updatedAt         DateTime         @updatedAt @map("updated_at")
   applications      Application[]
+  guarantorChanges  GuarantorChange[]
 
   @@index([status])
   @@index([nationality])
@@ -158,8 +166,11 @@ model Client {
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")
   applications     Application[]
+  guarantorChangeApplications Application[] @relation("GuarantorChange")
   payments         Payment[]
   documents        ClientDocument[]
+  fromGuarantorChanges GuarantorChange[] @relation("FromClient")
+  toGuarantorChanges GuarantorChange[] @relation("ToClient")
 
   @@index([companyId])
   @@map("clients")
@@ -167,30 +178,40 @@ model Client {
 
 // Application model - central entity linking Client, Candidate, and Process
 model Application {
-  id               String                  @id @default(uuid())
-  clientId         String                  @map("client_id")
-  client           Client                  @relation(fields: [clientId], references: [id])
-  candidateId      String                  @map("candidate_id")
-  candidate        Candidate               @relation(fields: [candidateId], references: [id])
-  status           ApplicationStatus
-  type             ApplicationType
-  brokerId         String?                 @map("broker_id")
-  broker           Broker?                 @relation(fields: [brokerId], references: [id])
-  permitExpiryDate DateTime?               @map("permit_expiry_date")
-  shareableLink    String                  @unique @map("shareable_link")
-  feeTemplateId    String?                 @map("fee_template_id")
-  feeTemplate      FeeTemplate?            @relation(fields: [feeTemplateId], references: [id])
-  finalFeeAmount   Decimal?                @map("final_fee_amount") @db.Decimal(10, 2)
-  companyId        String                  @map("company_id")
-  company          Company                 @relation(fields: [companyId], references: [id])
-  createdAt        DateTime                @default(now()) @map("created_at")
-  updatedAt        DateTime                @updatedAt @map("updated_at")
-  payments         Payment[]
-  costs            Cost[]
-  documentItems    DocumentChecklistItem[]
+  id                     String                  @id @default(uuid())
+  clientId               String                  @map("client_id")
+  client                 Client                  @relation(fields: [clientId], references: [id])
+  fromClientId           String?                 @map("from_client_id")
+  fromClient             Client?                 @relation("GuarantorChange", fields: [fromClientId], references: [id])
+  candidateId            String                  @map("candidate_id")
+  candidate              Candidate               @relation(fields: [candidateId], references: [id])
+  status                 ApplicationStatus
+  type                   ApplicationType
+  brokerId               String?                 @map("broker_id")
+  broker                 Broker?                 @relation(fields: [brokerId], references: [id])
+  permitExpiryDate       DateTime?               @map("permit_expiry_date")
+  exactArrivalDate       DateTime?               @map("exact_arrival_date")
+  shareableLink          String                  @unique @map("shareable_link")
+  feeTemplateId          String?                 @map("fee_template_id")
+  feeTemplate            FeeTemplate?            @relation(fields: [feeTemplateId], references: [id])
+  finalFeeAmount         Decimal?                @map("final_fee_amount") @db.Decimal(10, 2)
+  lawyerServiceRequested Boolean                 @default(false) @map("lawyer_service_requested")
+  lawyerFeeCost          Decimal?                @map("lawyer_fee_cost") @db.Decimal(10, 2)
+  lawyerFeeCharge        Decimal?                @map("lawyer_fee_charge") @db.Decimal(10, 2)
+  companyId              String                  @map("company_id")
+  company                Company                 @relation(fields: [companyId], references: [id])
+  createdAt              DateTime                @default(now()) @map("created_at")
+  updatedAt              DateTime                @updatedAt @map("updated_at")
+  payments               Payment[]
+  costs                  Cost[]
+  documentItems          DocumentChecklistItem[]
+  originalGuarantorChanges GuarantorChange[] @relation("OriginalApplication")
+  newGuarantorChanges    GuarantorChange[] @relation("NewApplication")
+  lifecycleHistory       ApplicationLifecycleHistory[]
 
   @@index([status])
   @@index([clientId])
+  @@index([fromClientId])
   @@index([candidateId])
   @@index([companyId])
   @@map("applications")
@@ -207,6 +228,9 @@ enum ApplicationStatus {
   ACTIVE_EMPLOYMENT
   CONTRACT_ENDED
   RENEWAL_PENDING
+  CANCELLED_PRE_ARRIVAL
+  CANCELLED_POST_ARRIVAL
+  CANCELLED_CANDIDATE
 }
 
 enum ApplicationType {
@@ -224,7 +248,9 @@ model Payment {
   amount        Decimal     @db.Decimal(10, 2)
   currency      String      @default("USD")
   paymentDate   DateTime    @default(now()) @map("payment_date")
+  paymentType   String      @default("FEE") @map("payment_type") // FEE, REFUND, PARTIAL_REFUND, etc.
   notes         String?
+  isRefundable  Boolean     @default(true) @map("is_refundable")
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
 
@@ -417,4 +443,129 @@ model CostTypeModel {
   @@unique([companyId, name])
   @@index([companyId])
   @@map("cost_types")
+}
+
+// GuarantorChange model for tracking guarantor changes
+model GuarantorChange {
+  id                    String      @id @default(uuid())
+  originalApplicationId String      @map("original_application_id")
+  originalApplication   Application @relation("OriginalApplication", fields: [originalApplicationId], references: [id])
+  newApplicationId      String?     @map("new_application_id")
+  newApplication        Application? @relation("NewApplication", fields: [newApplicationId], references: [id])
+  fromClientId          String      @map("from_client_id")
+  fromClient            Client      @relation("FromClient", fields: [fromClientId], references: [id])
+  toClientId            String      @map("to_client_id")
+  toClient              Client      @relation("ToClient", fields: [toClientId], references: [id])
+  candidateId           String      @map("candidate_id")
+  candidate             Candidate   @relation(fields: [candidateId], references: [id])
+  changeDate            DateTime    @default(now()) @map("change_date")
+  reason                String?     // Reason for the change
+  refundAmount          Decimal?    @db.Decimal(10, 2) @map("refund_amount")
+  refundCurrency        String      @default("USD") @map("refund_currency")
+  refundProcessed       Boolean     @default(false) @map("refund_processed")
+  refundProcessedDate   DateTime?   @map("refund_processed_date")
+  candidateStatusBefore String      @map("candidate_status_before")
+  candidateStatusAfter  String      @map("candidate_status_after")
+  notes                 String?
+  companyId             String      @map("company_id")
+  company               Company     @relation(fields: [companyId], references: [id])
+  createdAt             DateTime    @default(now()) @map("created_at")
+  updatedAt             DateTime    @updatedAt @map("updated_at")
+
+  @@index([originalApplicationId])
+  @@index([newApplicationId])
+  @@index([fromClientId])
+  @@index([toClientId])
+  @@index([candidateId])
+  @@index([companyId])
+  @@map("guarantor_changes")
+}
+
+// Application Lifecycle History model for tracking all application changes
+model ApplicationLifecycleHistory {
+  id                    String      @id @default(uuid())
+  applicationId         String      @map("application_id")
+  application           Application @relation(fields: [applicationId], references: [id])
+  action                String      // 'status_change', 'cancellation', 'guarantor_change', 'payment_added', etc.
+  fromStatus            String?     @map("from_status")
+  toStatus              String?     @map("to_status")
+  fromClientId          String?     @map("from_client_id")
+  toClientId            String?     @map("to_client_id")
+  candidateStatusBefore String?     @map("candidate_status_before")
+  candidateStatusAfter  String?     @map("candidate_status_after")
+  financialImpact       Json?       @map("financial_impact") // Store refund amounts, costs, etc.
+  notes                 String?
+  performedBy           String      @map("performed_by")
+  performer             User        @relation(fields: [performedBy], references: [id])
+  performedAt           DateTime    @default(now()) @map("performed_at")
+  companyId             String      @map("company_id")
+  company               Company     @relation(fields: [companyId], references: [id])
+
+  @@index([applicationId])
+  @@index([companyId])
+  @@index([performedBy])
+  @@map("application_lifecycle_history")
+}
+
+// Office Overhead Costs model for general business expenses
+model OfficeOverheadCost {
+  id                  String   @id @default(uuid())
+  name                String
+  description         String?
+  amount              Decimal  @db.Decimal(10, 2)
+  currency            String   @default("USD")
+  costDate            DateTime @default(now()) @map("cost_date")
+  category            String   // 'rent', 'utilities', 'salaries', 'equipment', 'marketing', etc.
+  recurring           Boolean  @default(false)
+  recurringFrequency  String?  @map("recurring_frequency") // 'monthly', 'quarterly', 'yearly'
+  companyId           String   @map("company_id")
+  company             Company  @relation(fields: [companyId], references: [id])
+  createdBy           String   @map("created_by")
+  creator             User     @relation(fields: [createdBy], references: [id])
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId])
+  @@index([category])
+  @@index([costDate])
+  @@map("office_overhead_costs")
+}
+
+// Cancellation Settings model for configurable cancellation policies
+model CancellationSetting {
+  id                  String   @id @default(uuid())
+  cancellationType    String   @map("cancellation_type") // 'pre_arrival', 'post_arrival_within_3_months', 'post_arrival_after_3_months', 'candidate_cancellation'
+  penaltyFee          Decimal  @default(0) @map("penalty_fee") @db.Decimal(10, 2)
+  refundPercentage    Decimal  @default(100) @map("refund_percentage") @db.Decimal(5, 2) // 0-100
+  nonRefundableFees   Json?    @map("non_refundable_fees") // Array of fee types that are non-refundable
+  monthlyServiceFee   Decimal  @default(0) @map("monthly_service_fee") @db.Decimal(10, 2)
+  maxRefundAmount     Decimal? @map("max_refund_amount") @db.Decimal(10, 2)
+  description         String?
+  active              Boolean  @default(true)
+  companyId           String   @map("company_id")
+  company             Company  @relation(fields: [companyId], references: [id])
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId, cancellationType])
+  @@index([companyId])
+  @@index([cancellationType])
+  @@map("cancellation_settings")
+}
+
+// Lawyer Service Settings model for configurable lawyer fees
+model LawyerServiceSetting {
+  id              String   @id @default(uuid())
+  lawyerFeeCost   Decimal  @map("lawyer_fee_cost") @db.Decimal(10, 2) // Actual cost to office
+  lawyerFeeCharge Decimal  @map("lawyer_fee_charge") @db.Decimal(10, 2) // What office charges client
+  description     String?
+  active          Boolean  @default(true)
+  companyId       String   @map("company_id")
+  company         Company  @relation(fields: [companyId], references: [id])
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId])
+  @@index([companyId])
+  @@map("lawyer_service_settings")
 }

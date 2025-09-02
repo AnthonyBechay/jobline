@@ -30,14 +30,18 @@ const Register = () => {
     e.preventDefault();
     setError('');
     
+    console.log('📝 Registration form submitted for company:', formData.companyName);
+    
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
+      console.warn('⚠️ Password validation failed: passwords do not match');
       setError('Passwords do not match');
       return;
     }
 
     // Validate password length
     if (formData.password.length < 6) {
+      console.warn('⚠️ Password validation failed: too short');
       setError('Password must be at least 6 characters long');
       return;
     }
@@ -45,6 +49,8 @@ const Register = () => {
     setLoading(true);
 
     try {
+      console.log('🏢 Creating new office and admin account...');
+      
       // Register company and super admin
       const response = await api.post('/auth/register', {
         companyName: formData.companyName,
@@ -56,15 +62,20 @@ const Register = () => {
         password: formData.password,
       });
 
+      console.log('✅ Registration successful for:', formData.companyName);
+      
       // Store token and redirect
       localStorage.setItem('token', response.data.token);
       
       setSuccess(true);
       setTimeout(() => {
+        console.log('🔄 Redirecting to dashboard...');
         window.location.href = '/dashboard'; // Force reload to update auth context
       }, 1500);
     } catch (error: any) {
-      setError(error.response?.data?.error || 'Registration failed. Please try again.');
+      const errorMessage = error.response?.data?.error || 'Registration failed. Please try again.';
+      console.error('💥 Registration error:', errorMessage);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

@@ -29,6 +29,10 @@ import costTypeRouter from './routes/costType.routes';
 import serviceTypeRouter from './routes/serviceType.routes';
 import candidatePdfRouter from './routes/candidatePdf.routes';
 import documentSearchRouter from './routes/documentSearch.routes';
+import guarantorChangeRouter from './routes/guarantorChange.routes';
+import applicationCancellationRouter from './routes/applicationCancellation.routes';
+import officeOverheadCostsRouter from './routes/officeOverheadCosts.routes';
+import businessSettingsRouter from './routes/businessSettings.routes';
 
 // Import middleware
 import { errorHandler } from './middleware/error.middleware';
@@ -119,6 +123,10 @@ app.use('/api/company', companyRouter);
 app.use('/api/cost-types', costTypeRouter);
 app.use('/api/service-types', serviceTypeRouter);
 app.use('/api/candidates/:id/export-pdf', candidatePdfRouter);
+app.use('/api/guarantor-changes', guarantorChangeRouter);
+app.use('/api/applications', applicationCancellationRouter);
+app.use('/api/office-overhead', officeOverheadCostsRouter);
+app.use('/api/business-settings', businessSettingsRouter);
 
 // Error handling middleware
 app.use(notFound);

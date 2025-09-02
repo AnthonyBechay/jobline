@@ -9,6 +9,27 @@ router.use(authenticate);
 // However, only Super Admin can see costs (handled in cost.routes.ts)
 router.use(adminOnly); // This already allows both ADMIN and SUPER_ADMIN
 
+// Get payment types (for dropdowns)
+router.get('/types', async (req: AuthRequest, res) => {
+  try {
+    // For now, return predefined payment types
+    // Later this can be made configurable through business settings
+    const paymentTypes = [
+      { id: 'fee', name: 'Application Fee', isRefundable: true },
+      { id: 'insurance', name: 'Insurance', isRefundable: false },
+      { id: 'visa', name: 'Visa Fee', isRefundable: false },
+      { id: 'medical', name: 'Medical Checkup', isRefundable: false },
+      { id: 'transport', name: 'Transportation', isRefundable: false },
+      { id: 'other', name: 'Other', isRefundable: true }
+    ];
+    
+    res.json(paymentTypes);
+  } catch (error) {
+    console.error('Failed to fetch payment types:', error);
+    res.status(500).json({ error: 'Failed to fetch payment types' });
+  }
+});
+
 // Get all payments
 router.get('/', async (req: AuthRequest, res) => {
   try {
