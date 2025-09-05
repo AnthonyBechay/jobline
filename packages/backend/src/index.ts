@@ -107,6 +107,7 @@ app.use('/api/candidates', candidateRouter);
 app.use('/api/documents', documentSearchRouter);
 app.use('/api/clients', clientRouter);
 app.use('/api/applications', applicationRouter);
+app.use('/api/cancellations', applicationCancellationRouter);
 app.use('/api/payments', paymentRouter);
 app.use('/api/costs', costRouter);
 app.use('/api/agents', agentRouter);
@@ -124,7 +125,6 @@ app.use('/api/cost-types', costTypeRouter);
 app.use('/api/service-types', serviceTypeRouter);
 app.use('/api/candidates/:id/export-pdf', candidatePdfRouter);
 app.use('/api/guarantor-changes', guarantorChangeRouter);
-app.use('/api/applications', applicationCancellationRouter);
 app.use('/api/office-overhead', officeOverheadCostsRouter);
 app.use('/api/business-settings', businessSettingsRouter);
 

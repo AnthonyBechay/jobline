@@ -191,6 +191,8 @@ model Application {
   broker                 Broker?                 @relation(fields: [brokerId], references: [id])
   permitExpiryDate       DateTime?               @map("permit_expiry_date")
   exactArrivalDate       DateTime?               @map("exact_arrival_date")
+  laborPermitDate        DateTime?               @map("labor_permit_date")
+  residencyPermitDate    DateTime?               @map("residency_permit_date")
   shareableLink          String                  @unique @map("shareable_link")
   feeTemplateId          String?                 @map("fee_template_id")
   feeTemplate            FeeTemplate?            @relation(fields: [feeTemplateId], references: [id])

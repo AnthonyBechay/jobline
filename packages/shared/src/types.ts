@@ -118,6 +118,9 @@ export interface Application {
   brokerId?: string;
   broker?: Broker;
   permitExpiryDate?: Date;
+  exactArrivalDate?: Date;
+  laborPermitDate?: Date;
+  residencyPermitDate?: Date;
   shareableLink: string;
   feeTemplateId?: string;
   feeTemplate?: FeeTemplate;

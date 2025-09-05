@@ -142,13 +142,15 @@ router.patch('/:id/status',
     param('id').isUUID(),
     body('status').isString(),
     body('exactArrivalDate').optional().isISO8601(),
+    body('laborPermitDate').optional().isISO8601(),
+    body('residencyPermitDate').optional().isISO8601(),
     body('notes').optional().isString().trim()
   ],
   validate,
   async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
-      const { status, exactArrivalDate, notes } = req.body;
+      const { status, exactArrivalDate, laborPermitDate, residencyPermitDate, notes } = req.body;
       const companyId = req.user!.companyId;
       const performedBy = req.user!.id;
 
@@ -189,6 +191,12 @@ router.patch('/:id/status',
       const updateData: any = { status };
       if (exactArrivalDate) {
         updateData.exactArrivalDate = new Date(exactArrivalDate);
+      }
+      if (laborPermitDate) {
+        updateData.laborPermitDate = new Date(laborPermitDate);
+      }
+      if (residencyPermitDate) {
+        updateData.residencyPermitDate = new Date(residencyPermitDate);
       }
 
       const updatedApplication = await prisma.application.update({

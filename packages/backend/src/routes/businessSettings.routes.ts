@@ -210,7 +210,54 @@ router.post('/cancellation',
   }
 );
 
-// Delete cancellation setting
+// Update cancellation setting
+router.put('/cancellation/:id',
+  [
+    param('id').isUUID().withMessage('Valid ID required'),
+    body('penaltyFee').optional().isFloat({ min: 0 }).withMessage('Penalty fee must be a positive number'),
+    body('refundPercentage').optional().isFloat({ min: 0, max: 100 }).withMessage('Refund percentage must be between 0 and 100'),
+    body('nonRefundableFees').optional().isArray().withMessage('Non-refundable fees must be an array'),
+    body('monthlyServiceFee').optional().isFloat({ min: 0 }).withMessage('Monthly service fee must be a positive number'),
+    body('maxRefundAmount').optional().isFloat({ min: 0 }),
+    body('description').optional().trim(),
+    body('active').optional().isBoolean()
+  ],
+  validate,
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const companyId = req.user!.companyId;
+      const updateData = req.body;
+
+      // Find the setting by ID and ensure it belongs to the company
+      const existingSetting = await prisma.cancellationSetting.findFirst({
+        where: { 
+          id,
+          companyId
+        }
+      });
+
+      if (!existingSetting) {
+        res.status(404).json({ error: 'Cancellation setting not found' });
+        return;
+      }
+
+      // Update the setting
+      const updatedSetting = await prisma.cancellationSetting.update({
+        where: { id },
+        data: updateData
+      });
+
+      console.log('✅ Cancellation setting updated:', updatedSetting.cancellationType);
+      res.json(updatedSetting);
+    } catch (error) {
+      console.error('❌ Update cancellation setting error:', error);
+      res.status(500).json({ error: 'Failed to update cancellation setting' });
+    }
+  }
+);
+
+// Delete cancellation setting by type
 router.delete('/cancellation/:type',
   [
     param('type').isIn(['pre_arrival', 'post_arrival_within_3_months', 'post_arrival_after_3_months', 'candidate_cancellation'])

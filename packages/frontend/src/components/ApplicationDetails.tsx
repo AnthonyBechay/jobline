@@ -100,6 +100,7 @@ import { useAuth } from '../contexts/AuthContext'
 import api from '../services/api'
 import FileUpload, { UploadedFile } from './FileUpload'
 import ApplicationCancellationDialog from './ApplicationCancellationDialog'
+import ApplicationActionDialog from './ApplicationActionDialog'
 
 // Status workflow mapping with enhanced styling
 const statusWorkflow = {
@@ -231,6 +232,13 @@ const ApplicationDetails = () => {
   const [editCandidateDialog, setEditCandidateDialog] = useState(false)
   const [editBrokerDialog, setEditBrokerDialog] = useState(false)
   const [cancellationDialogOpen, setCancellationDialogOpen] = useState(false)
+  const [applicationActionDialogOpen, setApplicationActionDialogOpen] = useState(false)
+  const [arrivalDateDialog, setArrivalDateDialog] = useState(false)
+  const [arrivalDate, setArrivalDate] = useState('')
+  const [laborPermitDateDialog, setLaborPermitDateDialog] = useState(false)
+  const [laborPermitDate, setLaborPermitDate] = useState('')
+  const [residencyPermitDateDialog, setResidencyPermitDateDialog] = useState(false)
+  const [residencyPermitDate, setResidencyPermitDate] = useState('')
   const [validationError, setValidationError] = useState<string>('')
   
   // Form controls for dialogs
@@ -420,6 +428,28 @@ const ApplicationDetails = () => {
   const handleUpdateApplicationStatus = async (newStatus: ApplicationStatus) => {
     try {
       setValidationError('')
+      
+      // Check if moving to WORKER_ARRIVED status
+      if (newStatus === ApplicationStatus.WORKER_ARRIVED) {
+        setUpdateStatusDialog(false)
+        setArrivalDateDialog(true)
+        return
+      }
+      
+      // Check if moving to LABOUR_PERMIT_PROCESSING status
+      if (newStatus === ApplicationStatus.LABOUR_PERMIT_PROCESSING) {
+        setUpdateStatusDialog(false)
+        setLaborPermitDateDialog(true)
+        return
+      }
+      
+      // Check if moving to RESIDENCY_PERMIT_PROCESSING status
+      if (newStatus === ApplicationStatus.RESIDENCY_PERMIT_PROCESSING) {
+        setUpdateStatusDialog(false)
+        setResidencyPermitDateDialog(true)
+        return
+      }
+      
       await api.patch(`/applications/${id}`, { status: newStatus })
       setUpdateStatusDialog(false)
       await fetchApplicationDetails()
@@ -438,6 +468,72 @@ const ApplicationDetails = () => {
       } else {
         setError(err.response?.data?.error || 'Failed to update status')
       }
+    }
+  }
+
+  const handleConfirmArrivalDate = async () => {
+    if (!arrivalDate) {
+      setSnackbarMessage('Please select an arrival date')
+      setSnackbarOpen(true)
+      return
+    }
+    
+    try {
+      await api.patch(`/applications/${id}/status`, {
+        status: ApplicationStatus.WORKER_ARRIVED,
+        exactArrivalDate: arrivalDate
+      })
+      setArrivalDateDialog(false)
+      setArrivalDate('')
+      await fetchApplicationDetails()
+      setSnackbarMessage('Application status updated with arrival date')
+      setSnackbarOpen(true)
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to update status')
+    }
+  }
+
+  const handleConfirmLaborPermitDate = async () => {
+    if (!laborPermitDate) {
+      setSnackbarMessage('Please select a labor permit date')
+      setSnackbarOpen(true)
+      return
+    }
+    
+    try {
+      await api.patch(`/applications/${id}/status`, {
+        status: ApplicationStatus.LABOUR_PERMIT_PROCESSING,
+        laborPermitDate: laborPermitDate
+      })
+      setLaborPermitDateDialog(false)
+      setLaborPermitDate('')
+      await fetchApplicationDetails()
+      setSnackbarMessage('Application status updated with labor permit date')
+      setSnackbarOpen(true)
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to update status')
+    }
+  }
+
+  const handleConfirmResidencyPermitDate = async () => {
+    if (!residencyPermitDate) {
+      setSnackbarMessage('Please select a residency permit date')
+      setSnackbarOpen(true)
+      return
+    }
+    
+    try {
+      await api.patch(`/applications/${id}/status`, {
+        status: ApplicationStatus.RESIDENCY_PERMIT_PROCESSING,
+        residencyPermitDate: residencyPermitDate
+      })
+      setResidencyPermitDateDialog(false)
+      setResidencyPermitDate('')
+      await fetchApplicationDetails()
+      setSnackbarMessage('Application status updated with residency permit date')
+      setSnackbarOpen(true)
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to update status')
     }
   }
 
@@ -659,6 +755,18 @@ const ApplicationDetails = () => {
             </Typography>
           </Box>
           <Stack direction="row" spacing={2}>
+            {application && !['CONTRACT_ENDED', 'CANCELLED_PRE_ARRIVAL', 'CANCELLED_POST_ARRIVAL', 'CANCELLED_CANDIDATE'].includes(application.status) && (
+              <Button
+                size="small"
+                variant="outlined"
+                color="warning"
+                startIcon={<SwapHorizIcon />}
+                onClick={() => setCancellationDialogOpen(true)}
+                sx={{ borderRadius: 2 }}
+              >
+                Cancel/Change
+              </Button>
+            )}
             <Tooltip title="Download Application PDF">
               <Button
                 variant="outlined"
@@ -678,18 +786,6 @@ const ApplicationDetails = () => {
                 Copy Link
               </Button>
             </Tooltip>
-            {application?.status === ApplicationStatus.ACTIVE_EMPLOYMENT && (
-              <Tooltip title="Process guarantor change">
-                <Button
-                  variant="outlined"
-                  color="warning"
-                  startIcon={<SwapHorizIcon />}
-                  onClick={() => {/* Removed guarantor change functionality */}}
-                >
-                  Guarantor Change
-                </Button>
-              </Tooltip>
-            )}
             <Button 
               variant="contained" 
               onClick={() => navigate('/applications')}
@@ -1049,17 +1145,6 @@ const ApplicationDetails = () => {
                       sx={{ borderRadius: 2 }}
                     >
                       Add Cost
-                    </Button>
-                  )}
-                  {application && !['CONTRACT_ENDED', 'CANCELLED_PRE_ARRIVAL', 'CANCELLED_POST_ARRIVAL', 'CANCELLED_CANDIDATE'].includes(application.status) && (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      color="error"
-                      onClick={() => setCancellationDialogOpen(true)}
-                      sx={{ borderRadius: 2 }}
-                    >
-                      Cancel Application
                     </Button>
                   )}
                 </Stack>
@@ -1741,10 +1826,10 @@ const ApplicationDetails = () => {
           applicationStatus={application.status}
           candidateName={`${application.candidate?.firstName} ${application.candidate?.lastName}`}
           clientName={application.client?.name || ''}
-          onSuccess={() => {
+          onSuccess={(message) => {
             setCancellationDialogOpen(false)
             fetchApplicationDetails()
-            setSnackbarMessage('Application cancelled successfully')
+            setSnackbarMessage(message || 'Application cancelled successfully')
             setSnackbarOpen(true)
           }}
           onError={(error) => {
@@ -1753,6 +1838,163 @@ const ApplicationDetails = () => {
           }}
         />
       )}
+
+      {/* Application Action Dialog */}
+      {application && (
+        <ApplicationActionDialog
+          open={applicationActionDialogOpen}
+          onClose={() => setApplicationActionDialogOpen(false)}
+          applicationId={application.id}
+          candidateName={`${application.candidate?.firstName} ${application.candidate?.lastName}`}
+          currentClientName={application.client?.name || ''}
+          applicationStatus={application.status}
+          onSuccess={(message) => {
+            setApplicationActionDialogOpen(false)
+            fetchApplicationDetails()
+            setSnackbarMessage(message || 'Action processed successfully')
+            setSnackbarOpen(true)
+          }}
+          onError={(error) => {
+            setSnackbarMessage(error)
+            setSnackbarOpen(true)
+          }}
+        />
+      )}
+
+      {/* Arrival Date Dialog */}
+      <Dialog open={arrivalDateDialog} onClose={() => setArrivalDateDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box display="flex" alignItems="center">
+            <FlightIcon sx={{ mr: 1, color: 'primary.main' }} />
+            Enter Exact Arrival Date
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Please enter the exact arrival date from the candidate's passport stamp.
+            This date is important for calculating probation periods and refunds.
+          </Alert>
+          <TextField
+            type="date"
+            label="Arrival Date"
+            value={arrivalDate}
+            onChange={(e) => setArrivalDate(e.target.value)}
+            fullWidth
+            InputLabelProps={{ shrink: true }}
+            required
+            sx={{ mt: 2 }}
+            inputProps={{
+              max: new Date().toISOString().split('T')[0] // Can't be future date
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setArrivalDateDialog(false)
+            setArrivalDate('')
+          }}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConfirmArrivalDate}
+            variant="contained"
+            disabled={!arrivalDate}
+            startIcon={<CheckIcon />}
+          >
+            Confirm Arrival
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Labor Permit Date Dialog */}
+      <Dialog open={laborPermitDateDialog} onClose={() => setLaborPermitDateDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box display="flex" alignItems="center">
+            <DocumentIcon sx={{ mr: 1, color: 'primary.main' }} />
+            Enter Labor Permit Date
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Please enter the exact date when the labor permit was issued.
+            This date is important for tracking permit validity and renewal schedules.
+          </Alert>
+          <TextField
+            type="date"
+            label="Labor Permit Date"
+            value={laborPermitDate}
+            onChange={(e) => setLaborPermitDate(e.target.value)}
+            fullWidth
+            InputLabelProps={{ shrink: true }}
+            required
+            sx={{ mt: 2 }}
+            inputProps={{
+              max: new Date().toISOString().split('T')[0] // Can't be future date
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setLaborPermitDateDialog(false)
+            setLaborPermitDate('')
+          }}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConfirmLaborPermitDate}
+            variant="contained"
+            disabled={!laborPermitDate}
+            startIcon={<CheckIcon />}
+          >
+            Confirm Labor Permit Date
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Residency Permit Date Dialog */}
+      <Dialog open={residencyPermitDateDialog} onClose={() => setResidencyPermitDateDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box display="flex" alignItems="center">
+            <DocumentIcon sx={{ mr: 1, color: 'primary.main' }} />
+            Enter Residency Permit Date
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Please enter the exact date when the residency permit was issued.
+            This date is important for tracking permit validity and renewal schedules.
+          </Alert>
+          <TextField
+            type="date"
+            label="Residency Permit Date"
+            value={residencyPermitDate}
+            onChange={(e) => setResidencyPermitDate(e.target.value)}
+            fullWidth
+            InputLabelProps={{ shrink: true }}
+            required
+            sx={{ mt: 2 }}
+            inputProps={{
+              max: new Date().toISOString().split('T')[0] // Can't be future date
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setResidencyPermitDateDialog(false)
+            setResidencyPermitDate('')
+          }}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConfirmResidencyPermitDate}
+            variant="contained"
+            disabled={!residencyPermitDate}
+            startIcon={<CheckIcon />}
+          >
+            Confirm Residency Permit Date
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Snackbar for notifications */}
       <Snackbar

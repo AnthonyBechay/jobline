@@ -202,12 +202,19 @@ const filterPresets: Record<string, {
       ApplicationStatus.VISA_RECEIVED,
     ],
   },
-  'paperwork': {
-    label: 'Paperwork in Progress',
-    icon: <PaperworkIcon />,
-    description: 'Workers arrived, processing documents',
+  'arrived': {
+    label: 'Arrived',
+    icon: <ArrivalIcon />,
+    description: 'Workers who have arrived',
     statuses: [
       ApplicationStatus.WORKER_ARRIVED,
+    ],
+  },
+  'paperwork': {
+    label: 'Paperwork has started',
+    icon: <PaperworkIcon />,
+    description: 'Processing documents and permits',
+    statuses: [
       ApplicationStatus.LABOUR_PERMIT_PROCESSING,
       ApplicationStatus.RESIDENCY_PERMIT_PROCESSING,
     ],
@@ -223,24 +230,6 @@ const filterPresets: Record<string, {
     dateFilter: { days: 30 } // Last 30 days by default
   },
 
-  'all': {
-    label: 'All Active Applications',
-    icon: <ListIcon />,
-    description: 'View all active applications (excluding cancelled)',
-    statuses: [
-      ApplicationStatus.PENDING_MOL,
-      ApplicationStatus.MOL_AUTH_RECEIVED,
-      ApplicationStatus.VISA_PROCESSING,
-      ApplicationStatus.VISA_RECEIVED,
-      ApplicationStatus.WORKER_ARRIVED,
-      ApplicationStatus.LABOUR_PERMIT_PROCESSING,
-      ApplicationStatus.RESIDENCY_PERMIT_PROCESSING,
-      ApplicationStatus.ACTIVE_EMPLOYMENT,
-      ApplicationStatus.CONTRACT_ENDED,
-      ApplicationStatus.RENEWAL_PENDING,
-    ],
-    dateFilter: { days: 30 } // Last 30 days by default
-  },
 }
 
 // Application Card Component
@@ -359,9 +348,6 @@ const ApplicationList = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [filterPreset, setFilterPreset] = useState<string>('pre-arrival') // Default filter
-  const [statusFilter, setStatusFilter] = useState<ApplicationStatus | ''>('')
-  const [typeFilter, setTypeFilter] = useState<ApplicationType | ''>('')
-  const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(12)
@@ -387,12 +373,6 @@ const ApplicationList = () => {
     }
   }, [filterPreset, page, pageSize])
 
-  useEffect(() => {
-    if (statusFilter || typeFilter || searchQuery) {
-      setFilterPreset('custom')
-      fetchApplications()
-    }
-  }, [statusFilter, typeFilter, searchQuery])
 
   const fetchApplicationsWithPreset = async (statuses: ApplicationStatus[], dateFilter?: { days: number }) => {
     try {
@@ -431,31 +411,6 @@ const ApplicationList = () => {
     }
   }
 
-  const fetchApplications = async () => {
-    try {
-      if (!isChangingFilter) {
-        setLoading(true)
-      }
-      const params = new URLSearchParams()
-      params.append('page', (page + 1).toString())
-      params.append('limit', pageSize.toString())
-      if (statusFilter) params.append('status', statusFilter)
-      if (typeFilter) params.append('type', typeFilter)
-      if (searchQuery) params.append('search', searchQuery)
-
-      const response = await api.get<any>(`/applications?${params}`)
-      const applications = response.data.applications || response.data.data || []
-      const pagination = response.data.pagination || { total: 0 }
-      
-      setApplications(applications)
-      setTotalRows(pagination.total)
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to fetch applications')
-    } finally {
-      setLoading(false)
-      setIsChangingFilter(false)
-    }
-  }
 
   const handleCopyLink = (shareableLink: string) => {
     const fullUrl = `${window.location.origin}/status/${shareableLink}`
@@ -467,9 +422,6 @@ const ApplicationList = () => {
   const handlePresetChange = (preset: string) => {
     setIsChangingFilter(true)
     setFilterPreset(preset)
-    setStatusFilter('')
-    setTypeFilter('')
-    setSearchQuery('')
     setPage(0)
   }
 
@@ -574,14 +526,27 @@ const ApplicationList = () => {
               Manage all recruitment applications
             </Typography>
           </Box>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => navigate('/applications/new')}
-            sx={{ borderRadius: 2 }}
-          >
-            New Application
-          </Button>
+          <Stack direction="row" spacing={2}>
+            <Button
+              variant="outlined"
+              startIcon={<SearchIcon />}
+              onClick={() => {
+                // TODO: Navigate to history search page
+                console.log('Navigate to history search')
+              }}
+              sx={{ borderRadius: 2 }}
+            >
+              History Search
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => navigate('/applications/new')}
+              sx={{ borderRadius: 2 }}
+            >
+              New Application
+            </Button>
+          </Stack>
         </Box>
       </Paper>
 
@@ -680,78 +645,22 @@ const ApplicationList = () => {
         </Button>
       </Box>
 
-      {/* Advanced Filters & Search */}
-      <Paper sx={{ p: 2, mb: 3, borderRadius: 2 }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={3}>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="Search applications..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Status Filter</InputLabel>
-              <Select
-                value={statusFilter}
-                label="Status Filter"
-                onChange={(e) => setStatusFilter(e.target.value as ApplicationStatus | '')}
-              >
-                <MenuItem value="">All Statuses</MenuItem>
-                {Object.values(ApplicationStatus).map((status) => (
-                  <MenuItem key={status} value={status}>
-                    {statusWorkflow[status]?.label || status.replace(/_/g, ' ')}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Type Filter</InputLabel>
-              <Select
-                value={typeFilter}
-                label="Type Filter"
-                onChange={(e) => setTypeFilter(e.target.value as ApplicationType | '')}
-              >
-                <MenuItem value="">All Types</MenuItem>
-                {Object.values(ApplicationType).map((type) => (
-                  <MenuItem key={type} value={type}>
-                    {type.replace(/_/g, ' ')}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <Box display="flex" justifyContent="flex-end" gap={1}>
-              <ToggleButtonGroup
-                value={viewMode}
-                exclusive
-                onChange={(e, newMode) => newMode && setViewMode(newMode)}
-                size="small"
-              >
-                <ToggleButton value="grid">
-                  <CardIcon />
-                </ToggleButton>
-                <ToggleButton value="list">
-                  <ListIcon />
-                </ToggleButton>
-              </ToggleButtonGroup>
-            </Box>
-          </Grid>
-        </Grid>
-      </Paper>
+      {/* View Mode Toggle */}
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-end' }}>
+        <ToggleButtonGroup
+          value={viewMode}
+          exclusive
+          onChange={(e, newMode) => newMode && setViewMode(newMode)}
+          size="small"
+        >
+          <ToggleButton value="grid">
+            <CardIcon />
+          </ToggleButton>
+          <ToggleButton value="list">
+            <ListIcon />
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
 
       {/* Applications Display */}
       {loading && !isChangingFilter ? (
@@ -824,6 +733,7 @@ const ApplicationForm = () => {
   const [feeTemplates, setFeeTemplates] = useState<any[]>([])
   const [clientSearchTerm, setClientSearchTerm] = useState('')
   const [fromClientSearchTerm, setFromClientSearchTerm] = useState('')
+  const [candidateSearchTerm, setCandidateSearchTerm] = useState('')
   const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<any>({
     defaultValues: {
       createdAt: new Date().toISOString().split('T')[0], // Default to today
@@ -831,8 +741,12 @@ const ApplicationForm = () => {
     }
   })
 
-  const selectedType = watch('type')
   const selectedCandidateId = watch('candidateId')
+  const selectedClientId = watch('clientId')
+  
+  // Auto-determine application type based on candidate status and previous applications
+  const [applicationType, setApplicationType] = useState<ApplicationType>(ApplicationType.NEW_CANDIDATE)
+  const [candidatePreviousApplications, setCandidatePreviousApplications] = useState<any[]>([])
 
   useEffect(() => {
     fetchData()
@@ -847,6 +761,53 @@ const ApplicationForm = () => {
       }
     }
   }, [selectedCandidateId, candidates])
+
+  useEffect(() => {
+    // Auto-determine application type when candidate is selected
+    if (selectedCandidateId) {
+      determineApplicationType(selectedCandidateId)
+    }
+  }, [selectedCandidateId])
+
+  const determineApplicationType = async (candidateId: string) => {
+    try {
+      // Fetch candidate's previous applications
+      const response = await api.get(`/candidates/${candidateId}/applications`)
+      const previousApplications = response.data || []
+      setCandidatePreviousApplications(previousApplications)
+      
+      // Find the candidate
+      const candidate = [...candidates, ...availableInLebanonCandidates].find(c => c.id === candidateId)
+      
+      if (!candidate) return
+      
+      // Determine type based on candidate status and previous applications
+      if (candidate.status === CandidateStatus.AVAILABLE_IN_LEBANON && previousApplications.length > 0) {
+        // Candidate is in Lebanon and has previous applications - this is a guarantor change
+        setApplicationType(ApplicationType.GUARANTOR_CHANGE)
+        setValue('type', ApplicationType.GUARANTOR_CHANGE)
+        
+        // Auto-populate the "From Client" field with the most recent application's client
+        const mostRecentApplication = previousApplications[0] // Assuming they're sorted by date
+        if (mostRecentApplication?.clientId) {
+          setValue('fromClientId', mostRecentApplication.clientId)
+        }
+      } else if (candidate.status === CandidateStatus.AVAILABLE_ABROAD) {
+        // Candidate is abroad - this is a new application
+        setApplicationType(ApplicationType.NEW_CANDIDATE)
+        setValue('type', ApplicationType.NEW_CANDIDATE)
+      } else {
+        // Default to new candidate
+        setApplicationType(ApplicationType.NEW_CANDIDATE)
+        setValue('type', ApplicationType.NEW_CANDIDATE)
+      }
+    } catch (error) {
+      console.error('Failed to determine application type:', error)
+      // Default to new candidate on error
+      setApplicationType(ApplicationType.NEW_CANDIDATE)
+      setValue('type', ApplicationType.NEW_CANDIDATE)
+    }
+  }
 
   const fetchData = async () => {
     try {
@@ -899,9 +860,10 @@ const ApplicationForm = () => {
   const onSubmit = async (data: any) => {
     try {
       setLoading(true)
-      // Clean up data before sending
+      // Clean up data before sending and include auto-determined type
       const cleanData = {
         ...data,
+        type: applicationType, // Use auto-determined type
         brokerId: data.brokerId || null, // Convert empty string to null
       }
       const response = await api.post('/applications', cleanData)
@@ -927,6 +889,50 @@ const ApplicationForm = () => {
       <Paper sx={{ p: 3 }}>
         <form onSubmit={handleSubmit(onSubmit)}>
           <Grid container spacing={3}>
+            {/* Application Type Display */}
+            <Grid item xs={12}>
+              <Alert severity="info" sx={{ borderRadius: 2 }}>
+                <Typography variant="subtitle2" fontWeight="bold">
+                  Application Type: {applicationType === ApplicationType.NEW_CANDIDATE ? 'New Application' : 'Guarantor Change'}
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  {applicationType === ApplicationType.NEW_CANDIDATE 
+                    ? 'This will create a new application for a candidate from abroad.'
+                    : 'This will create a guarantor change process for a candidate already in Lebanon.'}
+                </Typography>
+              </Alert>
+            </Grid>
+
+            {/* Conditional Paperwork Information for Guarantor Change */}
+            {applicationType === ApplicationType.GUARANTOR_CHANGE && (
+              <Grid item xs={12}>
+                <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                  <Typography variant="subtitle2" fontWeight="bold">
+                    Conditional Paperwork Requirements
+                  </Typography>
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    The paperwork requirements will be determined based on the original application's completion status:
+                  </Typography>
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="body2" fontWeight="medium">
+                      If original paperwork was NOT completed:
+                    </Typography>
+                    <Typography variant="body2" sx={{ ml: 2, mt: 0.5 }}>
+                      • The new client's application must include the remaining standard steps PLUS new transfer steps before the others: Relinquish, Commitment, Transfer of Sponsorship, Certificate of Deposit.
+                    </Typography>
+                  </Box>
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="body2" fontWeight="medium">
+                      If original paperwork WAS completed:
+                    </Typography>
+                    <Typography variant="body2" sx={{ ml: 2, mt: 0.5 }}>
+                      • The new client's application only requires the transfer steps: Relinquish, Commitment, Transfer of Sponsorship, Certificate of Deposit.
+                    </Typography>
+                  </Box>
+                </Alert>
+              </Grid>
+            )}
+            
             {/* Date Field */}
             <Grid item xs={12} md={6}>
               <Controller
@@ -945,44 +951,29 @@ const ApplicationForm = () => {
               />
             </Grid>
             
-            {/* Application Type */}
-            <Grid item xs={12} md={6}>
-              <Controller
-                name="type"
-                control={control}
-                rules={{ required: 'Application type is required' }}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    fullWidth
-                    select
-                    label="Application Type"
-                    error={!!errors.type}
-                    helperText={errors.type?.message as string}
-                  >
-                    {Object.values(ApplicationType).map((type) => (
-                      <MenuItem key={type} value={type}>
-                        {type.replace(/_/g, ' ')}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                )}
-              />
-            </Grid>
             
-            {/* Client Selection - For New Candidate or To Client for Guarantor Change */}
-            <Grid item xs={12} md={selectedType === ApplicationType.GUARANTOR_CHANGE ? 6 : 12}>
+            {/* Client Selection - Auto-determined based on application type */}
+            <Grid item xs={12} md={applicationType === ApplicationType.GUARANTOR_CHANGE ? 6 : 12}>
+              <TextField
+                fullWidth
+                placeholder="Search clients..."
+                value={clientSearchTerm}
+                onChange={(e) => setClientSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                }}
+                sx={{ mb: 1 }}
+              />
               <Controller
                 name="clientId"
                 control={control}
-                rules={{ required: selectedType === ApplicationType.GUARANTOR_CHANGE ? 'To Client is required' : 'Client is required' }}
+                rules={{ required: applicationType === ApplicationType.GUARANTOR_CHANGE ? 'To Client is required' : 'Client is required' }}
                 render={({ field }) => (
                   <TextField
                     {...field}
                     fullWidth
                     select
-                    label={selectedType === ApplicationType.GUARANTOR_CHANGE ? "To Client (New Guarantor)" : "Client"}
-                    placeholder="Type to search..."
+                    label={applicationType === ApplicationType.GUARANTOR_CHANGE ? "To Client (New Guarantor)" : "Client"}
                     value={field.value || ''}
                     onChange={(e) => {
                       field.onChange(e.target.value)
@@ -995,7 +986,7 @@ const ApplicationForm = () => {
                       renderValue: (value) => {
                         if (!value) return ''
                         const client = clients.find(c => c.id === value)
-                        return client ? client.name : ''
+                        return client ? `${client.name} ${client.surname || ''}`.trim() : ''
                       }
                     }}
                   >
@@ -1005,11 +996,11 @@ const ApplicationForm = () => {
                     {clients
                       .filter(client => 
                         !clientSearchTerm || 
-                        client.name.toLowerCase().includes(clientSearchTerm.toLowerCase())
+                        `${client.name} ${client.surname || ''}`.toLowerCase().includes(clientSearchTerm.toLowerCase())
                       )
                       .map((client) => (
                         <MenuItem key={client.id} value={client.id}>
-                          {client.name}
+                          {client.name} {client.surname || ''}
                         </MenuItem>
                       ))}
                   </TextField>
@@ -1018,8 +1009,18 @@ const ApplicationForm = () => {
             </Grid>
             
             {/* From Client - Only for Guarantor Change */}
-            {selectedType === ApplicationType.GUARANTOR_CHANGE && (
+            {applicationType === ApplicationType.GUARANTOR_CHANGE && (
               <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  placeholder="Search clients..."
+                  value={fromClientSearchTerm}
+                  onChange={(e) => setFromClientSearchTerm(e.target.value)}
+                  InputProps={{
+                    startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                  }}
+                  sx={{ mb: 1 }}
+                />
                 <Controller
                   name="fromClientId"
                   control={control}
@@ -1030,7 +1031,6 @@ const ApplicationForm = () => {
                       fullWidth
                       select
                       label="From Client (Previous Guarantor)"
-                      placeholder="Type to search..."
                       value={field.value || ''}
                       onChange={(e) => {
                         field.onChange(e.target.value)
@@ -1043,7 +1043,7 @@ const ApplicationForm = () => {
                         renderValue: (value) => {
                           if (!value) return ''
                           const client = clients.find(c => c.id === value)
-                          return client ? client.name : ''
+                          return client ? `${client.name} ${client.surname || ''}`.trim() : ''
                         }
                       }}
                     >
@@ -1053,11 +1053,11 @@ const ApplicationForm = () => {
                       {clients
                         .filter(client => 
                           !fromClientSearchTerm || 
-                          client.name.toLowerCase().includes(fromClientSearchTerm.toLowerCase())
+                          `${client.name} ${client.surname || ''}`.toLowerCase().includes(fromClientSearchTerm.toLowerCase())
                         )
                         .map((client) => (
                           <MenuItem key={client.id} value={client.id}>
-                            {client.name}
+                            {client.name} {client.surname || ''}
                           </MenuItem>
                         ))}
                     </TextField>
@@ -1068,12 +1068,22 @@ const ApplicationForm = () => {
             
             {/* Candidate Selection */}
             <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                placeholder="Search candidates..."
+                value={candidateSearchTerm}
+                onChange={(e) => setCandidateSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                }}
+                sx={{ mb: 1 }}
+              />
               <Controller
                 name="candidateId"
                 control={control}
                 rules={{ required: 'Candidate is required' }}
                 render={({ field }) => {
-                  const candidateList = selectedType === ApplicationType.GUARANTOR_CHANGE 
+                  const candidateList = applicationType === ApplicationType.GUARANTOR_CHANGE 
                     ? availableInLebanonCandidates 
                     : candidates
                   
@@ -1082,18 +1092,36 @@ const ApplicationForm = () => {
                       {...field}
                       fullWidth
                       select
-                      label={selectedType === ApplicationType.GUARANTOR_CHANGE 
+                      label={applicationType === ApplicationType.GUARANTOR_CHANGE 
                         ? "Candidate (Available in Lebanon)" 
                         : "Candidate"}
+                      value={field.value || ''}
+                      onChange={(e) => {
+                        field.onChange(e.target.value)
+                        setCandidateSearchTerm('')
+                      }}
                       error={!!errors.candidateId}
                       helperText={errors.candidateId?.message as string}
+                      SelectProps={{
+                        displayEmpty: true,
+                        renderValue: (value) => {
+                          if (!value) return ''
+                          const candidate = candidateList.find(c => c.id === value)
+                          return candidate ? `${candidate.firstName} ${candidate.lastName} - ${candidate.nationality}` : ''
+                        }
+                      }}
                     >
                       <MenuItem value="">Select a candidate</MenuItem>
-                      {candidateList.map((candidate) => (
-                        <MenuItem key={candidate.id} value={candidate.id}>
-                          {candidate.firstName} {candidate.lastName} - {candidate.nationality}
-                        </MenuItem>
-                      ))}
+                      {candidateList
+                        .filter(candidate => 
+                          !candidateSearchTerm || 
+                          `${candidate.firstName} ${candidate.lastName} ${candidate.nationality}`.toLowerCase().includes(candidateSearchTerm.toLowerCase())
+                        )
+                        .map((candidate) => (
+                          <MenuItem key={candidate.id} value={candidate.id}>
+                            {candidate.firstName} {candidate.lastName} - {candidate.nationality}
+                          </MenuItem>
+                        ))}
                     </TextField>
                   )
                 }}

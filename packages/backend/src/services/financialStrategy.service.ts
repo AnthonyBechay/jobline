@@ -147,30 +147,56 @@ class PreArrivalRefundStrategy extends RefundCalculationStrategy {
       sum + Number(payment.amount), 0
     );
 
-    const penaltyFee = Number(settings.penaltyFee || 0);
-    const refundPercentage = Number(settings.refundPercentage || 100) / 100;
+    // Calculate total fees owed by client
+    const monthlyServiceFee = Number(settings.monthlyServiceFee || 0);
+    const monthsSinceArrival = options.monthsSinceArrival || 0;
+    const fixedPenaltyFee = Number(settings.penaltyFee || 0);
     
-    const refundableAmount = totalPaid - penaltyFee;
-    const calculatedRefund = refundableAmount * refundPercentage;
-    const finalRefund = Math.max(0, calculatedRefund);
+    // Total fees client should pay: monthly fees + fixed penalty
+    const totalFeesOwed = (monthlyServiceFee * monthsSinceArrival) + fixedPenaltyFee;
+    
+    // Calculate refund: payments made - total fees owed
+    const calculatedRefund = totalPaid - totalFeesOwed;
+    const finalRefund = calculatedRefund; // Can be positive (refund) or negative (client owes)
 
+    // Create breakdown
     const breakdown = payments.map((payment: any) => ({
       paymentType: payment.paymentType || 'FEE',
       amount: Number(payment.amount),
       isRefundable: payment.isRefundable !== false,
-      refundAmount: payment.isRefundable !== false ? 
-        (Number(payment.amount) * refundPercentage) : 0
+      refundAmount: Number(payment.amount)
     }));
+
+    // Add fee breakdown
+    if (monthlyServiceFee > 0 && monthsSinceArrival > 0) {
+      breakdown.push({
+        paymentType: 'MONTHLY_SERVICE_FEES',
+        amount: monthlyServiceFee * monthsSinceArrival,
+        isRefundable: false,
+        refundAmount: -(monthlyServiceFee * monthsSinceArrival)
+      });
+    }
+
+    if (fixedPenaltyFee > 0) {
+      breakdown.push({
+        paymentType: 'PENALTY_FEE',
+        amount: fixedPenaltyFee,
+        isRefundable: false,
+        refundAmount: -fixedPenaltyFee
+      });
+    }
 
     return {
       totalPaid,
-      refundableAmount,
-      nonRefundableAmount: penaltyFee,
-      penaltyFee,
+      refundableAmount: Math.max(0, calculatedRefund),
+      nonRefundableAmount: totalFeesOwed,
+      penaltyFee: totalFeesOwed,
       calculatedRefund,
       finalRefund,
       breakdown,
-      description: `Pre-arrival cancellation: Full refund minus $${penaltyFee} penalty`
+      description: calculatedRefund >= 0
+        ? `Pre-arrival cancellation: Client gets $${calculatedRefund} refund (paid $${totalPaid}, owes $${totalFeesOwed})`
+        : `Pre-arrival cancellation: Client owes $${Math.abs(calculatedRefund)} (paid $${totalPaid}, owes $${totalFeesOwed})`
     };
   }
 }
@@ -188,19 +214,21 @@ class PostArrivalProbationRefundStrategy extends RefundCalculationStrategy {
       sum + Number(payment.amount), 0
     );
 
-    const nonRefundableFees = settings.nonRefundableFees || [];
+    // Calculate total fees owed by client
     const monthlyServiceFee = Number(settings.monthlyServiceFee || 0);
     const monthsSinceArrival = options.monthsSinceArrival || 0;
-
-    // Calculate non-refundable amount
-    let nonRefundableAmount = 0;
+    const fixedPenaltyFee = Number(settings.penaltyFee || 0);
+    const nonRefundableFees = settings.nonRefundableFees || [];
+    
+    // Calculate non-refundable amount from actual payments
+    let nonRefundableFromPayments = 0;
     const breakdown = payments.map((payment: any) => {
       const isNonRefundable = nonRefundableFees.includes(payment.paymentType) || 
                              payment.paymentType === 'GOV_FEE' ||
                              payment.paymentType === 'ATTORNEY_FEE';
       
       if (isNonRefundable) {
-        nonRefundableAmount += Number(payment.amount);
+        nonRefundableFromPayments += Number(payment.amount);
       }
 
       return {
@@ -211,20 +239,44 @@ class PostArrivalProbationRefundStrategy extends RefundCalculationStrategy {
       };
     });
 
-    // Subtract monthly service fees
-    const serviceFeeDeduction = monthlyServiceFee * monthsSinceArrival;
-    const refundableAmount = totalPaid - nonRefundableAmount - serviceFeeDeduction;
-    const finalRefund = Math.max(0, refundableAmount);
+    // Total fees client should pay: monthly fees + fixed penalty + non-refundable fees
+    const monthlyFees = monthlyServiceFee * monthsSinceArrival;
+    const totalFeesOwed = monthlyFees + fixedPenaltyFee + nonRefundableFromPayments;
+    
+    // Calculate refund: payments made - total fees owed
+    const calculatedRefund = totalPaid - totalFeesOwed;
+    const finalRefund = calculatedRefund; // Can be positive (refund) or negative (client owes)
+
+    // Add fee breakdown
+    if (monthlyFees > 0) {
+      breakdown.push({
+        paymentType: 'MONTHLY_SERVICE_FEES',
+        amount: monthlyFees,
+        isRefundable: false,
+        refundAmount: -monthlyFees
+      });
+    }
+
+    if (fixedPenaltyFee > 0) {
+      breakdown.push({
+        paymentType: 'PENALTY_FEE',
+        amount: fixedPenaltyFee,
+        isRefundable: false,
+        refundAmount: -fixedPenaltyFee
+      });
+    }
 
     return {
       totalPaid,
-      refundableAmount,
-      nonRefundableAmount,
-      penaltyFee: serviceFeeDeduction,
-      calculatedRefund: refundableAmount,
+      refundableAmount: Math.max(0, calculatedRefund),
+      nonRefundableAmount: totalFeesOwed,
+      penaltyFee: totalFeesOwed,
+      calculatedRefund,
       finalRefund,
       breakdown,
-      description: `Post-arrival cancellation: Refund minus non-refundable fees and ${monthsSinceArrival} months service fee`
+      description: calculatedRefund >= 0
+        ? `Post-arrival cancellation: Client gets $${calculatedRefund} refund (paid $${totalPaid}, owes $${totalFeesOwed})`
+        : `Post-arrival cancellation: Client owes $${Math.abs(calculatedRefund)} (paid $${totalPaid}, owes $${totalFeesOwed})`
     };
   }
 }
@@ -242,20 +294,22 @@ class PostArrivalPostProbationRefundStrategy extends RefundCalculationStrategy {
       sum + Number(payment.amount), 0
     );
 
-    const nonRefundableFees = settings.nonRefundableFees || [];
+    // Calculate total fees owed by client
     const monthlyServiceFee = Number(settings.monthlyServiceFee || 0);
     const monthsSinceArrival = options.monthsSinceArrival || 0;
+    const fixedPenaltyFee = Number(settings.penaltyFee || 0);
+    const nonRefundableFees = settings.nonRefundableFees || [];
     const maxRefundAmount = options.maxRefundAmount || Number(settings.maxRefundAmount || 0);
-
-    // Calculate non-refundable amount
-    let nonRefundableAmount = 0;
+    
+    // Calculate non-refundable amount from actual payments
+    let nonRefundableFromPayments = 0;
     const breakdown = payments.map((payment: any) => {
       const isNonRefundable = nonRefundableFees.includes(payment.paymentType) || 
                              payment.paymentType === 'GOV_FEE' ||
                              payment.paymentType === 'ATTORNEY_FEE';
       
       if (isNonRefundable) {
-        nonRefundableAmount += Number(payment.amount);
+        nonRefundableFromPayments += Number(payment.amount);
       }
 
       return {
@@ -266,26 +320,50 @@ class PostArrivalPostProbationRefundStrategy extends RefundCalculationStrategy {
       };
     });
 
-    // Subtract monthly service fees
-    const serviceFeeDeduction = monthlyServiceFee * monthsSinceArrival;
-    let refundableAmount = totalPaid - nonRefundableAmount - serviceFeeDeduction;
+    // Total fees client should pay: monthly fees + fixed penalty + non-refundable fees
+    const monthlyFees = monthlyServiceFee * monthsSinceArrival;
+    const totalFeesOwed = monthlyFees + fixedPenaltyFee + nonRefundableFromPayments;
+    
+    // Calculate refund: payments made - total fees owed
+    let calculatedRefund = totalPaid - totalFeesOwed;
     
     // Apply maximum refund limit if set
-    if (maxRefundAmount > 0) {
-      refundableAmount = Math.min(refundableAmount, maxRefundAmount);
+    if (maxRefundAmount > 0 && calculatedRefund > maxRefundAmount) {
+      calculatedRefund = maxRefundAmount;
+    }
+    
+    const finalRefund = calculatedRefund; // Can be positive (refund) or negative (client owes)
+
+    // Add fee breakdown
+    if (monthlyFees > 0) {
+      breakdown.push({
+        paymentType: 'MONTHLY_SERVICE_FEES',
+        amount: monthlyFees,
+        isRefundable: false,
+        refundAmount: -monthlyFees
+      });
     }
 
-    const finalRefund = Math.max(0, refundableAmount);
+    if (fixedPenaltyFee > 0) {
+      breakdown.push({
+        paymentType: 'PENALTY_FEE',
+        amount: fixedPenaltyFee,
+        isRefundable: false,
+        refundAmount: -fixedPenaltyFee
+      });
+    }
 
     return {
       totalPaid,
-      refundableAmount,
-      nonRefundableAmount,
-      penaltyFee: serviceFeeDeduction,
-      calculatedRefund: refundableAmount,
+      refundableAmount: Math.max(0, calculatedRefund),
+      nonRefundableAmount: totalFeesOwed,
+      penaltyFee: totalFeesOwed,
+      calculatedRefund,
       finalRefund,
       breakdown,
-      description: `Post-probation cancellation: Limited refund minus non-refundable fees and service fees`
+      description: calculatedRefund >= 0
+        ? `Post-arrival cancellation: Client gets $${calculatedRefund} refund (paid $${totalPaid}, owes $${totalFeesOwed})${maxRefundAmount > 0 ? ` (max $${maxRefundAmount})` : ''}`
+        : `Post-arrival cancellation: Client owes $${Math.abs(calculatedRefund)} (paid $${totalPaid}, owes $${totalFeesOwed})${maxRefundAmount > 0 ? ` (max $${maxRefundAmount})` : ''}`
     };
   }
 }

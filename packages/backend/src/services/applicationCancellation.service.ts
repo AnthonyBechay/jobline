@@ -9,6 +9,7 @@ export interface CancellationRequest {
   reason?: string;
   notes?: string;
   customRefundAmount?: number;
+  overrideFee?: number; // New field for super admin to override penalty fee
   candidateInLebanon?: boolean;
   candidateDeparted?: boolean;
   newClientId?: string; // For reassignment
@@ -189,7 +190,8 @@ export class ApplicationCancellationService {
       request.notes,
       {
         refundAmount: refundCalculation.finalRefund,
-        penaltyFee: refundCalculation.penaltyFee,
+        penaltyFee: request.overrideFee !== undefined ? request.overrideFee : refundCalculation.penaltyFee,
+        actualCancellationFee: request.overrideFee !== undefined ? request.overrideFee : refundCalculation.penaltyFee,
         reason: request.reason
       }
     );
@@ -533,8 +535,16 @@ export class ApplicationCancellationService {
     }
 
     // Add custom refund amount if provided
-    if (request.customRefundAmount) {
+    if (request.customRefundAmount !== undefined) {
       options.customRefundAmount = request.customRefundAmount;
+    }
+
+    // Override penalty fee if provided (super admin only)
+    if (request.overrideFee !== undefined) {
+      settings = {
+        ...settings,
+        penaltyFee: request.overrideFee
+      };
     }
 
     return await FinancialStrategyService.calculateRefund(

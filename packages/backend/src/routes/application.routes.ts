@@ -5,6 +5,7 @@ import { validate } from '../middleware/validate.middleware';
 import { prisma } from '../index';
 import { v4 as uuidv4 } from 'uuid';
 import { generateApplicationPDF } from '../services/pdf.service';
+import { ApplicationCancellationService } from '../services/applicationCancellation.service';
 
 const router = Router();
 
@@ -875,5 +876,27 @@ router.get('/:id/pdf', async (req: AuthRequest, res) => {
     res.status(500).json({ error: 'Failed to generate PDF' });
   }
 });
+
+// Get available cancellation options for an application
+router.get('/:id/cancellation-options', 
+  [param('id').isUUID()],
+  validate,
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const companyId = req.user!.companyId;
+
+      const options = await ApplicationCancellationService.getAvailableCancellationOptions(
+        id,
+        companyId
+      );
+
+      res.json(options);
+    } catch (error) {
+      console.error('Get cancellation options error:', error);
+      res.status(500).json({ error: 'Failed to get cancellation options' });
+    }
+  }
+);
 
 export default router;
