@@ -35,6 +35,7 @@ import {
   Fade,
   CircularProgress,
   Snackbar,
+  Autocomplete,
 } from '@mui/material'
 import { DataGrid, GridColDef } from '@mui/x-data-grid'
 import {
@@ -368,7 +369,7 @@ const ApplicationList = () => {
       if (preset.statuses.length > 0 || preset.dateFilter) {
         fetchApplicationsWithPreset(preset.statuses, preset.dateFilter)
       } else {
-        fetchApplications()
+        fetchApplicationsWithPreset([], undefined)
       }
     }
   }, [filterPreset, page, pageSize])
@@ -385,7 +386,7 @@ const ApplicationList = () => {
       
       // Add multiple status filters
       if (statuses.length > 0) {
-        statuses.filter(status => status && status !== 'undefined').forEach(status => {
+        statuses.filter(status => status).forEach(status => {
           params.append('status', status)
         })
       }
@@ -538,14 +539,14 @@ const ApplicationList = () => {
             >
               History Search
             </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => navigate('/applications/new')}
-              sx={{ borderRadius: 2 }}
-            >
-              New Application
-            </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => navigate('/applications/new')}
+            sx={{ borderRadius: 2 }}
+          >
+            New Application
+          </Button>
           </Stack>
         </Box>
       </Paper>
@@ -647,20 +648,20 @@ const ApplicationList = () => {
 
       {/* View Mode Toggle */}
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-end' }}>
-        <ToggleButtonGroup
-          value={viewMode}
-          exclusive
-          onChange={(e, newMode) => newMode && setViewMode(newMode)}
-          size="small"
-        >
-          <ToggleButton value="grid">
-            <CardIcon />
-          </ToggleButton>
-          <ToggleButton value="list">
-            <ListIcon />
-          </ToggleButton>
-        </ToggleButtonGroup>
-      </Box>
+              <ToggleButtonGroup
+                value={viewMode}
+                exclusive
+                onChange={(e, newMode) => newMode && setViewMode(newMode)}
+                size="small"
+              >
+                <ToggleButton value="grid">
+                  <CardIcon />
+                </ToggleButton>
+                <ToggleButton value="list">
+                  <ListIcon />
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
 
       {/* Applications Display */}
       {loading && !isChangingFilter ? (
@@ -731,9 +732,6 @@ const ApplicationForm = () => {
   const [availableInLebanonCandidates, setAvailableInLebanonCandidates] = useState<Candidate[]>([])
   const [brokers, setBrokers] = useState<Broker[]>([])
   const [feeTemplates, setFeeTemplates] = useState<any[]>([])
-  const [clientSearchTerm, setClientSearchTerm] = useState('')
-  const [fromClientSearchTerm, setFromClientSearchTerm] = useState('')
-  const [candidateSearchTerm, setCandidateSearchTerm] = useState('')
   const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<any>({
     defaultValues: {
       createdAt: new Date().toISOString().split('T')[0], // Default to today
@@ -954,56 +952,41 @@ const ApplicationForm = () => {
             
             {/* Client Selection - Auto-determined based on application type */}
             <Grid item xs={12} md={applicationType === ApplicationType.GUARANTOR_CHANGE ? 6 : 12}>
-              <TextField
-                fullWidth
-                placeholder="Search clients..."
-                value={clientSearchTerm}
-                onChange={(e) => setClientSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                }}
-                sx={{ mb: 1 }}
-              />
               <Controller
                 name="clientId"
                 control={control}
                 rules={{ required: applicationType === ApplicationType.GUARANTOR_CHANGE ? 'To Client is required' : 'Client is required' }}
                 render={({ field }) => (
-                  <TextField
+                  <Autocomplete
                     {...field}
                     fullWidth
-                    select
-                    label={applicationType === ApplicationType.GUARANTOR_CHANGE ? "To Client (New Guarantor)" : "Client"}
-                    value={field.value || ''}
-                    onChange={(e) => {
-                      field.onChange(e.target.value)
-                      setClientSearchTerm('')
+                    options={clients}
+                    getOptionLabel={(client) => client.name}
+                    value={clients.find(c => c.id === field.value) || null}
+                    onChange={(_, newValue) => {
+                      field.onChange(newValue?.id || '')
                     }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label={applicationType === ApplicationType.GUARANTOR_CHANGE ? "To Client (New Guarantor)" : "Client"}
+                        placeholder="Type to search clients..."
                     error={!!errors.clientId}
                     helperText={errors.clientId?.message as string}
-                    SelectProps={{
-                      displayEmpty: true,
-                      renderValue: (value) => {
-                        if (!value) return ''
-                        const client = clients.find(c => c.id === value)
-                        return client ? `${client.name} ${client.surname || ''}`.trim() : ''
-                      }
-                    }}
-                  >
-                    <MenuItem value="">
-                      <em>Select a client</em>
-                    </MenuItem>
-                    {clients
-                      .filter(client => 
-                        !clientSearchTerm || 
-                        `${client.name} ${client.surname || ''}`.toLowerCase().includes(clientSearchTerm.toLowerCase())
-                      )
-                      .map((client) => (
-                        <MenuItem key={client.id} value={client.id}>
-                          {client.name} {client.surname || ''}
-                        </MenuItem>
-                      ))}
-                  </TextField>
+                        InputProps={{
+                          ...params.InputProps,
+                          startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                        }}
+                      />
+                    )}
+                    renderOption={(props, client) => (
+                        <Box component="li" {...props}>
+                          {client.name}
+                        </Box>
+                      )}
+                    isOptionEqualToValue={(option, value) => option.id === value?.id}
+                    noOptionsText="No clients found"
+                  />
                 )}
               />
             </Grid>
@@ -1011,56 +994,41 @@ const ApplicationForm = () => {
             {/* From Client - Only for Guarantor Change */}
             {applicationType === ApplicationType.GUARANTOR_CHANGE && (
               <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  placeholder="Search clients..."
-                  value={fromClientSearchTerm}
-                  onChange={(e) => setFromClientSearchTerm(e.target.value)}
-                  InputProps={{
-                    startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                  }}
-                  sx={{ mb: 1 }}
-                />
                 <Controller
                   name="fromClientId"
                   control={control}
                   rules={{ required: 'From Client is required' }}
                   render={({ field }) => (
-                    <TextField
+                    <Autocomplete
                       {...field}
                       fullWidth
-                      select
-                      label="From Client (Previous Guarantor)"
-                      value={field.value || ''}
-                      onChange={(e) => {
-                        field.onChange(e.target.value)
-                        setFromClientSearchTerm('')
+                      options={clients}
+                      getOptionLabel={(client) => client.name}
+                      value={clients.find(c => c.id === field.value) || null}
+                      onChange={(_, newValue) => {
+                        field.onChange(newValue?.id || '')
                       }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="From Client (Previous Guarantor)"
+                          placeholder="Type to search clients..."
                       error={!!errors.fromClientId}
                       helperText={errors.fromClientId?.message as string}
-                      SelectProps={{
-                        displayEmpty: true,
-                        renderValue: (value) => {
-                          if (!value) return ''
-                          const client = clients.find(c => c.id === value)
-                          return client ? `${client.name} ${client.surname || ''}`.trim() : ''
-                        }
-                      }}
-                    >
-                      <MenuItem value="">
-                        <em>Select a client</em>
-                      </MenuItem>
-                      {clients
-                        .filter(client => 
-                          !fromClientSearchTerm || 
-                          `${client.name} ${client.surname || ''}`.toLowerCase().includes(fromClientSearchTerm.toLowerCase())
-                        )
-                        .map((client) => (
-                          <MenuItem key={client.id} value={client.id}>
-                            {client.name} {client.surname || ''}
-                          </MenuItem>
-                        ))}
-                    </TextField>
+                          InputProps={{
+                            ...params.InputProps,
+                            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                          }}
+                        />
+                      )}
+                      renderOption={(props, client) => (
+                        <Box component="li" {...props}>
+                          {client.name}
+                        </Box>
+                      )}
+                      isOptionEqualToValue={(option, value) => option.id === value?.id}
+                      noOptionsText="No clients found"
+                    />
                   )}
                 />
               </Grid>
@@ -1068,61 +1036,63 @@ const ApplicationForm = () => {
             
             {/* Candidate Selection */}
             <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                placeholder="Search candidates..."
-                value={candidateSearchTerm}
-                onChange={(e) => setCandidateSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                }}
-                sx={{ mb: 1 }}
-              />
               <Controller
                 name="candidateId"
                 control={control}
                 rules={{ required: 'Candidate is required' }}
                 render={({ field }) => {
-                  const candidateList = applicationType === ApplicationType.GUARANTOR_CHANGE 
-                    ? availableInLebanonCandidates 
-                    : candidates
+                  // Show ALL available candidates (both abroad and in Lebanon)
+                  const allCandidates = [...candidates, ...availableInLebanonCandidates]
                   
                   return (
-                    <TextField
+                    <Autocomplete
                       {...field}
                       fullWidth
-                      select
-                      label={applicationType === ApplicationType.GUARANTOR_CHANGE 
-                        ? "Candidate (Available in Lebanon)" 
-                        : "Candidate"}
-                      value={field.value || ''}
-                      onChange={(e) => {
-                        field.onChange(e.target.value)
-                        setCandidateSearchTerm('')
-                      }}
-                      error={!!errors.candidateId}
-                      helperText={errors.candidateId?.message as string}
-                      SelectProps={{
-                        displayEmpty: true,
-                        renderValue: (value) => {
-                          if (!value) return ''
-                          const candidate = candidateList.find(c => c.id === value)
-                          return candidate ? `${candidate.firstName} ${candidate.lastName} - ${candidate.nationality}` : ''
+                      options={allCandidates}
+                      getOptionLabel={(candidate) => `${candidate.firstName} ${candidate.lastName} - ${candidate.nationality}`}
+                      value={allCandidates.find(c => c.id === field.value) || null}
+                      onChange={(_, newValue) => {
+                        field.onChange(newValue?.id || '')
+                        // Auto-determine application type based on selected candidate
+                        if (newValue) {
+                          const isInLebanon = availableInLebanonCandidates.some(c => c.id === newValue.id)
+                          const newApplicationType = isInLebanon ? ApplicationType.GUARANTOR_CHANGE : ApplicationType.NEW_CANDIDATE
+                          setApplicationType(newApplicationType)
+                          setValue('type', newApplicationType)
                         }
                       }}
-                    >
-                      <MenuItem value="">Select a candidate</MenuItem>
-                      {candidateList
-                        .filter(candidate => 
-                          !candidateSearchTerm || 
-                          `${candidate.firstName} ${candidate.lastName} ${candidate.nationality}`.toLowerCase().includes(candidateSearchTerm.toLowerCase())
-                        )
-                        .map((candidate) => (
-                          <MenuItem key={candidate.id} value={candidate.id}>
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Candidate"
+                          placeholder="Type to search candidates..."
+                          error={!!errors.candidateId}
+                          helperText={errors.candidateId?.message as string}
+                          InputProps={{
+                            ...params.InputProps,
+                            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                          }}
+                        />
+                      )}
+                      renderOption={(props, candidate) => {
+                        const isInLebanon = availableInLebanonCandidates.some(c => c.id === candidate.id)
+                        return (
+                          <Box component="li" {...props}>
                             {candidate.firstName} {candidate.lastName} - {candidate.nationality}
-                          </MenuItem>
-                        ))}
-                    </TextField>
+                            {isInLebanon && (
+                              <Chip 
+                                label="In Lebanon" 
+                                size="small" 
+                                color="success" 
+                                sx={{ ml: 1, fontSize: '0.7rem' }}
+                              />
+                            )}
+                          </Box>
+                        )
+                      }}
+                      isOptionEqualToValue={(option, value) => option.id === value?.id}
+                      noOptionsText="No candidates found"
+                    />
                   )
                 }}
               />

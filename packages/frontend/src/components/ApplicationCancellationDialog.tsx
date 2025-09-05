@@ -34,7 +34,8 @@ import {
   InputAdornment,
   Collapse,
   IconButton,
-  Tooltip
+  Tooltip,
+  Autocomplete
 } from '@mui/material';
 import {
   Warning as WarningIcon,
@@ -111,7 +112,6 @@ const ApplicationCancellationDialog: React.FC<ApplicationCancellationDialogProps
   const [clients, setClients] = useState<any[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
-  const [clientSearchTerm, setClientSearchTerm] = useState('');
   const [formData, setFormData] = useState<CancellationFormData>({
     cancellationType: '',
     reason: '',
@@ -132,6 +132,24 @@ const ApplicationCancellationDialog: React.FC<ApplicationCancellationDialogProps
     }
   }, [open, applicationId]);
 
+  // Set candidateInLebanon based on cancellation type (not application status)
+  useEffect(() => {
+    console.log('useEffect triggered with formData.cancellationType:', formData.cancellationType);
+    
+    // Show next actions for ANY post-arrival cancellation type
+    const isPostArrival = Boolean(formData.cancellationType && (
+      formData.cancellationType.includes('post_arrival') || 
+      formData.cancellationType === 'post_arrival_within_3_months' ||
+      formData.cancellationType === 'post_arrival_after_3_months'
+    ));
+    
+    console.log('Is post-arrival cancellation:', isPostArrival);
+    setFormData(prev => ({
+      ...prev,
+      candidateInLebanon: isPostArrival
+    }));
+  }, [formData.cancellationType]);
+
   const resetForm = () => {
     setFormData({
       cancellationType: '',
@@ -146,17 +164,12 @@ const ApplicationCancellationDialog: React.FC<ApplicationCancellationDialogProps
     });
     setActiveStep(0);
     setShowAdvanced(false);
-    setClientSearchTerm('');
   };
 
-  // Filter clients based on search term
-  const filteredClients = clients.filter(client =>
-    client.name.toLowerCase().includes(clientSearchTerm.toLowerCase())
-  );
 
   const fetchCancellationOptions = async () => {
     try {
-      const response = await api.get(`/applications/${applicationId}/cancellation-options`);
+      const response = await api.get(`/cancellations/${applicationId}/cancellation-options`);
       setOptions(response.data);
       if (response.data.availableTypes.length > 0) {
         setFormData(prev => ({
@@ -217,7 +230,7 @@ const ApplicationCancellationDialog: React.FC<ApplicationCancellationDialogProps
 
     setLoading(true);
     try {
-      const response = await api.post(`/applications/${applicationId}/cancel`, formData);
+      const response = await api.post(`/cancellations/${applicationId}/cancel`, formData);
       
       onSuccess(response.data.message || 'Application cancelled successfully');
       onClose();
@@ -279,9 +292,9 @@ const ApplicationCancellationDialog: React.FC<ApplicationCancellationDialogProps
   const steps = [
     'Select Cancellation Type',
     'Provide Reason',
-    formData.candidateInLebanon ? 'Next Actions for Candidate' : null,
+    'Next Actions for Candidate (Post-Arrival Only)',
     'Review & Confirm'
-  ].filter(Boolean);
+  ];
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -426,18 +439,20 @@ const ApplicationCancellationDialog: React.FC<ApplicationCancellationDialogProps
           </Step>
 
           {/* Step 3: Next Actions for Candidate */}
-          {formData.candidateInLebanon && (
-            <Step>
-              <StepLabel 
-                onClick={() => handleStepClick(2)}
-                sx={{ cursor: activeStep >= 2 ? 'pointer' : 'default' }}
-              >
-                Next Actions for Candidate
-              </StepLabel>
-              <StepContent>
-                <Grid container spacing={2}>
+          <Step>
+            <StepLabel 
+              onClick={() => handleStepClick(2)}
+              sx={{ cursor: activeStep >= 2 ? 'pointer' : 'default' }}
+            >
+              Next Actions for Candidate (Post-Arrival Only)
+            </StepLabel>
+            <StepContent>
+              <Grid container spacing={2}>
 
-                  {formData.candidateInLebanon && (
+                {(() => {
+                  console.log('Rendering step content, candidateInLebanon:', formData.candidateInLebanon);
+                  return formData.candidateInLebanon;
+                })() ? (
                     <>
                       <Grid item xs={12}>
                         <Divider sx={{ my: 1 }} />
@@ -468,33 +483,33 @@ const ApplicationCancellationDialog: React.FC<ApplicationCancellationDialogProps
                           
                           {formData.nextAction === 'move_to_client' && (
                             <Box sx={{ mt: 2 }}>
-                              <TextField
+                              <Autocomplete
                                 fullWidth
-                                placeholder="Search clients..."
-                                value={clientSearchTerm}
-                                onChange={(e) => setClientSearchTerm(e.target.value)}
-                                InputProps={{
-                                  startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                options={clients}
+                                getOptionLabel={(client) => client.name}
+                                value={clients.find(c => c.id === formData.newClientId) || null}
+                                onChange={(_, newValue) => {
+                                  handleInputChange('newClientId', newValue?.id || '');
                                 }}
-                                sx={{ mb: 2 }}
+                                renderInput={(params) => (
+                                  <TextField
+                                    {...params}
+                                    label="Select New Client"
+                                    placeholder="Type to search clients..."
+                                    InputProps={{
+                                      ...params.InputProps,
+                                      startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                    }}
+                                  />
+                                )}
+                                renderOption={(props, client) => (
+                                  <Box component="li" {...props}>
+                                    {client.name}
+                                  </Box>
+                                )}
+                                isOptionEqualToValue={(option, value) => option.id === value?.id}
+                                noOptionsText="No clients found"
                               />
-                              <FormControl fullWidth>
-                                <InputLabel>Select New Client</InputLabel>
-                                <Select
-                                  value={formData.newClientId || ''}
-                                  onChange={(e) => handleInputChange('newClientId', e.target.value)}
-                                  label="Select New Client"
-                                >
-                                  <MenuItem value="">
-                                    <em>Choose a client...</em>
-                                  </MenuItem>
-                                  {filteredClients.map((client) => (
-                                    <MenuItem key={client.id} value={client.id}>
-                                      {client.name}
-                                    </MenuItem>
-                                  ))}
-                                </Select>
-                              </FormControl>
                             </Box>
                           )}
                         </Paper>
@@ -556,6 +571,17 @@ const ApplicationCancellationDialog: React.FC<ApplicationCancellationDialogProps
                         </Paper>
                       </Grid>
                     </>
+                  ) : (
+                    <Grid item xs={12}>
+                      <Alert severity="info">
+                        <Typography variant="subtitle2" fontWeight="bold">
+                          Pre-Arrival Cancellation
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 1 }}>
+                          This is a pre-arrival cancellation. The candidate will be marked as available abroad and no additional actions are required.
+                        </Typography>
+                      </Alert>
+                    </Grid>
                   )}
                 </Grid>
 
@@ -569,7 +595,6 @@ const ApplicationCancellationDialog: React.FC<ApplicationCancellationDialogProps
                 </Box>
               </StepContent>
             </Step>
-          )}
 
           {/* Step 4: Review & Confirm */}
           <Step>
