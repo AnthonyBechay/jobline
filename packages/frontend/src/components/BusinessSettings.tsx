@@ -100,13 +100,17 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
-const BusinessSettings: React.FC = () => {
+interface BusinessSettingsProps {
+  onBack: () => void;
+  onError: (message: string) => void;
+  onSuccess: (message: string) => void;
+}
+
+const BusinessSettings: React.FC<BusinessSettingsProps> = ({ onBack, onError, onSuccess }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [cancellationSettings, setCancellationSettings] = useState<CancellationSetting[]>([]);
   const [lawyerServiceSetting, setLawyerServiceSetting] = useState<LawyerServiceSetting | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [editingLawyer, setEditingLawyer] = useState(false);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   
@@ -180,7 +184,7 @@ const BusinessSettings: React.FC = () => {
 
   const fetchSettings = async () => {
     setLoading(true);
-    setError('');
+    onError('');
     try {
       const [cancellationResponse, lawyerResponse] = await Promise.all([
         api.get('/business-settings/cancellation'),
@@ -191,7 +195,7 @@ const BusinessSettings: React.FC = () => {
       setLawyerServiceSetting(lawyerResponse.data.data || null);
     } catch (error: any) {
       console.error('Failed to fetch business settings:', error);
-      setError('Failed to load business settings. Please try again.');
+      onError('Failed to load business settings. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -208,7 +212,7 @@ const BusinessSettings: React.FC = () => {
       const availableTypes = cancellationTypes.filter(t => !existingTypes.includes(t.value));
       
       if (availableTypes.length === 0) {
-        setError('All cancellation types are already configured');
+        onError('All cancellation types are already configured');
         return;
       }
       
@@ -249,10 +253,10 @@ const BusinessSettings: React.FC = () => {
       
       if (mode === 'create') {
         await api.post('/business-settings/cancellation', data);
-        setSuccess('Cancellation setting created successfully');
+        onSuccess('Cancellation setting created successfully');
       } else {
         await api.put(`/business-settings/cancellation/${data.id}`, data);
-        setSuccess('Cancellation setting updated successfully');
+        onSuccess('Cancellation setting updated successfully');
       }
       
       handleCloseCancellationDialog();
@@ -261,7 +265,7 @@ const BusinessSettings: React.FC = () => {
       console.error('❌ Cancellation setting error:', error.response?.data);
       const errorMessage = error.response?.data?.error || 'Failed to save cancellation setting';
       const details = error.response?.data?.details;
-      setError(details ? `${errorMessage}: ${JSON.stringify(details)}` : errorMessage);
+      onError(details ? `${errorMessage}: ${JSON.stringify(details)}` : errorMessage);
     } finally {
       setLoading(false);
     }
@@ -272,10 +276,10 @@ const BusinessSettings: React.FC = () => {
     
     try {
       await api.delete(`/business-settings/cancellation/${type}`);
-      setSuccess('Cancellation setting deleted successfully');
+      onSuccess('Cancellation setting deleted successfully');
       fetchSettings();
     } catch (error: any) {
-      setError(error.response?.data?.error || 'Failed to delete cancellation setting');
+      onError(error.response?.data?.error || 'Failed to delete cancellation setting');
     }
   };
 
@@ -286,12 +290,12 @@ const BusinessSettings: React.FC = () => {
       } else {
         await api.post('/business-settings/lawyer-service', setting);
       }
-      setSuccess('Lawyer service setting updated successfully');
+      onSuccess('Lawyer service setting updated successfully');
       setEditingLawyer(false);
       fetchSettings();
     } catch (error: any) {
       console.error('Failed to update lawyer service setting:', error);
-      setError(error.response?.data?.error || 'Failed to update lawyer service setting');
+      onError(error.response?.data?.error || 'Failed to update lawyer service setting');
     }
   };
 
@@ -322,7 +326,7 @@ const BusinessSettings: React.FC = () => {
     const availableTypes = cancellationTypes.filter(t => !existingTypes.includes(t.value));
     
     if (availableTypes.length === 0) {
-      setError('All cancellation types are already configured');
+        onError('All cancellation types are already configured');
       return;
     }
     
@@ -355,17 +359,6 @@ const BusinessSettings: React.FC = () => {
         </Box>
       </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
-      {success && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
-          {success}
-        </Alert>
-      )}
 
       <Card sx={{ borderRadius: 2, boxShadow: 2 }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>

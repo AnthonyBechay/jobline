@@ -332,6 +332,7 @@ export interface ApiError {
 export interface LoginRequest {
   email: string;
   password: string;
+  companyName: string;
 }
 
 export interface LoginResponse {

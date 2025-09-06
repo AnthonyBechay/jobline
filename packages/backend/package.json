@@ -21,7 +21,7 @@
     "seed:settings": "ts-node src/scripts/seedBusinessSettings.ts",
     "seed:all": "ts-node src/scripts/seedCompany.ts && ts-node src/scripts/seedBusinessSettings.ts",
     "postinstall": "prisma generate",
-    "render-build": "npm install && npx prisma generate && npm run build && npx prisma migrate deploy && npm run db:fix-render",
+    "render-build": "npm install && npx prisma generate && npm run build && npx prisma migrate deploy && node dist/scripts/fixRenderDatabase.js",
     "render-start": "node dist/index.js"
   },
   "dependencies": {

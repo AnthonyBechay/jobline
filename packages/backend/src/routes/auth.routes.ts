@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { body } from 'express-validator';
+import { validate } from '../middleware/validate.middleware';
 import { authenticate } from '../middleware/auth.middleware';
 import { 
   register, 
@@ -13,7 +15,12 @@ const router = Router();
 
 // Public routes
 router.post('/register', register);
-router.post('/login', login);
+router.post('/login', [
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('password').notEmpty().withMessage('Password is required'),
+  body('companyName').notEmpty().withMessage('Company name is required'),
+  validate
+], login);
 
 // Protected routes
 router.get('/me', authenticate, getCurrentUser);

@@ -4,13 +4,6 @@ import {
   Card,
   CardContent,
   Typography,
-  Timeline,
-  TimelineItem,
-  TimelineSeparator,
-  TimelineConnector,
-  TimelineContent,
-  TimelineDot,
-  TimelineOppositeContent,
   Chip,
   Alert,
   Button,
@@ -30,6 +23,15 @@ import {
   Tooltip
 } from '@mui/material';
 import {
+  Timeline,
+  TimelineItem,
+  TimelineSeparator,
+  TimelineConnector,
+  TimelineContent,
+  TimelineDot,
+  TimelineOppositeContent
+} from '@mui/lab';
+import {
   Person as PersonIcon,
   Business as BusinessIcon,
   AttachMoney as MoneyIcon,
@@ -43,7 +45,8 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
-import { apiClient } from '../services/api';
+import api from '../services/api'
+
 
 interface LifecycleEvent {
   id: string;
@@ -130,7 +133,7 @@ const ApplicationLifecycleHistory: React.FC<ApplicationLifecycleHistoryProps> = 
   const fetchLifecycleHistory = async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get(`/applications/${applicationId}/lifecycle-history`);
+      const response = await api.get(`/applications/${applicationId}/lifecycle-history`);
       setEvents(response.data.data || []);
     } catch (error) {
       console.error('Failed to fetch lifecycle history:', error);
@@ -147,7 +150,7 @@ const ApplicationLifecycleHistory: React.FC<ApplicationLifecycleHistoryProps> = 
     }
 
     try {
-      await apiClient.post(`/applications/${applicationId}/lifecycle-history`, newEvent);
+      await api.post(`/applications/${applicationId}/lifecycle-history`, newEvent);
       setAddEventDialog(false);
       setNewEvent({
         action: '',
