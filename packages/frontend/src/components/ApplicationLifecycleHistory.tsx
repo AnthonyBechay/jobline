@@ -220,7 +220,7 @@ const ApplicationLifecycleHistory: React.FC<ApplicationLifecycleHistoryProps> = 
       case 'refund':
         return 'info';
       default:
-        return 'default';
+        return 'grey';
     }
   };
 
