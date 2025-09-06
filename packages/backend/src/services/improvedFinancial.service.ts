@@ -28,6 +28,68 @@ export interface RefundCalculationResult {
 
 export class ImprovedFinancialService {
   /**
+   * Get default refund calculation when no cancellation settings exist
+   */
+  private static getDefaultRefundCalculation(
+    application: any,
+    cancellationType: string,
+    totalPaid: number
+  ): RefundCalculationResult {
+    let refundableAmount = 0;
+    let nonRefundableAmount = 0;
+    let penaltyFee = 0;
+    let description = '';
+
+    // Default logic based on cancellation type
+    if (cancellationType.includes('pre_arrival')) {
+      if (cancellationType.includes('candidate')) {
+        // Candidate cancellation - full refund to client
+        refundableAmount = totalPaid;
+        nonRefundableAmount = 0;
+        penaltyFee = 0;
+        description = 'Candidate cancellation - full refund to client';
+      } else {
+        // Client pre-arrival cancellation - refund minus penalty
+        penaltyFee = Math.min(totalPaid * 0.1, 500); // 10% or max $500
+        refundableAmount = Math.max(0, totalPaid - penaltyFee);
+        nonRefundableAmount = penaltyFee;
+        description = 'Client pre-arrival cancellation - refund minus penalty';
+      }
+    } else if (cancellationType.includes('post_arrival')) {
+      // Post-arrival cancellation - reduced refund
+      penaltyFee = Math.min(totalPaid * 0.3, 1000); // 30% or max $1000
+      refundableAmount = Math.max(0, totalPaid - penaltyFee);
+      nonRefundableAmount = penaltyFee;
+      description = 'Post-arrival cancellation - reduced refund due to costs';
+    } else {
+      // Default case
+      refundableAmount = totalPaid * 0.5; // 50% refund
+      nonRefundableAmount = totalPaid * 0.5;
+      penaltyFee = totalPaid * 0.5;
+      description = 'Default cancellation policy - 50% refund';
+    }
+
+    return {
+      totalPaid,
+      refundableComponents: refundableAmount,
+      nonRefundableComponents: nonRefundableAmount,
+      penaltyFee,
+      monthlyServiceFees: 0,
+      calculatedRefund: refundableAmount,
+      finalRefund: refundableAmount,
+      description,
+      componentBreakdown: [
+        {
+          component: 'Application Fee',
+          amount: totalPaid,
+          isRefundable: refundableAmount > 0,
+          refundReason: refundableAmount === 0 ? 'Non-refundable per default policy' : undefined
+        }
+      ]
+    };
+  }
+
+  /**
    * Create or update fee template with components
    */
   static async createFeeTemplate(
@@ -92,6 +154,14 @@ export class ImprovedFinancialService {
       monthsSinceArrival?: number;
     } = {}
   ): Promise<RefundCalculationResult> {
+    // Get all payments for the application first
+    const payments = await prisma.payment.findMany({
+      where: { applicationId: application.id }
+    });
+
+    const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+    console.log(`💰 Refund calculation for application ${application.id}: totalPaid=${totalPaid}, cancellationType=${cancellationType}`);
+
     // Get cancellation settings
     const settings = await prisma.cancellationSetting.findFirst({
       where: {
@@ -102,15 +172,35 @@ export class ImprovedFinancialService {
     });
 
     if (!settings) {
-      throw new Error(`No active cancellation settings found for type: ${cancellationType}`);
+      console.warn(`No active cancellation settings found for type: ${cancellationType}, attempting to seed settings...`);
+      
+      // Try to seed default settings for this company
+      try {
+        const { seedBusinessSettings } = await import('../scripts/seedBusinessSettings');
+        await seedBusinessSettings(companyId);
+        
+        // Try to get settings again after seeding
+        const settingsAfterSeeding = await prisma.cancellationSetting.findFirst({
+          where: {
+            companyId,
+            cancellationType,
+            active: true
+          }
+        });
+        
+        if (settingsAfterSeeding) {
+          console.log('✅ Successfully seeded cancellation settings, recalculating...');
+          // Recursively call this method with the seeded settings
+          return this.calculateImprovedRefund(application, cancellationType, companyId, options);
+        }
+      } catch (seedError) {
+        console.warn('Failed to seed cancellation settings:', seedError);
+      }
+      
+      // If seeding failed or still no settings, use default calculation
+      console.warn(`Using default calculation for type: ${cancellationType}`);
+      return this.getDefaultRefundCalculation(application, cancellationType, totalPaid);
     }
-
-    // Get all payments for the application
-    const payments = await prisma.payment.findMany({
-      where: { applicationId: application.id }
-    });
-
-    const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
 
     // Get fee template with components
     let feeComponents: any[] = [];

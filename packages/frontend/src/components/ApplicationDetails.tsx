@@ -85,6 +85,7 @@ import {
   HourglassEmpty as PendingIcon,
   Visibility as ViewIcon,
   Delete as DeleteIcon,
+  Cancel as CancelIcon,
 } from '@mui/icons-material'
 import { useForm, Controller } from 'react-hook-form'
 import {
@@ -183,6 +184,30 @@ const statusWorkflow = {
     icon: <WarningIcon />,
     color: 'warning' as const,
     description: 'Renewal documents required'
+  },
+  [ApplicationStatus.CANCELLED_PRE_ARRIVAL]: {
+    next: null,
+    label: 'Cancelled (Pre-Arrival)',
+    shortLabel: 'Cancelled',
+    icon: <CancelIcon />,
+    color: 'error' as const,
+    description: 'Application cancelled before worker arrival'
+  },
+  [ApplicationStatus.CANCELLED_POST_ARRIVAL]: {
+    next: null,
+    label: 'Cancelled (Post-Arrival)',
+    shortLabel: 'Cancelled',
+    icon: <CancelIcon />,
+    color: 'error' as const,
+    description: 'Application cancelled after worker arrival'
+  },
+  [ApplicationStatus.CANCELLED_CANDIDATE]: {
+    next: null,
+    label: 'Cancelled (Candidate)',
+    shortLabel: 'Cancelled',
+    icon: <CancelIcon />,
+    color: 'error' as const,
+    description: 'Application cancelled by candidate'
   },
 }
 
@@ -690,7 +715,7 @@ const ApplicationDetails = () => {
   if (error && !validationError) return <Alert severity="error">{error}</Alert>
   if (!application) return <Alert severity="info">Application not found</Alert>
 
-  const statusInfo = statusWorkflow[application.status]
+  const statusInfo = statusWorkflow[application.status as keyof typeof statusWorkflow]
   const steps = getStatusSteps()
   const activeStep = steps.indexOf(application.status)
 
@@ -809,7 +834,7 @@ const ApplicationDetails = () => {
           <Stepper activeStep={activeStep} alternativeLabel sx={{ pt: 1 }}>
             {steps.map((step) => (
               <Step key={step}>
-                <StepLabel>{statusWorkflow[step].shortLabel}</StepLabel>
+                <StepLabel>{statusWorkflow[step as keyof typeof statusWorkflow]?.shortLabel || step}</StepLabel>
               </Step>
             ))}
           </Stepper>
@@ -889,7 +914,11 @@ const ApplicationDetails = () => {
               <Stack spacing={2}>
                 <Box display="flex" alignItems="center">
                   <PhoneIcon sx={{ mr: 2, color: 'text.secondary', fontSize: 20 }} />
-                  <Typography variant="body2">{application.client?.phone || 'No phone'}</Typography>
+                  <Typography variant="body2">
+                    {typeof application.client?.phone === 'string' 
+                      ? application.client.phone 
+                      : (application.client?.phone as any)?.phone || 'No phone'}
+                  </Typography>
                 </Box>
                 {(application.client as any)?.email && (
                   <Box display="flex" alignItems="center">
@@ -899,7 +928,11 @@ const ApplicationDetails = () => {
                 )}
                 <Box display="flex" alignItems="flex-start">
                   <LocationIcon sx={{ mr: 2, color: 'text.secondary', fontSize: 20 }} />
-                  <Typography variant="body2">{application.client?.address || 'No address'}</Typography>
+                  <Typography variant="body2">
+                    {typeof application.client?.address === 'string' 
+                      ? application.client.address 
+                      : (application.client?.address as any)?.address || 'No address'}
+                  </Typography>
                 </Box>
               </Stack>
             </CardContent>
@@ -958,7 +991,11 @@ const ApplicationDetails = () => {
                 <Stack spacing={2}>
                   <Box display="flex" alignItems="center">
                     <PhoneIcon sx={{ mr: 2, color: 'text.secondary', fontSize: 20 }} />
-                    <Typography variant="body2">{application.broker.contactDetails || 'No contact details'}</Typography>
+                    <Typography variant="body2">
+                      {typeof application.broker.contactDetails === 'string' 
+                        ? application.broker.contactDetails 
+                        : application.broker.contactDetails?.phone || 'No contact details'}
+                    </Typography>
                   </Box>
                 </Stack>
               )}
@@ -1489,7 +1526,7 @@ const ApplicationDetails = () => {
         <DialogTitle>Update Application Status</DialogTitle>
         <DialogContent>
           <Typography>
-            Move application to: {statusInfo.next && statusWorkflow[statusInfo.next].label}?
+            Move application to: {statusInfo.next && statusWorkflow[statusInfo.next as keyof typeof statusWorkflow]?.label}?
           </Typography>
         </DialogContent>
         <DialogActions>

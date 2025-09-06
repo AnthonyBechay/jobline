@@ -235,10 +235,19 @@ export class ApplicationCancellationService {
       tx
     );
 
-    // Update candidate status to Available (In Lebanon)
+    // Update candidate status based on next action
+    let candidateStatus: any = CandidateStatus.AVAILABLE_IN_LEBANON;
+    if (request.newClientId && !request.deportCandidate) {
+      // If reassigning to new client, candidate should be IN_PROCESS (not available for new applications)
+      candidateStatus = CandidateStatus.IN_PROCESS;
+    } else if (request.deportCandidate) {
+      // If deporting, keep as AVAILABLE_IN_LEBANON for now (will be changed to DEPORTED later)
+      candidateStatus = CandidateStatus.AVAILABLE_IN_LEBANON;
+    }
+    
     await tx.candidate.update({
       where: { id: application.candidateId },
-      data: { status: CandidateStatus.AVAILABLE_IN_LEBANON }
+      data: { status: candidateStatus }
     });
 
     // Create refund payment if applicable
@@ -409,6 +418,47 @@ export class ApplicationCancellationService {
       companyId
     );
 
+    // Determine starting status based on original application progress
+    let startingStatus = ApplicationStatus.PENDING_MOL;
+    let transferSteps: string[] = [];
+    
+    if (hasExistingPaperwork) {
+      // If paperwork was completed, start from where original application left off
+      if (originalApplication.status === ApplicationStatus.ACTIVE_EMPLOYMENT) {
+        startingStatus = ApplicationStatus.PENDING_MOL; // Start fresh for transfer
+        transferSteps = [
+          'Transfer of Sponsorship',
+          'Relinquish Letter from Previous Client',
+          'Commitment Letter from New Client',
+          'Certificate of Deposit from New Client'
+        ];
+      } else if (originalApplication.status === ApplicationStatus.RESIDENCY_PERMIT_PROCESSING) {
+        startingStatus = ApplicationStatus.PENDING_MOL; // Start fresh for transfer
+        transferSteps = [
+          'Transfer of Sponsorship',
+          'Relinquish Letter from Previous Client',
+          'Commitment Letter from New Client',
+          'Certificate of Deposit from New Client'
+        ];
+      } else if (originalApplication.status === ApplicationStatus.LABOUR_PERMIT_PROCESSING) {
+        startingStatus = ApplicationStatus.PENDING_MOL; // Start fresh for transfer
+        transferSteps = [
+          'Transfer of Sponsorship',
+          'Relinquish Letter from Previous Client',
+          'Commitment Letter from New Client',
+          'Certificate of Deposit from New Client'
+        ];
+      } else if (originalApplication.status === ApplicationStatus.WORKER_ARRIVED) {
+        startingStatus = ApplicationStatus.PENDING_MOL; // Start fresh for transfer
+        transferSteps = [
+          'Transfer of Sponsorship',
+          'Relinquish Letter from Previous Client',
+          'Commitment Letter from New Client',
+          'Certificate of Deposit from New Client'
+        ];
+      }
+    }
+
     // Generate shareable link
     const shareableLink = `app-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -418,7 +468,7 @@ export class ApplicationCancellationService {
         clientId: newClientId,
         candidateId: originalApplication.candidateId,
         type: ApplicationType.GUARANTOR_CHANGE,
-        status: ApplicationStatus.PENDING_MOL,
+        status: startingStatus,
         shareableLink,
         feeTemplateId: feeTemplate?.id,
         finalFeeAmount: feeTemplate?.defaultPrice,
@@ -435,20 +485,43 @@ export class ApplicationCancellationService {
     // Create document checklist based on paperwork status
     const documentTemplates = await tx.documentTemplate.findMany({
       where: {
-        stage: ApplicationStatus.PENDING_MOL,
+        stage: startingStatus,
         companyId
       },
       orderBy: { order: 'asc' }
     });
 
+    const documentItems: any[] = [];
+    
+    // Add standard documents
     if (documentTemplates.length > 0) {
+      documentItems.push(...documentTemplates.map(template => ({
+        applicationId: newApplication.id,
+        documentName: template.name,
+        status: 'PENDING',
+        stage: template.stage,
+        required: template.required,
+        requiredFrom: template.requiredFrom,
+        order: template.order
+      })));
+    }
+    
+    // Add transfer-specific documents if this is a guarantor change
+    if (transferSteps.length > 0) {
+      documentItems.push(...transferSteps.map((step, index) => ({
+        applicationId: newApplication.id,
+        documentName: step,
+        status: 'PENDING',
+        stage: startingStatus,
+        required: true,
+        requiredFrom: 'office',
+        order: (documentTemplates.length || 0) + index + 1
+      })));
+    }
+
+    if (documentItems.length > 0) {
       await tx.documentChecklistItem.createMany({
-        data: documentTemplates.map(template => ({
-          applicationId: newApplication.id,
-          documentName: template.name,
-          status: 'PENDING',
-          stage: template.stage
-        }))
+        data: documentItems
       });
     }
 
@@ -665,11 +738,13 @@ export class ApplicationCancellationService {
     let refundEstimate: any | undefined;
     if (availableTypes.length > 0) {
       try {
+        console.log(`🔍 Calculating refund estimate for application ${application.id}, type: ${availableTypes[0]}`);
         refundEstimate = await this.calculateRefund(application, {
           applicationId,
           cancellationType: availableTypes[0] as any,
           reason: ''
         }, companyId);
+        console.log(`✅ Refund estimate calculated:`, refundEstimate);
       } catch (error) {
         console.warn('Could not calculate refund estimate:', error);
       }

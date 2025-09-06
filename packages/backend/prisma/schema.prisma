@@ -288,6 +288,9 @@ model DocumentChecklistItem {
   documentName  String           @map("document_name")
   status        DocumentStatus
   stage         ApplicationStatus
+  required      Boolean          @default(true)
+  requiredFrom  String           @default("office") // "office" or "client"
+  order         Int              @default(0)
   createdAt     DateTime         @default(now()) @map("created_at")
   updatedAt     DateTime         @updatedAt @map("updated_at")
 

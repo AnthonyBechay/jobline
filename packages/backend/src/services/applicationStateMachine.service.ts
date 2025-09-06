@@ -355,6 +355,18 @@ export class ApplicationStateMachine {
     tx?: any
   ): Promise<void> {
     const prismaClient = tx || prisma;
+    
+    // Verify the application exists before creating lifecycle history
+    const application = await prismaClient.application.findUnique({
+      where: { id: applicationId },
+      select: { id: true }
+    });
+    
+    if (!application) {
+      console.warn(`Application ${applicationId} not found when logging state transition`);
+      return;
+    }
+    
     await prismaClient.applicationLifecycleHistory.create({
       data: {
         applicationId,

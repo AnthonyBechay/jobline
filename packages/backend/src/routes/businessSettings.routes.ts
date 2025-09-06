@@ -52,12 +52,26 @@ router.get('/cancellation',
       console.log('🔧 Fetching cancellation settings for company:', req.user?.companyId);
       const companyId = req.user!.companyId;
 
-      const settings = await prisma.cancellationSetting.findMany({
+      let settings = await prisma.cancellationSetting.findMany({
         where: { companyId },
         orderBy: { cancellationType: 'asc' }
       });
 
       console.log('✅ Found', settings.length, 'cancellation settings');
+      
+      // If no settings exist, seed default settings
+      if (settings.length === 0) {
+        console.log('🔧 No cancellation settings found, seeding defaults...');
+        const { seedBusinessSettings } = await import('../scripts/seedBusinessSettings');
+        await seedBusinessSettings(companyId);
+        
+        // Fetch settings again after seeding
+        settings = await prisma.cancellationSetting.findMany({
+          where: { companyId },
+          orderBy: { cancellationType: 'asc' }
+        });
+        console.log('✅ Seeded and found', settings.length, 'cancellation settings');
+      }
       
       // Ensure all settings have a name field (for backward compatibility)
       const settingsWithNames = settings.map(setting => ({
@@ -65,7 +79,6 @@ router.get('/cancellation',
         name: setting.name || getCancellationTypeName(setting.cancellationType)
       }));
       
-      // If no settings exist, return empty array (frontend will handle this)
       res.json({ data: settingsWithNames || [] });
     } catch (error) {
       console.error('❌ Get cancellation settings error:', error);
@@ -161,84 +174,6 @@ router.get('/cancellation/:type',
   }
 );
 
-// Create or update cancellation setting
-router.post('/cancellation',
-  [
-    body('cancellationType').isIn(['pre_arrival_client', 'pre_arrival_candidate', 'post_arrival_within_3_months', 'post_arrival_after_3_months', 'candidate_cancellation']),
-    body('penaltyFee').isFloat({ min: 0 }).withMessage('Penalty fee must be a positive number'),
-    body('refundPercentage').isFloat({ min: 0, max: 100 }).withMessage('Refund percentage must be between 0 and 100'),
-    body('nonRefundableComponents').optional().isArray(),
-    body('monthlyServiceFee').isFloat({ min: 0 }).withMessage('Monthly service fee must be a positive number'),
-    body('maxRefundAmount').optional().isFloat({ min: 0 }),
-    body('description').optional().trim(),
-    body('active').optional().isBoolean()
-  ],
-  validate,
-  async (req: AuthRequest, res) => {
-    try {
-      const {
-        cancellationType,
-        penaltyFee,
-        refundPercentage,
-        name,
-        nonRefundableComponents,
-        monthlyServiceFee,
-        maxRefundAmount,
-        description,
-        active = true
-      } = req.body;
-
-      const companyId = req.user!.companyId;
-
-      // Check if setting already exists
-      const existingSetting = await prisma.cancellationSetting.findFirst({
-        where: {
-          companyId,
-          cancellationType
-        }
-      });
-
-      let setting;
-      if (existingSetting) {
-        // Update existing setting
-        setting = await prisma.cancellationSetting.update({
-          where: { id: existingSetting.id },
-          data: {
-            penaltyFee,
-            refundPercentage,
-            name: name || cancellationType,
-            nonRefundableComponents,
-            monthlyServiceFee,
-            maxRefundAmount,
-            description,
-            active
-          }
-        });
-      } else {
-        // Create new setting
-        setting = await prisma.cancellationSetting.create({
-          data: {
-            cancellationType,
-            penaltyFee,
-            refundPercentage,
-            name: name || cancellationType,
-            nonRefundableComponents,
-            monthlyServiceFee,
-            maxRefundAmount,
-            description,
-            active,
-            companyId
-          }
-        });
-      }
-
-      res.json(setting);
-    } catch (error) {
-      console.error('Create/update cancellation setting error:', error);
-      res.status(500).json({ error: 'Failed to create/update cancellation setting' });
-    }
-  }
-);
 
 // Update cancellation setting
 router.put('/cancellation/:id',
@@ -258,6 +193,12 @@ router.put('/cancellation/:id',
       const { id } = req.params;
       const companyId = req.user!.companyId;
       const updateData = req.body;
+
+      console.log('🔍 Update cancellation setting request:', {
+        id,
+        companyId,
+        updateData
+      });
 
       // Find the setting by ID and ensure it belongs to the company
       const existingSetting = await prisma.cancellationSetting.findFirst({

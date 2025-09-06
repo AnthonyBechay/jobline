@@ -198,7 +198,7 @@ const ClientStatus = () => {
     )
   }
 
-  const statusInfo = statusWorkflow[application.status]
+  const statusInfo = statusWorkflow[application.status as keyof typeof statusWorkflow]
   const steps = getStatusSteps()
   const activeStep = steps.indexOf(application.status)
   const pendingDocuments = documents.filter(d => d.status === DocumentStatus.PENDING)
@@ -236,7 +236,7 @@ const ClientStatus = () => {
             <Step key={step}>
               <StepLabel>
                 <Typography variant="caption">
-                  {statusWorkflow[step].label.split(' ').slice(0, 2).join(' ')}
+                  {statusWorkflow[step as keyof typeof statusWorkflow]?.label?.split(' ').slice(0, 2).join(' ') || step}
                 </Typography>
               </StepLabel>
             </Step>

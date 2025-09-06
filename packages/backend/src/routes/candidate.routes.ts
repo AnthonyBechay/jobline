@@ -40,6 +40,39 @@ router.get(
   getCandidateById
 );
 
+// Get candidate applications
+router.get(
+  '/:id/applications',
+  [param('id').isUUID()],
+  validate,
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const companyId = req.user!.companyId;
+
+      const applications = await prisma.application.findMany({
+        where: {
+          candidateId: id,
+          companyId
+        },
+        include: {
+          client: true,
+          candidate: true,
+          broker: true
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+
+      res.json(applications);
+    } catch (error) {
+      console.error('Error fetching candidate applications:', error);
+      res.status(500).json({ error: 'Failed to fetch candidate applications' });
+    }
+  }
+);
+
 // Create new candidate
 router.post(
   '/',

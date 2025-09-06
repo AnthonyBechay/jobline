@@ -258,7 +258,10 @@ const BusinessSettings: React.FC = () => {
       handleCloseCancellationDialog();
       fetchSettings();
     } catch (error: any) {
-      setError(error.response?.data?.error || 'Failed to save cancellation setting');
+      console.error('❌ Cancellation setting error:', error.response?.data);
+      const errorMessage = error.response?.data?.error || 'Failed to save cancellation setting';
+      const details = error.response?.data?.details;
+      setError(details ? `${errorMessage}: ${JSON.stringify(details)}` : errorMessage);
     } finally {
       setLoading(false);
     }

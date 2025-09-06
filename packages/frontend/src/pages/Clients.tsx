@@ -758,14 +758,22 @@ const ClientDetails = () => {
                 <ListItem>
                   <ListItemText
                     primary="Phone"
-                    secondary={client.phone}
+                    secondary={
+                      typeof client.phone === 'string' 
+                        ? client.phone 
+                        : (client.phone as any)?.phone || 'Not provided'
+                    }
                   />
                 </ListItem>
                 <Divider />
                 <ListItem>
                   <ListItemText
                     primary="Address"
-                    secondary={client.address || 'Not provided'}
+                    secondary={
+                      typeof client.address === 'string' 
+                        ? client.address 
+                        : (client.address as any)?.address || 'Not provided'
+                    }
                   />
                 </ListItem>
                 <Divider />
