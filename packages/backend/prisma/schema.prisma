@@ -561,7 +561,6 @@ model CancellationSetting {
   nonRefundableComponents Json? @map("non_refundable_components") // Array of component names that are non-refundable
   monthlyServiceFee   Decimal  @default(0) @map("monthly_service_fee") @db.Decimal(10, 2)
   maxRefundAmount     Decimal? @map("max_refund_amount") @db.Decimal(10, 2)
-  deportationCost     Decimal  @default(500) @map("deportation_cost") @db.Decimal(10, 2)
   description         String?
   active              Boolean  @default(true)
   companyId           String   @map("company_id")

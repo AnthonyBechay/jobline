@@ -13,10 +13,15 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:reset": "prisma migrate reset --force",
     "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:diagnose": "ts-node src/scripts/diagnoseSchema.ts",
+    "db:fix-render": "ts-node src/scripts/fixRenderDatabase.ts",
+    "db:fix-local": "ts-node src/scripts/updateCancellationSettings.ts",
     "seed:company": "ts-node src/scripts/seedCompany.ts",
-    "seed:all": "ts-node src/scripts/seedCompany.ts",
+    "seed:settings": "ts-node src/scripts/seedBusinessSettings.ts",
+    "seed:all": "ts-node src/scripts/seedCompany.ts && ts-node src/scripts/seedBusinessSettings.ts",
     "postinstall": "prisma generate",
-    "render-build": "npm install && npx prisma generate && npm run build && npx prisma migrate deploy",
+    "render-build": "npm install && npx prisma generate && npm run build && npx prisma migrate deploy && npm run db:fix-render",
     "render-start": "node dist/index.js"
   },
   "dependencies": {

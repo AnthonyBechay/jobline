@@ -60,9 +60,10 @@ import api from '../services/api'
 interface CancellationSetting {
   id: string;
   cancellationType: string;
+  name: string;
   penaltyFee: number;
   refundPercentage: number;
-  nonRefundableFees: string[];
+  nonRefundableComponents: string[];  // Changed from nonRefundableFees
   monthlyServiceFee: number;
   maxRefundAmount?: number;
   description?: string;
@@ -158,7 +159,7 @@ const BusinessSettings: React.FC = () => {
     }
   ];
 
-  const nonRefundableFeeOptions = [
+  const nonRefundableComponentOptions = [
     'Visa Processing',
     'Medical Examination',
     'Government Documentation',
@@ -166,7 +167,11 @@ const BusinessSettings: React.FC = () => {
     'Legal Fees',
     'Administrative Fees',
     'Insurance',
-    'Training Costs'
+    'Training Costs',
+    'Ticket',
+    'Government Fees',
+    'Office Service',
+    'Processing Fee'
   ];
 
   useEffect(() => {
@@ -212,9 +217,10 @@ const BusinessSettings: React.FC = () => {
         mode: 'create',
         data: {
           cancellationType: availableTypes[0].value,
+          name: availableTypes[0].label,
           penaltyFee: 0,
           refundPercentage: 100,
-          nonRefundableFees: [],
+          nonRefundableComponents: [],
           monthlyServiceFee: 0,
           active: true
         }
@@ -324,6 +330,7 @@ const BusinessSettings: React.FC = () => {
         ...setting,
         id: undefined,
         cancellationType: availableTypes[0].value,
+        name: availableTypes[0].label,
         description: `Copied from ${getCancellationTypeLabel(setting.cancellationType)}`
       }
     });
@@ -455,7 +462,7 @@ const BusinessSettings: React.FC = () => {
                             </Avatar>
                             <Box flex={1}>
                               <Typography variant="h6" fontWeight="bold">
-                                {typeInfo?.label}
+                                {setting.name || typeInfo?.label}
                               </Typography>
                               <Typography variant="body2" color="text.secondary">
                                 {typeInfo?.description}
@@ -540,16 +547,16 @@ const BusinessSettings: React.FC = () => {
                               </Box>
                             )}
                             
-                            {setting.nonRefundableFees && setting.nonRefundableFees.length > 0 && (
+                            {setting.nonRefundableComponents && setting.nonRefundableComponents.length > 0 && (
                               <Box sx={{ mb: 2 }}>
                                 <Typography variant="body2" color="text.secondary" gutterBottom>
                                   Non-Refundable Items
                                 </Typography>
                                 <Box display="flex" flexWrap="wrap" gap={0.5}>
-                                  {setting.nonRefundableFees.map((fee, index) => (
+                                  {setting.nonRefundableComponents.map((component, index) => (
                                     <Chip
                                       key={index}
-                                      label={fee}
+                                      label={component}
                                       size="small"
                                       variant="outlined"
                                       color="warning"
@@ -776,10 +783,17 @@ const BusinessSettings: React.FC = () => {
                 <InputLabel>Cancellation Type</InputLabel>
                 <Select
                   value={cancellationDialog.data.cancellationType || ''}
-                  onChange={(e) => setCancellationDialog(prev => ({
-                    ...prev,
-                    data: { ...prev.data, cancellationType: e.target.value }
-                  }))}
+                  onChange={(e) => {
+                    const selectedType = cancellationTypes.find(t => t.value === e.target.value);
+                    setCancellationDialog(prev => ({
+                      ...prev,
+                      data: { 
+                        ...prev.data, 
+                        cancellationType: e.target.value,
+                        name: selectedType?.label || e.target.value
+                      }
+                    }))
+                  }}
                   label="Cancellation Type"
                   disabled={cancellationDialog.mode === 'edit'}
                 >
@@ -912,10 +926,10 @@ const BusinessSettings: React.FC = () => {
                 <InputLabel>Non-Refundable Items</InputLabel>
                 <Select
                   multiple
-                  value={cancellationDialog.data.nonRefundableFees || []}
+                  value={cancellationDialog.data.nonRefundableComponents || []}
                   onChange={(e) => setCancellationDialog(prev => ({
                     ...prev,
-                    data: { ...prev.data, nonRefundableFees: e.target.value as string[] }
+                    data: { ...prev.data, nonRefundableComponents: e.target.value as string[] }
                   }))}
                   label="Non-Refundable Items"
                   renderValue={(selected) => (
@@ -926,7 +940,7 @@ const BusinessSettings: React.FC = () => {
                     </Box>
                   )}
                 >
-                  {nonRefundableFeeOptions.map((option) => (
+                  {nonRefundableComponentOptions.map((option) => (
                     <MenuItem key={option} value={option}>
                       {option}
                     </MenuItem>

@@ -8,37 +8,51 @@ export async function seedBusinessSettings(companyId: string) {
     // Seed cancellation settings
     const cancellationSettings = [
       {
-        cancellationType: 'pre_arrival',
+        cancellationType: 'pre_arrival_client',
+        name: 'Pre-Arrival Client Cancellation',
         penaltyFee: 200,
         refundPercentage: 100,
-        nonRefundableFees: ['GOV_FEE', 'ATTORNEY_FEE'],
+        nonRefundableComponents: ['Government Fees', 'Attorney Fees'],
         monthlyServiceFee: 0,
         maxRefundAmount: null,
-        description: 'Pre-arrival cancellation: Full refund minus $200 penalty fee'
+        description: 'Pre-arrival client cancellation: Full refund minus $200 penalty fee'
+      },
+      {
+        cancellationType: 'pre_arrival_candidate',
+        name: 'Pre-Arrival Candidate Cancellation',
+        penaltyFee: 0,
+        refundPercentage: 100,
+        nonRefundableComponents: [],
+        monthlyServiceFee: 0,
+        maxRefundAmount: null,
+        description: 'Pre-arrival candidate cancellation: Full refund when candidate refuses to come'
       },
       {
         cancellationType: 'post_arrival_within_3_months',
+        name: 'Post-Arrival Within 3 Months',
         penaltyFee: 0,
         refundPercentage: 80,
-        nonRefundableFees: ['GOV_FEE', 'ATTORNEY_FEE', 'BROKER_FEE'],
+        nonRefundableComponents: ['Government Fees', 'Attorney Fees', 'Broker Fees'],
         monthlyServiceFee: 50,
         maxRefundAmount: null,
         description: 'Post-arrival cancellation (within 3 months): 80% refund minus non-refundable fees and monthly service charges'
       },
       {
         cancellationType: 'post_arrival_after_3_months',
+        name: 'Post-Arrival After 3 Months',
         penaltyFee: 0,
         refundPercentage: 100,
-        nonRefundableFees: ['GOV_FEE', 'ATTORNEY_FEE', 'BROKER_FEE'],
+        nonRefundableComponents: ['Government Fees', 'Attorney Fees', 'Broker Fees'],
         monthlyServiceFee: 100,
         maxRefundAmount: null,
         description: 'Post-arrival cancellation (after 3 months): Full refund minus non-refundable fees and monthly service fee'
       },
       {
         cancellationType: 'candidate_cancellation',
+        name: 'Candidate Cancellation',
         penaltyFee: 0,
         refundPercentage: 100,
-        nonRefundableFees: [],
+        nonRefundableComponents: [],
         monthlyServiceFee: 0,
         maxRefundAmount: null,
         description: 'Candidate cancellation: Full refund to client, all costs absorbed by office'
@@ -188,7 +202,7 @@ export async function seedBusinessSettings(companyId: string) {
     const additionalCostTypes = [
       {
         name: 'Deportation Cost',
-        description: 'Cost for returning candidate to home country',
+        description: 'Cost for returning candidate to home country (flight ticket and related expenses)',
         active: true
       },
       {

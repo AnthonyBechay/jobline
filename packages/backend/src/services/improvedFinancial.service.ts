@@ -90,7 +90,6 @@ export class ImprovedFinancialService {
       customRefundAmount?: number;
       overridePenaltyFee?: number;
       monthsSinceArrival?: number;
-      deportCandidate?: boolean;
     } = {}
   ): Promise<RefundCalculationResult> {
     // Get cancellation settings
@@ -130,12 +129,15 @@ export class ImprovedFinancialService {
     let refundableComponents = 0;
     let nonRefundableComponents = 0;
 
+    // Parse nonRefundableComponents from JSON
+    const nonRefundableComponentsList = (settings.nonRefundableComponents as string[]) || [];
+
     // If no components exist, treat the entire payment as a single component
     if (feeComponents.length === 0) {
       const isRefundable = this.isComponentRefundable(
         'Application Fee',
         cancellationType,
-        settings.nonRefundableComponents as string[]
+        nonRefundableComponentsList
       );
       
       if (isRefundable) {
@@ -157,7 +159,7 @@ export class ImprovedFinancialService {
         const isRefundable = this.isComponentRefundable(
           component.name,
           cancellationType,
-          settings.nonRefundableComponents as string[]
+          nonRefundableComponentsList
         );
 
         // Special handling for post-arrival cancellations
@@ -199,17 +201,8 @@ export class ImprovedFinancialService {
       monthlyServiceFees = options.monthsSinceArrival * Number(settings.monthlyServiceFee);
     }
 
-    // Add deportation cost if applicable
-    if (options.deportCandidate) {
-      const deportationCost = Number(settings.deportationCost);
-      nonRefundableComponents += deportationCost;
-      componentBreakdown.push({
-        component: 'Deportation Cost',
-        amount: deportationCost,
-        isRefundable: false,
-        refundReason: 'Return ticket and deportation fees'
-      });
-    }
+    // Note: Deportation costs should be added as regular costs to the application
+    // They are not handled specially in refund calculations
 
     // Calculate refund
     let calculatedRefund = refundableComponents - penaltyFee - monthlyServiceFees;

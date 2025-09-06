@@ -8,6 +8,25 @@ import { prisma } from '../index';
 
 const router = Router();
 
+// Helper function to get cancellation type name
+function getCancellationTypeName(type: string): string {
+  switch (type) {
+    case 'pre_arrival':
+    case 'pre_arrival_client':
+      return 'Pre-Arrival Client Cancellation';
+    case 'pre_arrival_candidate':
+      return 'Pre-Arrival Candidate Cancellation';
+    case 'post_arrival_within_3_months':
+      return 'Post-Arrival Within 3 Months';
+    case 'post_arrival_after_3_months':
+      return 'Post-Arrival After 3 Months';
+    case 'candidate_cancellation':
+      return 'Candidate Cancellation';
+    default:
+      return type;
+  }
+}
+
 // All routes require authentication and Super Admin access
 router.use((req, res, next) => {
   console.log('🔐 Business Settings: Checking authentication for', req.path);
@@ -40,8 +59,14 @@ router.get('/cancellation',
 
       console.log('✅ Found', settings.length, 'cancellation settings');
       
+      // Ensure all settings have a name field (for backward compatibility)
+      const settingsWithNames = settings.map(setting => ({
+        ...setting,
+        name: setting.name || getCancellationTypeName(setting.cancellationType)
+      }));
+      
       // If no settings exist, return empty array (frontend will handle this)
-      res.json({ data: settings || [] });
+      res.json({ data: settingsWithNames || [] });
     } catch (error) {
       console.error('❌ Get cancellation settings error:', error);
       res.status(500).json({ error: 'Failed to get cancellation settings' });
@@ -52,10 +77,10 @@ router.get('/cancellation',
 // Create or update cancellation setting
 router.post('/cancellation',
   [
-    body('cancellationType').isIn(['pre_arrival', 'post_arrival_within_3_months', 'post_arrival_after_3_months', 'candidate_cancellation']).withMessage('Invalid cancellation type'),
+    body('cancellationType').isIn(['pre_arrival_client', 'pre_arrival_candidate', 'post_arrival_within_3_months', 'post_arrival_after_3_months', 'candidate_cancellation']).withMessage('Invalid cancellation type'),
     body('penaltyFee').isFloat({ min: 0 }).withMessage('Penalty fee must be a positive number'),
     body('refundPercentage').isFloat({ min: 0, max: 100 }).withMessage('Refund percentage must be between 0 and 100'),
-    body('nonRefundableFees').isArray().withMessage('Non-refundable fees must be an array'),
+    body('nonRefundableComponents').isArray().withMessage('Non-refundable components must be an array'),
     body('monthlyServiceFee').isFloat({ min: 0 }).withMessage('Monthly service fee must be a positive number'),
     body('active').isBoolean().withMessage('Active must be a boolean')
   ],
@@ -75,7 +100,8 @@ router.post('/cancellation',
         update: {
           penaltyFee: req.body.penaltyFee,
           refundPercentage: req.body.refundPercentage,
-          nonRefundableFees: req.body.nonRefundableFees,
+          name: req.body.name || req.body.cancellationType,
+          nonRefundableComponents: req.body.nonRefundableComponents,
           monthlyServiceFee: req.body.monthlyServiceFee,
           maxRefundAmount: req.body.maxRefundAmount,
           description: req.body.description,
@@ -86,7 +112,8 @@ router.post('/cancellation',
           cancellationType: req.body.cancellationType,
           penaltyFee: req.body.penaltyFee,
           refundPercentage: req.body.refundPercentage,
-          nonRefundableFees: req.body.nonRefundableFees,
+          name: req.body.name || req.body.cancellationType,
+          nonRefundableComponents: req.body.nonRefundableComponents,
           monthlyServiceFee: req.body.monthlyServiceFee,
           maxRefundAmount: req.body.maxRefundAmount,
           description: req.body.description,
@@ -106,7 +133,7 @@ router.post('/cancellation',
 // Get cancellation setting by type
 router.get('/cancellation/:type',
   [
-    param('type').isIn(['pre_arrival', 'post_arrival_within_3_months', 'post_arrival_after_3_months', 'candidate_cancellation'])
+    param('type').isIn(['pre_arrival_client', 'pre_arrival_candidate', 'post_arrival_within_3_months', 'post_arrival_after_3_months', 'candidate_cancellation'])
   ],
   validate,
   async (req: AuthRequest, res) => {
@@ -137,10 +164,10 @@ router.get('/cancellation/:type',
 // Create or update cancellation setting
 router.post('/cancellation',
   [
-    body('cancellationType').isIn(['pre_arrival', 'post_arrival_within_3_months', 'post_arrival_after_3_months', 'candidate_cancellation']),
+    body('cancellationType').isIn(['pre_arrival_client', 'pre_arrival_candidate', 'post_arrival_within_3_months', 'post_arrival_after_3_months', 'candidate_cancellation']),
     body('penaltyFee').isFloat({ min: 0 }).withMessage('Penalty fee must be a positive number'),
     body('refundPercentage').isFloat({ min: 0, max: 100 }).withMessage('Refund percentage must be between 0 and 100'),
-    body('nonRefundableFees').optional().isArray(),
+    body('nonRefundableComponents').optional().isArray(),
     body('monthlyServiceFee').isFloat({ min: 0 }).withMessage('Monthly service fee must be a positive number'),
     body('maxRefundAmount').optional().isFloat({ min: 0 }),
     body('description').optional().trim(),
@@ -153,7 +180,8 @@ router.post('/cancellation',
         cancellationType,
         penaltyFee,
         refundPercentage,
-        nonRefundableFees,
+        name,
+        nonRefundableComponents,
         monthlyServiceFee,
         maxRefundAmount,
         description,
@@ -178,7 +206,8 @@ router.post('/cancellation',
           data: {
             penaltyFee,
             refundPercentage,
-            nonRefundableFees,
+            name: name || cancellationType,
+            nonRefundableComponents,
             monthlyServiceFee,
             maxRefundAmount,
             description,
@@ -192,7 +221,8 @@ router.post('/cancellation',
             cancellationType,
             penaltyFee,
             refundPercentage,
-            nonRefundableFees,
+            name: name || cancellationType,
+            nonRefundableComponents,
             monthlyServiceFee,
             maxRefundAmount,
             description,
@@ -216,7 +246,7 @@ router.put('/cancellation/:id',
     param('id').isUUID().withMessage('Valid ID required'),
     body('penaltyFee').optional().isFloat({ min: 0 }).withMessage('Penalty fee must be a positive number'),
     body('refundPercentage').optional().isFloat({ min: 0, max: 100 }).withMessage('Refund percentage must be between 0 and 100'),
-    body('nonRefundableFees').optional().isArray().withMessage('Non-refundable fees must be an array'),
+    body('nonRefundableComponents').optional().isArray().withMessage('Non-refundable components must be an array'),
     body('monthlyServiceFee').optional().isFloat({ min: 0 }).withMessage('Monthly service fee must be a positive number'),
     body('maxRefundAmount').optional().isFloat({ min: 0 }),
     body('description').optional().trim(),
@@ -260,7 +290,7 @@ router.put('/cancellation/:id',
 // Delete cancellation setting by type
 router.delete('/cancellation/:type',
   [
-    param('type').isIn(['pre_arrival', 'post_arrival_within_3_months', 'post_arrival_after_3_months', 'candidate_cancellation'])
+    param('type').isIn(['pre_arrival_client', 'pre_arrival_candidate', 'post_arrival_within_3_months', 'post_arrival_after_3_months', 'candidate_cancellation'])
   ],
   validate,
   async (req: AuthRequest, res) => {
@@ -516,7 +546,7 @@ router.post('/calculate-fee',
 router.post('/calculate-refund',
   [
     body('applicationId').isUUID(),
-    body('cancellationType').isIn(['pre_arrival', 'post_arrival_within_3_months', 'post_arrival_after_3_months', 'candidate_cancellation']),
+    body('cancellationType').isIn(['pre_arrival_client', 'pre_arrival_candidate', 'post_arrival_within_3_months', 'post_arrival_after_3_months', 'candidate_cancellation']),
     body('customRefundAmount').optional().isFloat({ min: 0 })
   ],
   validate,
