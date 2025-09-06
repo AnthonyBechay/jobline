@@ -2,10 +2,11 @@ import { ApplicationStatus, CandidateStatus, ApplicationType } from '@prisma/cli
 import { prisma } from '../index';
 import { ApplicationStateMachine } from './applicationStateMachine.service';
 import { FinancialStrategyService, RefundCalculationResult } from './financialStrategy.service';
+import { ImprovedFinancialService } from './improvedFinancial.service';
 
 export interface CancellationRequest {
   applicationId: string;
-  cancellationType: 'pre_arrival' | 'post_arrival_within_3_months' | 'post_arrival_after_3_months' | 'candidate_cancellation';
+  cancellationType: 'pre_arrival' | 'pre_arrival_client' | 'pre_arrival_candidate' | 'post_arrival_within_3_months' | 'post_arrival_after_3_months' | 'candidate_cancellation';
   reason?: string;
   notes?: string;
   customRefundAmount?: number;
@@ -66,21 +67,11 @@ export class ApplicationCancellationService {
         throw new Error(`Cancellation not allowed: ${isValidCancellation.reason}`);
       }
 
-      // Get cancellation settings
-      const cancellationSettings = await FinancialStrategyService.getCancellationSettings(
-        companyId,
-        request.cancellationType
-      );
-
-      if (!cancellationSettings) {
-        throw new Error(`No cancellation settings found for type: ${request.cancellationType}`);
-      }
-
-      // Calculate refund
+      // Calculate refund using improved financial service
       const refundCalculation = await this.calculateRefund(
         application,
         request,
-        cancellationSettings
+        companyId
       );
 
       // Process the cancellation based on type
@@ -519,18 +510,24 @@ export class ApplicationCancellationService {
   private static async calculateRefund(
     application: any,
     request: CancellationRequest,
-    settings: any
-  ): Promise<RefundCalculationResult> {
+    companyId: string
+  ): Promise<any> {
     const options: any = {};
+
+    // Use the cancellation type directly (it should already be specific)
+    let specificCancellationType = request.cancellationType;
+    // Handle legacy 'pre_arrival' type by defaulting to client cancellation
+    if (specificCancellationType === 'pre_arrival') {
+      specificCancellationType = 'pre_arrival_client';
+    }
 
     // Add timing information for post-arrival cancellations
     if ((request.cancellationType === 'post_arrival_within_3_months' || request.cancellationType === 'post_arrival_after_3_months') && application.exactArrivalDate) {
       const arrivalDate = new Date(application.exactArrivalDate);
-      const monthsSinceArrival = FinancialStrategyService.calculateMonthlyServiceFee(
+      const monthsSinceArrival = ImprovedFinancialService.calculateMonthsSinceArrival(
         arrivalDate,
-        new Date(),
-        0
-      ).months;
+        new Date()
+      );
       options.monthsSinceArrival = monthsSinceArrival;
     }
 
@@ -541,16 +538,18 @@ export class ApplicationCancellationService {
 
     // Override penalty fee if provided (super admin only)
     if (request.overrideFee !== undefined) {
-      settings = {
-        ...settings,
-        penaltyFee: request.overrideFee
-      };
+      options.overridePenaltyFee = request.overrideFee;
     }
 
-    return await FinancialStrategyService.calculateRefund(
+    // Add deportation flag
+    if (request.deportCandidate) {
+      options.deportCandidate = true;
+    }
+
+    return await ImprovedFinancialService.calculateImprovedRefund(
       application,
-      request.cancellationType,
-      settings,
+      specificCancellationType,
+      companyId,
       options
     );
   }
@@ -578,6 +577,8 @@ export class ApplicationCancellationService {
   private static getCancellationStatus(cancellationType: string): ApplicationStatus {
     switch (cancellationType) {
       case 'pre_arrival':
+      case 'pre_arrival_client':
+      case 'pre_arrival_candidate':
         return ApplicationStatus.CANCELLED_PRE_ARRIVAL;
       case 'post_arrival_within_3_months':
       case 'post_arrival_after_3_months':
@@ -661,19 +662,14 @@ export class ApplicationCancellationService {
     }
 
     // Get refund estimate for the most likely cancellation type
-    let refundEstimate: RefundCalculationResult | undefined;
+    let refundEstimate: any | undefined;
     if (availableTypes.length > 0) {
       try {
-        const settings = await FinancialStrategyService.getCancellationSettings(
-          companyId,
-          availableTypes[0]
-        );
-        if (settings) {
-          refundEstimate = await this.calculateRefund(application, {
-            applicationId,
-            cancellationType: availableTypes[0] as any
-          }, settings);
-        }
+        refundEstimate = await this.calculateRefund(application, {
+          applicationId,
+          cancellationType: availableTypes[0] as any,
+          reason: ''
+        }, companyId);
       } catch (error) {
         console.warn('Could not calculate refund estimate:', error);
       }

@@ -51,7 +51,8 @@ import {
   ExpandLess as ExpandLessIcon,
   CheckCircle as CheckIcon,
   Cancel as CancelIcon,
-  Search as SearchIcon
+  Search as SearchIcon,
+  Business as BusinessIcon
 } from '@mui/icons-material';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -94,6 +95,7 @@ interface CancellationFormData {
   deportCandidate: boolean;
   nextAction?: string;
   keepWaiting?: boolean;
+  isCandidateCancellation?: boolean; // To differentiate between client and candidate pre-arrival cancellation
 }
 
 const ApplicationCancellationDialog: React.FC<ApplicationCancellationDialogProps> = ({
@@ -228,9 +230,20 @@ const ApplicationCancellationDialog: React.FC<ApplicationCancellationDialogProps
       return;
     }
 
+    // Adjust cancellation type for pre-arrival based on who is cancelling
+    let finalCancellationType = formData.cancellationType;
+    if (formData.cancellationType === 'pre_arrival') {
+      finalCancellationType = formData.isCandidateCancellation 
+        ? 'pre_arrival_candidate' 
+        : 'pre_arrival_client';
+    }
+
     setLoading(true);
     try {
-      const response = await api.post(`/cancellations/${applicationId}/cancel`, formData);
+      const response = await api.post(`/cancellations/${applicationId}/cancel`, {
+        ...formData,
+        cancellationType: finalCancellationType
+      });
       
       onSuccess(response.data.message || 'Application cancelled successfully');
       onClose();
@@ -245,30 +258,38 @@ const ApplicationCancellationDialog: React.FC<ApplicationCancellationDialogProps
   const getCancellationTypeInfo = (type: string) => {
     switch (type) {
       case 'pre_arrival':
+        if (formData.isCandidateCancellation) {
+          return {
+            label: 'Pre-Arrival Candidate Cancellation',
+            description: 'Candidate cancels before arrival. Full refund to client, office absorbs all costs.',
+            icon: <PersonIcon />,
+            color: 'secondary'
+          };
+        }
         return {
-          label: 'Pre-Arrival Cancellation',
-          description: 'Cancel before worker arrives in Lebanon. Full refund minus penalty fee.',
+          label: 'Pre-Arrival Client Cancellation',
+          description: 'Client cancels before worker arrives. Refund minus penalty fee.',
           icon: <FlightIcon />,
           color: 'warning'
         };
       case 'post_arrival_within_3_months':
         return {
           label: 'Post-Arrival (Within 3 Months)',
-          description: 'Cancel within probation period. Partial refund based on settings.',
+          description: 'Cancel within probation period. Partial refund based on non-refundable components.',
           icon: <HomeIcon />,
           color: 'info'
         };
       case 'post_arrival_after_3_months':
         return {
           label: 'Post-Arrival (After 3 Months)',
-          description: 'Cancel after probation period. Limited refund may apply.',
+          description: 'Cancel after probation period. Limited refund with more non-refundable components.',
           icon: <HomeIcon />,
           color: 'error'
         };
       case 'candidate_cancellation':
         return {
-          label: 'Candidate Cancellation',
-          description: 'Candidate initiated cancellation. Full refund to client.',
+          label: 'Candidate Post-Arrival Cancellation',
+          description: 'Candidate initiated cancellation after arrival. Full refund to client.',
           icon: <PersonIcon />,
           color: 'secondary'
         };
@@ -383,6 +404,60 @@ const ApplicationCancellationDialog: React.FC<ApplicationCancellationDialogProps
                   );
                 })}
               </Grid>
+              
+              {/* Show additional option for pre-arrival to specify who is cancelling */}
+              {formData.cancellationType === 'pre_arrival' && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Who is initiating the cancellation?
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                      <Paper
+                        sx={{
+                          p: 2,
+                          cursor: 'pointer',
+                          border: '2px solid',
+                          borderColor: !formData.isCandidateCancellation ? 'primary.main' : 'grey.300',
+                          bgcolor: !formData.isCandidateCancellation ? 'primary.50' : 'transparent',
+                          '&:hover': { bgcolor: 'primary.50' }
+                        }}
+                        onClick={() => handleInputChange('isCandidateCancellation', false)}
+                      >
+                        <Box display="flex" alignItems="center">
+                          <BusinessIcon sx={{ mr: 1 }} />
+                          <Typography variant="body1">Client</Typography>
+                        </Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Client is cancelling the application
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Paper
+                        sx={{
+                          p: 2,
+                          cursor: 'pointer',
+                          border: '2px solid',
+                          borderColor: formData.isCandidateCancellation ? 'secondary.main' : 'grey.300',
+                          bgcolor: formData.isCandidateCancellation ? 'secondary.50' : 'transparent',
+                          '&:hover': { bgcolor: 'secondary.50' }
+                        }}
+                        onClick={() => handleInputChange('isCandidateCancellation', true)}
+                      >
+                        <Box display="flex" alignItems="center">
+                          <PersonIcon sx={{ mr: 1 }} />
+                          <Typography variant="body1">Candidate</Typography>
+                        </Box>
+                        <Typography variant="caption" color="text.secondary">
+                          Candidate is refusing to come
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+                </Box>
+              )}
+              
               <Box sx={{ mt: 2 }}>
                 <Button onClick={handleNext} variant="contained" disabled={!formData.cancellationType}>
                   Next

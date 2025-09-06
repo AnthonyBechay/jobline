@@ -1,0 +1,65 @@
+-- CreateTable for FeeComponent (only if it doesn't exist)
+CREATE TABLE IF NOT EXISTS "fee_components" (
+    "id" TEXT NOT NULL,
+    "fee_template_id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "amount" DECIMAL(10,2) NOT NULL,
+    "is_refundable" BOOLEAN NOT NULL DEFAULT true,
+    "refundable_after_arrival" BOOLEAN NOT NULL DEFAULT false,
+    "description" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "fee_components_pkey" PRIMARY KEY ("id")
+);
+
+-- Add columns to CancellationSetting only if they don't exist
+DO $$ 
+BEGIN
+    -- Add name column if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'cancellation_settings' 
+                   AND column_name = 'name') THEN
+        ALTER TABLE "cancellation_settings" ADD COLUMN "name" TEXT;
+    END IF;
+    
+    -- Add deportation_cost column if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'cancellation_settings' 
+                   AND column_name = 'deportation_cost') THEN
+        ALTER TABLE "cancellation_settings" ADD COLUMN "deportation_cost" DECIMAL(10,2) DEFAULT 500;
+    END IF;
+    
+    -- Handle non_refundable_components column
+    IF EXISTS (SELECT 1 FROM information_schema.columns 
+               WHERE table_name = 'cancellation_settings' 
+               AND column_name = 'non_refundable_fees') THEN
+        -- Rename old column if it exists
+        ALTER TABLE "cancellation_settings" 
+        RENAME COLUMN "non_refundable_fees" TO "non_refundable_components";
+    ELSIF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                      WHERE table_name = 'cancellation_settings' 
+                      AND column_name = 'non_refundable_components') THEN
+        -- Add new column if neither exists
+        ALTER TABLE "cancellation_settings" ADD COLUMN "non_refundable_components" JSONB;
+    END IF;
+END $$;
+
+-- CreateIndex only if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes 
+                   WHERE indexname = 'fee_components_fee_template_id_idx') THEN
+        CREATE INDEX "fee_components_fee_template_id_idx" ON "fee_components"("fee_template_id");
+    END IF;
+END $$;
+
+-- AddForeignKey only if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint 
+                   WHERE conname = 'fee_components_fee_template_id_fkey') THEN
+        ALTER TABLE "fee_components" ADD CONSTRAINT "fee_components_fee_template_id_fkey" 
+        FOREIGN KEY ("fee_template_id") REFERENCES "fee_templates"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;

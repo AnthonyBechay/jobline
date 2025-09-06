@@ -10,13 +10,16 @@ const router = Router();
 router.use(authenticate);
 router.use(superAdminOnly);
 
-// Get all fee templates (company-specific)
+// Get all fee templates with components (company-specific)
 router.get('/', async (req: AuthRequest, res) => {
   try {
     const companyId = req.user!.companyId;
     
     const feeTemplates = await prisma.feeTemplate.findMany({
       where: { companyId },
+      include: {
+        feeComponents: true // Include components in the response
+      },
       orderBy: { name: 'asc' },
     });
     
@@ -27,7 +30,7 @@ router.get('/', async (req: AuthRequest, res) => {
   }
 });
 
-// Get fee template by ID (company-specific)
+// Get fee template by ID with components (company-specific)
 router.get('/:id', async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
@@ -38,6 +41,9 @@ router.get('/:id', async (req: AuthRequest, res) => {
         id,
         companyId,
       },
+      include: {
+        feeComponents: true // Include components
+      }
     });
     
     if (!feeTemplate) {
@@ -52,7 +58,7 @@ router.get('/:id', async (req: AuthRequest, res) => {
   }
 });
 
-// Create new fee template (company-specific)
+// Create new fee template with components (company-specific)
 router.post(
   '/',
   [
@@ -63,11 +69,12 @@ router.post(
     body('currency').optional().isString(),
     body('nationality').optional().isString(),
     body('description').optional().trim(),
+    body('components').optional().isArray(), // Add components validation
   ],
   validate,
   async (req: AuthRequest, res) => {
     try {
-      const { name, defaultPrice, minPrice, maxPrice, currency = 'USD', nationality, description } = req.body;
+      const { name, defaultPrice, minPrice, maxPrice, currency = 'USD', nationality, description, components } = req.body;
       const companyId = req.user!.companyId;
       
       // Validate price range
@@ -98,17 +105,41 @@ router.post(
         return;
       }
       
-      const feeTemplate = await prisma.feeTemplate.create({
-        data: {
-          name,
-          defaultPrice,
-          minPrice,
-          maxPrice,
-          currency,
-          nationality,
-          description,
-          companyId,
-        },
+      // Create fee template with components in a transaction
+      const feeTemplate = await prisma.$transaction(async (tx) => {
+        // Create the fee template
+        const template = await tx.feeTemplate.create({
+          data: {
+            name,
+            defaultPrice,
+            minPrice,
+            maxPrice,
+            currency,
+            nationality,
+            description,
+            companyId,
+          },
+        });
+        
+        // Create components if provided
+        if (components && Array.isArray(components) && components.length > 0) {
+          await tx.feeComponent.createMany({
+            data: components.map((component: any) => ({
+              feeTemplateId: template.id,
+              name: component.name,
+              amount: component.amount || 0,
+              isRefundable: component.isRefundable !== false,
+              refundableAfterArrival: component.refundableAfterArrival || false,
+              description: component.description,
+            })),
+          });
+        }
+        
+        // Return template with components
+        return await tx.feeTemplate.findUnique({
+          where: { id: template.id },
+          include: { feeComponents: true },
+        });
       });
       
       res.status(201).json(feeTemplate);
@@ -119,7 +150,7 @@ router.post(
   }
 );
 
-// Update fee template (company-specific)
+// Update fee template with components (company-specific)
 router.put(
   '/:id',
   [
@@ -131,6 +162,7 @@ router.put(
     body('currency').optional().isString(),
     body('nationality').optional().isString(),
     body('description').optional().trim(),
+    body('components').optional().isArray(), // Add components validation
   ],
   validate,
   async (req: AuthRequest, res) => {
@@ -180,9 +212,49 @@ router.put(
         }
       }
       
-      const feeTemplate = await prisma.feeTemplate.update({
-        where: { id },
-        data: updateData,
+      // Update fee template with components in a transaction
+      const feeTemplate = await prisma.$transaction(async (tx) => {
+        // Update the fee template
+        const updatedTemplate = await tx.feeTemplate.update({
+          where: { id },
+          data: {
+            name: updateData.name,
+            defaultPrice: updateData.defaultPrice,
+            minPrice: updateData.minPrice,
+            maxPrice: updateData.maxPrice,
+            currency: updateData.currency,
+            nationality: updateData.nationality,
+            description: updateData.description,
+          },
+        });
+        
+        // Handle components if provided
+        if (updateData.components !== undefined) {
+          // Delete existing components
+          await tx.feeComponent.deleteMany({
+            where: { feeTemplateId: id },
+          });
+          
+          // Create new components
+          if (Array.isArray(updateData.components) && updateData.components.length > 0) {
+            await tx.feeComponent.createMany({
+              data: updateData.components.map((component: any) => ({
+                feeTemplateId: id,
+                name: component.name,
+                amount: component.amount || 0,
+                isRefundable: component.isRefundable !== false,
+                refundableAfterArrival: component.refundableAfterArrival || false,
+                description: component.description,
+              })),
+            });
+          }
+        }
+        
+        // Return template with components
+        return await tx.feeTemplate.findUnique({
+          where: { id },
+          include: { feeComponents: true },
+        });
       });
       
       res.json(feeTemplate);

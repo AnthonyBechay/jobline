@@ -46,6 +46,8 @@ import {
   Person as ClientIcon,
   CheckCircle as CheckIcon,
   RadioButtonUnchecked as PendingIcon,
+  AddCircle as AddCircleIcon,
+  RemoveCircle as RemoveCircleIcon,
 } from '@mui/icons-material'
 import { useForm, Controller } from 'react-hook-form'
 import { DocumentTemplate, FeeTemplate, ServiceType } from '../../shared/types'
@@ -99,6 +101,7 @@ const Templates = ({ onBack, onError, onSuccess }: TemplatesProps) => {
   const [editingFeeTemplate, setEditingFeeTemplate] = useState<FeeTemplate | null>(null)
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([])
   const [nationalities, setNationalities] = useState<any[]>([])
+  const [feeComponents, setFeeComponents] = useState<any[]>([])
 
   // Document Templates State
   const [documentTemplates, setDocumentTemplates] = useState<DocumentTemplate[]>([])
@@ -163,6 +166,7 @@ const Templates = ({ onBack, onError, onSuccess }: TemplatesProps) => {
         defaultPrice: parseFloat(data.defaultPrice),
         minPrice: parseFloat(data.minPrice),
         maxPrice: parseFloat(data.maxPrice),
+        components: feeComponents // Include components in the save data
       }
       
       if (editingFeeTemplate) {
@@ -175,6 +179,7 @@ const Templates = ({ onBack, onError, onSuccess }: TemplatesProps) => {
       setFeeTemplateDialog(false)
       resetFeeTemplate()
       setEditingFeeTemplate(null)
+      setFeeComponents([]) // Reset components
       fetchFeeTemplates()
     } catch (err: any) {
       onError(err.response?.data?.error || 'Failed to save fee template')
@@ -201,6 +206,8 @@ const Templates = ({ onBack, onError, onSuccess }: TemplatesProps) => {
     setFeeTemplateValue('maxPrice', feeTemplate.maxPrice)
     setFeeTemplateValue('nationality', feeTemplate.nationality)
     setFeeTemplateValue('serviceType', feeTemplate.serviceType)
+    // Load existing components if any
+    setFeeComponents((feeTemplate as any).feeComponents || [])
     setFeeTemplateDialog(true)
   }
 

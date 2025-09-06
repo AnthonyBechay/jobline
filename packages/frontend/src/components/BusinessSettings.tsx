@@ -122,11 +122,18 @@ const BusinessSettings: React.FC = () => {
 
   const cancellationTypes = [
     { 
-      value: 'pre_arrival', 
-      label: 'Pre-Arrival Cancellation',
+      value: 'pre_arrival_client', 
+      label: 'Pre-Arrival Client Cancellation',
       description: 'Client cancels before worker arrives in Lebanon',
       color: '#FFA726',
-      icon: '✈️'
+      icon: '💼'
+    },
+    { 
+      value: 'pre_arrival_candidate', 
+      label: 'Pre-Arrival Candidate Cancellation',
+      description: 'Candidate refuses to come before arrival',
+      color: '#9C27B0',
+      icon: '👤'
     },
     { 
       value: 'post_arrival_within_3_months', 

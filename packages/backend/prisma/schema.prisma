@@ -352,11 +352,29 @@ model FeeTemplate {
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
   applications Application[]
+  feeComponents FeeComponent[]
 
   @@unique([companyId, name])
   @@index([companyId])
   @@index([nationality])
   @@map("fee_templates")
+}
+
+// FeeComponent model for breaking down fee structures
+model FeeComponent {
+  id            String      @id @default(uuid())
+  feeTemplateId String      @map("fee_template_id")
+  feeTemplate   FeeTemplate @relation(fields: [feeTemplateId], references: [id], onDelete: Cascade)
+  name          String      // e.g., "Office Service", "Insurance", "Ticket", "Government Fees"
+  amount        Decimal     @db.Decimal(10, 2)
+  isRefundable  Boolean     @default(true) @map("is_refundable")
+  refundableAfterArrival Boolean @default(false) @map("refundable_after_arrival")
+  description   String?
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  @@index([feeTemplateId])
+  @@map("fee_components")
 }
 
 // File model for managing uploaded files
@@ -536,12 +554,14 @@ model OfficeOverheadCost {
 // Cancellation Settings model for configurable cancellation policies
 model CancellationSetting {
   id                  String   @id @default(uuid())
-  cancellationType    String   @map("cancellation_type") // 'pre_arrival', 'post_arrival_within_3_months', 'post_arrival_after_3_months', 'candidate_cancellation'
+  cancellationType    String   @map("cancellation_type") // 'pre_arrival_client', 'pre_arrival_candidate', 'post_arrival_within_3_months', 'post_arrival_after_3_months', 'candidate_cancellation'
+  name                String   // Human-readable name for the cancellation type
   penaltyFee          Decimal  @default(0) @map("penalty_fee") @db.Decimal(10, 2)
   refundPercentage    Decimal  @default(100) @map("refund_percentage") @db.Decimal(5, 2) // 0-100
-  nonRefundableFees   Json?    @map("non_refundable_fees") // Array of fee types that are non-refundable
+  nonRefundableComponents Json? @map("non_refundable_components") // Array of component names that are non-refundable
   monthlyServiceFee   Decimal  @default(0) @map("monthly_service_fee") @db.Decimal(10, 2)
   maxRefundAmount     Decimal? @map("max_refund_amount") @db.Decimal(10, 2)
+  deportationCost     Decimal  @default(500) @map("deportation_cost") @db.Decimal(10, 2)
   description         String?
   active              Boolean  @default(true)
   companyId           String   @map("company_id")

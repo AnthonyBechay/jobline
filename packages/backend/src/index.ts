@@ -18,6 +18,7 @@ import agentRouter from './routes/agent.routes';
 import brokerRouter from './routes/broker.routes';
 import settingRouter from './routes/setting.routes';
 import feeTemplateRouter from './routes/feeTemplate.routes';
+import feeComponentRouter from './routes/feeComponent.routes';
 import dashboardRouter from './routes/dashboard.routes';
 import publicRouter from './routes/public.routes';
 import documentItemRouter from './routes/documentItem.routes';
@@ -114,6 +115,7 @@ app.use('/api/agents', agentRouter);
 app.use('/api/brokers', brokerRouter);
 app.use('/api/settings', settingRouter);
 app.use('/api/fee-templates', feeTemplateRouter);
+app.use('/api/fee-components', feeComponentRouter); // Enhanced fee templates with components
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/public', publicRouter); // For client shareable links
 app.use('/api/document-items', documentItemRouter);
