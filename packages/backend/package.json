@@ -15,14 +15,10 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:diagnose": "ts-node src/scripts/diagnoseSchema.ts",
-    "db:fix-render": "ts-node src/scripts/fixRenderDatabase.ts",
-    "db:fix-local": "ts-node src/scripts/updateCancellationSettings.ts",
     "seed:company": "ts-node src/scripts/seedCompany.ts",
     "seed:settings": "ts-node src/scripts/seedBusinessSettings.ts",
     "seed:all": "ts-node src/scripts/seedCompany.ts && ts-node src/scripts/seedBusinessSettings.ts",
-    "postinstall": "prisma generate",
-    "render-build": "npm install && npx prisma generate && npm run build && npx prisma migrate deploy && node dist/scripts/fixRenderDatabase.js",
-    "render-start": "node dist/index.js"
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.876.0",

@@ -2,71 +2,139 @@
 
 A comprehensive web application for recruitment agencies in Lebanon specializing in domestic workers.
 
-## 🚀 Quick Start
+## 🚀 Quick Start with Docker
 
 ### Prerequisites
-- Node.js (v16 or higher)
-- npm (v7 or higher)
-- PostgreSQL (v12 or higher)
+- Docker and Docker Compose
+- PostgreSQL database (can be external or in Docker)
 
-### Installation
+### Environment Setup
 
-1. **Create Database**
+Create a `.env` file in the root directory:
+
+```env
+# Database
+DATABASE_URL=postgresql://user:password@host:5432/jobline_db?schema=public
+
+# JWT Configuration
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+JWT_EXPIRES_IN=7d
+
+# Setup Key (for initial user registration)
+SETUP_KEY=jobline-setup-2024
+
+# Frontend URL (your production domain)
+FRONTEND_URL=https://yourdomain.com
+
+# Build Args (for frontend)
+VITE_API_URL=/api
+
+# File Upload
+MAX_FILE_SIZE=5242880
+UPLOAD_DIR=./uploads
+```
+
+### Deployment
+
+1. **Build and start the application**
    ```bash
-   psql -U postgres
-   CREATE DATABASE jobline_db;
-   \q
+   docker-compose up -d
    ```
 
-2. **Setup Project**
+2. **View logs**
    ```bash
-   node setup.js
+   docker-compose logs -f
    ```
 
-3. **Start Application**
+3. **Stop the application**
    ```bash
-   node start.js
+   docker-compose down
    ```
 
-4. **Initial Setup**
-   - Open http://localhost:5173/register
-   - Create your first Super Admin account
-   - Setup Key: `jobline-setup-2024` (from .env file)
-
-### Access Points
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:5000
+### Initial Setup
+- Open your frontend URL in a browser
+- Navigate to `/register`
+- Create your first Super Admin account
+- Use the `SETUP_KEY` from your `.env` file
 
 ## 📁 Project Structure
 
 ```
 jobline/
 ├── packages/
-│   ├── shared/         # Shared TypeScript types
-│   ├── backend/        # Express.js + Prisma + PostgreSQL
-│   └── frontend/       # React + Material-UI + Vite
-├── setup.js            # Setup script
-├── start.js            # Start development servers
-├── clean.js            # Clean build artifacts
-└── README.md           # This file
+│   ├── shared/              # Shared TypeScript types
+│   ├── backend/             # Express.js + Prisma + PostgreSQL
+│   │   ├── src/            # Source code
+│   │   ├── prisma/         # Database schema and migrations
+│   │   └── Dockerfile      # Backend Docker configuration
+│   └── frontend/           # React + Material-UI + Vite
+│       ├── src/            # Source code
+│       └── Dockerfile      # Frontend Docker configuration
+├── docker-compose.yml       # Docker Compose configuration
+├── .dockerignore           # Docker ignore patterns
+└── README.md               # This file
 ```
 
-## 🔧 Scripts
+## 🔧 Development
 
-### Main Scripts
-- `node setup.js` - Initial setup (install dependencies, setup database)
-- `node start.js` - Start development servers
-- `node clean.js` - Clean all build artifacts and dependencies
+### Local Development (without Docker)
 
-### Backend Commands (from packages/backend)
+#### Prerequisites
+- Node.js (v18 or higher)
+- npm (v9 or higher)
+- PostgreSQL (v12 or higher)
+
+#### Setup
+
+1. **Create Database**
+   ```bash
+   psql -U postgres -c "CREATE DATABASE jobline_db;"
+   ```
+
+2. **Install Dependencies**
+   ```bash
+   npm install
+   cd packages/backend && npm install
+   cd ../frontend && npm install
+   cd ../shared && npm install
+   ```
+
+3. **Setup Environment**
+   Create `.env` file in `packages/backend/`:
+   ```env
+   DATABASE_URL="postgresql://postgres:password@localhost:5432/jobline_db?schema=public"
+   PORT=5000
+   NODE_ENV=development
+   JWT_SECRET=your-super-secret-jwt-key
+   JWT_EXPIRES_IN=7d
+   SETUP_KEY=jobline-setup-2024
+   FRONTEND_URL=http://localhost:5173
+   MAX_FILE_SIZE=5242880
+   UPLOAD_DIR=./uploads
+   ```
+
+4. **Run Database Migrations**
+   ```bash
+   npm run db:migrate
+   ```
+
+5. **Start Development Servers**
+   ```bash
+   npm run dev:backend    # Backend on port 5000
+   npm run dev:frontend   # Frontend on port 5173
+   ```
+
+### Backend Commands
 ```bash
 npm run dev              # Start development server
 npm run build            # Build for production
+npm run db:migrate       # Run database migrations
+npm run db:generate      # Generate Prisma client
+npm run db:seed          # Seed database
 npx prisma studio        # Database GUI
-npx prisma migrate dev   # Run migrations
 ```
 
-### Frontend Commands (from packages/frontend)
+### Frontend Commands
 ```bash
 npm run dev              # Start development server
 npm run build            # Build for production
@@ -75,13 +143,14 @@ npm run build            # Build for production
 ## 👥 User Management
 
 ### First Time Setup
-1. Use the `/register` page to create the first Super Admin
-2. Requires a setup key from the `.env` file
-3. Only works when no users exist in the database
+1. Navigate to `/register` on the frontend
+2. Create the first Super Admin account
+3. Requires the setup key from `.env`
+4. Only works when no users exist in the database
 
 ### User Roles
 - **Super Admin**: Full system access, financial data, user management
-- **Admin**: Operational access, no financial data
+- **Admin**: Operational access, no financial data visibility
 
 ### Creating Additional Users
 - Super Admins can create new users from Settings > Users
@@ -99,7 +168,7 @@ npm run build            # Build for production
 
 ### For Admin
 - Candidate management
-- Client management  
+- Client management
 - Application tracking
 - Payment recording (revenue only)
 - Document checklist management
@@ -113,50 +182,68 @@ npm run build            # Build for production
 
 ## 🔐 Security
 
-### Environment Variables
-Update `.env` file in `packages/backend/`:
-```env
-DATABASE_URL="postgresql://postgres:yourpassword@localhost:5432/jobline_db"
-JWT_SECRET=your-super-secret-jwt-key
-SETUP_KEY=your-setup-key
+### Production Security Checklist
+- [ ] Change all default passwords
+- [ ] Use strong, unique JWT_SECRET
+- [ ] Update SETUP_KEY to something unique
+- [ ] Configure proper DATABASE_URL with strong credentials
+- [ ] Enable HTTPS on your domain
+- [ ] Configure CORS properly (via FRONTEND_URL)
+- [ ] Regularly backup your database
+- [ ] Keep dependencies updated
+
+## 🐳 Docker Deployment on Coolify/Hetzner
+
+### Coolify Setup
+
+1. **Connect your Git repository** to Coolify
+
+2. **Set Environment Variables** in Coolify dashboard:
+   - `DATABASE_URL`
+   - `JWT_SECRET`
+   - `JWT_EXPIRES_IN`
+   - `SETUP_KEY`
+   - `FRONTEND_URL`
+   - `VITE_API_URL`
+
+3. **Deploy** - Coolify will automatically use the `docker-compose.yml`
+
+### Database Migration
+
+Migrations run automatically on container startup. To run manually:
+
+```bash
+docker-compose exec backend sh -c "cd packages/backend && npx prisma migrate deploy"
 ```
-
-### Production Security
-- Change all default passwords
-- Use strong JWT_SECRET
-- Update SETUP_KEY
-- Enable HTTPS
-- Configure CORS properly
-
-## 🚀 Deployment
-
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions to:
-- Render (Backend)
-- Vercel (Frontend)
 
 ## 🔨 Troubleshooting
 
 ### Database Connection Issues
 ```bash
-# Check PostgreSQL is running
-psql -U postgres -c "\l"
+# Check database is accessible
+docker-compose exec backend sh -c "cd packages/backend && npx prisma db push"
 
-# Recreate database
-psql -U postgres -c "DROP DATABASE IF EXISTS jobline_db;"
-psql -U postgres -c "CREATE DATABASE jobline_db;"
+# View migration status
+docker-compose exec backend sh -c "cd packages/backend && npx prisma migrate status"
 ```
 
-### Port Issues
-- Backend: Port 5000
-- Frontend: Port 5173
-- Kill processes using these ports or change in config
-
-### Build Issues
+### Container Issues
 ```bash
-# Clean everything and start fresh
-node clean.js
-node setup.js
+# View logs
+docker-compose logs -f backend
+docker-compose logs -f frontend
+
+# Restart containers
+docker-compose restart
+
+# Rebuild containers
+docker-compose up -d --build
 ```
+
+### Port Conflicts
+- Backend runs on port 5000 internally
+- Frontend runs on port 80 (nginx)
+- Make sure these ports are available or configure different ones in docker-compose.yml
 
 ## 📄 License
 

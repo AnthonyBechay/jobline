@@ -7,23 +7,17 @@
     "packages/*"
   ],
   "scripts": {
-    "setup": "node setup.js",
-    "start": "node start.js",
-    "dev": "node start.js",
     "dev:backend": "cd packages/backend && npm run dev",
     "dev:frontend": "cd packages/frontend && npm run dev",
     "build:shared": "cd packages/shared && npm run build",
     "build:frontend": "cd packages/frontend && npm run build",
     "build:backend": "cd packages/backend && npm run build",
-    "build": "npm run build:shared && npm run build:frontend",
+    "build": "npm run build:shared && npm run build:frontend && npm run build:backend",
     "db:migrate": "cd packages/backend && npm run db:migrate",
     "db:generate": "cd packages/backend && npx prisma generate",
     "db:seed": "cd packages/backend && npm run db:seed:simple",
     "db:reset": "cd packages/backend && npm run db:reset",
-    "lint:backend": "cd packages/backend && npm run lint",
-    "clean": "node -e \"const fs=require('fs'),path=require('path');['node_modules','dist','build'].forEach(d=>{['.','.','packages/backend','packages/frontend','packages/shared'].forEach(base=>{const p=path.join(base,d);if(fs.existsSync(p)){console.log('Removing',p);require('child_process').execSync('rmdir /s /q '+p,{stdio:'inherit'})}})})\"",
-    "pre-deploy": "node scripts/pre-deploy-check.js",
-    "check": "node scripts/pre-deploy-check.js"
+    "lint:backend": "cd packages/backend && npm run lint"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
