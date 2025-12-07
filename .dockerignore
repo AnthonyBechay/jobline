@@ -1,84 +1,16 @@
-# Dependencies
-node_modules/
-npm-debug.log
-yarn-debug.log
-yarn-error.log
-pnpm-debug.log
-
-# Build outputs
-dist/
-build/
-.next/
-out/
-
-# Environment files
-.env
-.env.local
-.env.production
-.env.development
-.env.test
-
-# Git
-.git/
-.gitignore
-.gitattributes
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*.swn
-.vim/
-
-# OS files
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Testing
-coverage/
-*.lcov
-.nyc_output/
-.jest/
-
-# Logs
-logs/
-*.log
-
-# Uploads & temporary files
-uploads/
-temp/
-tmp/
-*.tmp
-
-# Database
-*.sqlite
-*.sqlite3
-*.db
-prisma/migrations/dev/
-
-# Deployment
-.vercel/
-.render/
-
-# Documentation
-README.md
-docs/
-*.md
-
-# Scripts
-scripts/
-setup.js
-start.js
-clean.js
-
-# Backup files
-*.bak
-*.backup
-*~
-
-# Docker
 Dockerfile
-docker-compose.yml
 .dockerignore
+node_modules
+npm-debug.log
+README.md
+.next
+.git
+.gitignore
+.env*.local
+.env
+*.md
+dist
+coverage
+.vercel
+.output
+drizzle

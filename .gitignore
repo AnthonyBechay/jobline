@@ -50,6 +50,7 @@ coverage/
 *.sqlite3
 *.db
 prisma/migrations/dev/
+drizzle/
 
 # Uploads & temporary files
 uploads/

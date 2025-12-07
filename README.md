@@ -1,250 +1,352 @@
-# Jobline - Recruitment Platform
+# Jobline - Modern Recruitment Platform
 
-A comprehensive web application for recruitment agencies in Lebanon specializing in domestic workers.
+A comprehensive recruitment management platform built with Next.js 15, Drizzle ORM, and modern web technologies.
 
-## 🚀 Quick Start with Docker
+## 🚀 Tech Stack
+
+### Frontend
+- **Framework**: Next.js 15 (App Router)
+- **Language**: TypeScript 5.7 (Strict Mode)
+- **UI Components**: Shadcn/ui + Radix UI
+- **Styling**: Tailwind CSS 3.4
+- **Forms**: React Hook Form + Zod
+- **Tables**: TanStack Table
+- **Charts**: Recharts
+- **Date Handling**: date-fns
+- **State Management**: Server Actions + React Server Components
+
+### Backend
+- **Runtime**: Node.js 20+
+- **Database**: PostgreSQL
+- **ORM**: Drizzle ORM 0.36
+- **Authentication**: Better-Auth 1.4
+- **File Storage**: Cloudflare R2 (S3-compatible)
+- **PDF Generation**: React-PDF (@react-pdf/renderer)
+- **Validation**: Zod
+
+### DevOps
+- **Package Manager**: pnpm
+- **Containerization**: Docker + Docker Compose
+- **Deployment**: Coolify-ready
+- **Build Output**: Standalone (optimized for production)
+
+## ✨ Features
+
+- ✅ Multi-tenant support with company isolation
+- ✅ Role-based access control (Super Admin, Admin)
+- ✅ Candidate management
+- ✅ Client management
+- ✅ Application tracking
+- ✅ Document management with R2 storage
+- ✅ Financial tracking (payments, costs, fees)
+- ✅ Guarantor change workflows
+- ✅ PDF generation for reports
+- ✅ Real-time data with Server Components
+- ✅ Responsive design (mobile-friendly)
+- ✅ Dark mode support
+
+## 📋 Getting Started
 
 ### Prerequisites
-- Docker and Docker Compose
-- PostgreSQL database (can be external or in Docker)
 
-### Environment Setup
+- Node.js 20+ and pnpm 10+
+- PostgreSQL database
+- Cloudflare R2 bucket (or S3-compatible storage)
 
-Create a `.env` file in the root directory:
+### Installation
+
+1. **Clone the repository**
+```bash
+git clone <repository-url>
+cd jobline
+```
+
+2. **Install dependencies**
+```bash
+pnpm install
+```
+
+3. **Set up environment variables**
+
+Create a `.env.local` file based on `.env.example`:
 
 ```env
 # Database
-DATABASE_URL=postgresql://user:password@host:5432/jobline_db?schema=public
+DATABASE_URL="postgresql://user:password@localhost:5432/jobline_db"
 
-# JWT Configuration
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-JWT_EXPIRES_IN=7d
+# Better-Auth
+BETTER_AUTH_SECRET="generate-with: openssl rand -base64 32"
+BETTER_AUTH_URL="http://localhost:3000"
 
-# Setup Key (for initial user registration)
-SETUP_KEY=jobline-setup-2024
+# Cloudflare R2
+R2_ACCOUNT_ID="your-cloudflare-account-id"
+R2_ACCESS_KEY_ID="your-r2-access-key"
+R2_SECRET_ACCESS_KEY="your-r2-secret-key"
+R2_BUCKET_NAME="jobline-files"
+R2_PUBLIC_URL="https://your-bucket.r2.dev"
 
-# Frontend URL (your production domain)
-FRONTEND_URL=https://yourdomain.com
-
-# Build Args (for frontend)
-VITE_API_URL=/api
-
-# File Upload
-MAX_FILE_SIZE=5242880
-UPLOAD_DIR=./uploads
+# App
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+NODE_ENV="development"
 ```
 
-### Deployment
+4. **Set up the database**
 
-1. **Build and start the application**
-   ```bash
-   docker-compose up -d
-   ```
+```bash
+# Generate Drizzle client
+pnpm db:generate
 
-2. **View logs**
-   ```bash
-   docker-compose logs -f
-   ```
+# Run migrations
+pnpm db:push
 
-3. **Stop the application**
-   ```bash
-   docker-compose down
-   ```
+# (Optional) Seed database
+pnpm db:seed
+```
 
-### Initial Setup
-- Open your frontend URL in a browser
-- Navigate to `/register`
-- Create your first Super Admin account
-- Use the `SETUP_KEY` from your `.env` file
+5. **Run development server**
 
-## 📁 Project Structure
+```bash
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## 🗂️ Project Structure
 
 ```
 jobline/
-├── packages/
-│   ├── shared/              # Shared TypeScript types
-│   ├── backend/             # Express.js + Prisma + PostgreSQL
-│   │   ├── src/            # Source code
-│   │   ├── prisma/         # Database schema and migrations
-│   │   └── Dockerfile      # Backend Docker configuration
-│   └── frontend/           # React + Material-UI + Vite
-│       ├── src/            # Source code
-│       └── Dockerfile      # Frontend Docker configuration
-├── docker-compose.yml       # Docker Compose configuration
-├── .dockerignore           # Docker ignore patterns
-└── README.md               # This file
+├── app/
+│   ├── (auth)/              # Authentication pages
+│   │   ├── login/
+│   │   └── register/
+│   ├── (dashboard)/         # Dashboard pages
+│   │   ├── candidates/
+│   │   ├── clients/
+│   │   ├── applications/
+│   │   ├── documents/
+│   │   ├── financial/
+│   │   └── settings/
+│   ├── api/                 # API routes
+│   │   ├── auth/
+│   │   └── upload/
+│   ├── actions/             # Server Actions
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
+├── components/
+│   ├── ui/                  # Shadcn components
+│   ├── forms/               # Reusable form components
+│   ├── tables/              # Data table components
+│   └── layouts/             # Layout components
+├── lib/
+│   ├── db/
+│   │   ├── schema.ts        # Drizzle schema (24 tables)
+│   │   └── index.ts         # DB client
+│   ├── validations/         # Zod schemas
+│   ├── auth.ts              # Better-Auth config
+│   ├── auth-client.ts       # Client auth hooks
+│   ├── auth-utils.ts        # Auth utilities
+│   ├── storage.ts           # R2 storage client
+│   └── utils.ts             # Utility functions
+├── Dockerfile
+├── docker-compose.yml
+├── drizzle.config.ts
+├── next.config.ts
+├── tailwind.config.ts
+├── tsconfig.json
+└── package.json
 ```
 
-## 🔧 Development
+## 🛠️ Development Scripts
 
-### Local Development (without Docker)
-
-#### Prerequisites
-- Node.js (v18 or higher)
-- npm (v9 or higher)
-- PostgreSQL (v12 or higher)
-
-#### Setup
-
-1. **Create Database**
-   ```bash
-   psql -U postgres -c "CREATE DATABASE jobline_db;"
-   ```
-
-2. **Install Dependencies**
-   ```bash
-   npm install
-   cd packages/backend && npm install
-   cd ../frontend && npm install
-   cd ../shared && npm install
-   ```
-
-3. **Setup Environment**
-   Create `.env` file in `packages/backend/`:
-   ```env
-   DATABASE_URL="postgresql://postgres:password@localhost:5432/jobline_db?schema=public"
-   PORT=5000
-   NODE_ENV=development
-   JWT_SECRET=your-super-secret-jwt-key
-   JWT_EXPIRES_IN=7d
-   SETUP_KEY=jobline-setup-2024
-   FRONTEND_URL=http://localhost:5173
-   MAX_FILE_SIZE=5242880
-   UPLOAD_DIR=./uploads
-   ```
-
-4. **Run Database Migrations**
-   ```bash
-   npm run db:migrate
-   ```
-
-5. **Start Development Servers**
-   ```bash
-   npm run dev:backend    # Backend on port 5000
-   npm run dev:frontend   # Frontend on port 5173
-   ```
-
-### Backend Commands
 ```bash
-npm run dev              # Start development server
-npm run build            # Build for production
-npm run db:migrate       # Run database migrations
-npm run db:generate      # Generate Prisma client
-npm run db:seed          # Seed database
-npx prisma studio        # Database GUI
+# Development
+pnpm dev                 # Start dev server
+pnpm build               # Build for production
+pnpm start               # Start production server
+pnpm lint                # Run ESLint
+pnpm type-check          # TypeScript type checking
+
+# Database
+pnpm db:generate         # Generate Drizzle migrations
+pnpm db:migrate          # Apply migrations
+pnpm db:push             # Push schema to database
+pnpm db:studio           # Open Drizzle Studio
+pnpm db:seed             # Seed database
 ```
 
-### Frontend Commands
-```bash
-npm run dev              # Start development server
-npm run build            # Build for production
-```
+## 🐳 Docker Deployment
 
-## 👥 User Management
-
-### First Time Setup
-1. Navigate to `/register` on the frontend
-2. Create the first Super Admin account
-3. Requires the setup key from `.env`
-4. Only works when no users exist in the database
-
-### User Roles
-- **Super Admin**: Full system access, financial data, user management
-- **Admin**: Operational access, no financial data visibility
-
-### Creating Additional Users
-- Super Admins can create new users from Settings > Users
-- Both Admin and Super Admin roles can be assigned
-
-## 📋 Features
-
-### For Super Admin
-- Full system access
-- Financial management (costs, profits)
-- User management
-- Agent & Broker management
-- System settings
-- All reports and analytics
-
-### For Admin
-- Candidate management
-- Client management
-- Application tracking
-- Payment recording (revenue only)
-- Document checklist management
-- Operational reports
-
-### For Clients
-- View application status via shareable link
-- See required documents
-- Track payment history
-- No login required
-
-## 🔐 Security
-
-### Production Security Checklist
-- [ ] Change all default passwords
-- [ ] Use strong, unique JWT_SECRET
-- [ ] Update SETUP_KEY to something unique
-- [ ] Configure proper DATABASE_URL with strong credentials
-- [ ] Enable HTTPS on your domain
-- [ ] Configure CORS properly (via FRONTEND_URL)
-- [ ] Regularly backup your database
-- [ ] Keep dependencies updated
-
-## 🐳 Docker Deployment on Coolify/Hetzner
-
-### Coolify Setup
-
-1. **Connect your Git repository** to Coolify
-
-2. **Set Environment Variables** in Coolify dashboard:
-   - `DATABASE_URL`
-   - `JWT_SECRET`
-   - `JWT_EXPIRES_IN`
-   - `SETUP_KEY`
-   - `FRONTEND_URL`
-   - `VITE_API_URL`
-
-3. **Deploy** - Coolify will automatically use the `docker-compose.yml`
-
-### Database Migration
-
-Migrations run automatically on container startup. To run manually:
+### Using Docker Compose (Development/Testing)
 
 ```bash
-docker-compose exec backend sh -c "cd packages/backend && npx prisma migrate deploy"
-```
+# Build and run
+docker-compose up -d
 
-## 🔨 Troubleshooting
-
-### Database Connection Issues
-```bash
-# Check database is accessible
-docker-compose exec backend sh -c "cd packages/backend && npx prisma db push"
-
-# View migration status
-docker-compose exec backend sh -c "cd packages/backend && npx prisma migrate status"
-```
-
-### Container Issues
-```bash
 # View logs
-docker-compose logs -f backend
-docker-compose logs -f frontend
+docker-compose logs -f app
 
-# Restart containers
-docker-compose restart
-
-# Rebuild containers
-docker-compose up -d --build
+# Stop
+docker-compose down
 ```
 
-### Port Conflicts
-- Backend runs on port 5000 internally
-- Frontend runs on port 80 (nginx)
-- Make sure these ports are available or configure different ones in docker-compose.yml
+### Using Dockerfile (Production)
+
+```bash
+# Build image
+docker build -t jobline:latest .
+
+# Run container
+docker run -p 3000:3000 \
+  -e DATABASE_URL="your-database-url" \
+  -e BETTER_AUTH_SECRET="your-secret" \
+  -e R2_ACCOUNT_ID="your-r2-account" \
+  # ... other env vars
+  jobline:latest
+```
+
+### Deploying to Coolify
+
+1. **Push to Git repository**
+2. **In Coolify**:
+   - Create new resource → Docker Compose
+   - Connect your repository
+   - Add environment variables
+   - Deploy
+
+Coolify will automatically:
+- Build the Docker image
+- Run database migrations
+- Start the application
+- Set up reverse proxy with SSL
+
+## 🔐 Environment Variables
+
+### Required
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@host:5432/db` |
+| `BETTER_AUTH_SECRET` | Secret for auth tokens | Generate with `openssl rand -base64 32` |
+| `R2_ACCOUNT_ID` | Cloudflare account ID | `abc123...` |
+| `R2_ACCESS_KEY_ID` | R2 access key | `xyz789...` |
+| `R2_SECRET_ACCESS_KEY` | R2 secret key | `secret123...` |
+| `R2_BUCKET_NAME` | R2 bucket name | `jobline-files` |
+
+### Optional
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `BETTER_AUTH_URL` | App URL for auth | `http://localhost:3000` |
+| `R2_PUBLIC_URL` | Public URL for R2 bucket | - |
+| `MAX_FILE_SIZE` | Max upload size in bytes | `10485760` (10MB) |
+
+## 📊 Database Schema
+
+The application uses Drizzle ORM with PostgreSQL. Key tables include:
+
+- `companies` - Multi-tenant company data
+- `users` - User accounts with roles
+- `candidates` - Recruitment candidates
+- `clients` - Client companies
+- `applications` - Job applications linking candidates and clients
+- `payments` - Payment tracking
+- `costs` - Expense tracking
+- `files` - File metadata
+- `fee_templates` - Fee structures
+- And 15+ more tables for comprehensive functionality
+
+### Database Migrations
+
+When you modify the schema:
+
+```bash
+# 1. Update lib/db/schema.ts
+
+# 2. Generate migration
+pnpm db:generate
+
+# 3. Apply migration
+pnpm db:migrate
+
+# OR push directly (dev only)
+pnpm db:push
+```
+
+## 🔒 Authentication
+
+The app uses Better-Auth with custom user schema:
+
+- Email/password authentication
+- Session-based auth with cookies
+- Role-based access control
+- Multi-tenant support via `companyId`
+
+### Auth Utilities
+
+```typescript
+import { requireAuth, requireSuperAdmin } from '@/lib/auth-utils';
+
+// Protect routes/actions
+const { user } = await requireAuth();
+
+// Require specific role
+const { user } = await requireSuperAdmin();
+```
+
+## 📁 File Uploads
+
+Files are stored in Cloudflare R2:
+
+```typescript
+import { uploadToR2 } from '@/lib/storage';
+
+// Upload file
+const result = await uploadToR2(file, 'candidates');
+// Returns: { key, url, publicUrl }
+```
+
+## 🧪 Testing
+
+```bash
+# Run tests (when implemented)
+pnpm test
+
+# Type check
+pnpm type-check
+
+# Lint
+pnpm lint
+```
+
+## 🚀 Production Deployment Checklist
+
+- [ ] Update all environment variables with production values
+- [ ] Generate strong `BETTER_AUTH_SECRET`
+- [ ] Configure production database
+- [ ] Set up Cloudflare R2 bucket
+- [ ] Configure domain and SSL
+- [ ] Run database migrations
+- [ ] Test authentication flow
+- [ ] Test file uploads
+- [ ] Set up database backups
+- [ ] Configure monitoring and logging
+
+## 📝 Contributing
+
+1. Create a feature branch
+2. Make changes
+3. Run `pnpm type-check` and `pnpm lint`
+4. Create pull request
 
 ## 📄 License
 
-Private - All rights reserved
+Proprietary - All rights reserved
+
+## 🤝 Support
+
+For issues or questions, contact your development team.
+
+---
+
+Built with ❤️ using Next.js 15 and modern web technologies.
