@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { candidateStatusEnum } from '@/lib/db/schema'; // We might need to manually define this if importing from schema fails in client
+
 
 const STATUS_OPTIONS = [
     'AVAILABLE_ABROAD',
