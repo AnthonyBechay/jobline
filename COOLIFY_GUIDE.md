@@ -6,23 +6,19 @@ Copy and paste these into your Coolify project's **Environment Variables** secti
 
 ```env
 # Database
-# In Coolify, if you use a managed Postgres, use the internal connection string.
-DATABASE_URL="postgresql://user:password@host:5432/jobline_db"
-
-# Database
-# In Coolify, if you use a managed Postgres, use the internal connection string.
-DATABASE_URL="postgresql://user:password@host:5432/jobline_db"
+DATABASE_URL="postgres://postgres:tOqKMrnDmBd1UQN1Q6c34KZ3FMGJs0FstEATDS7FHJd6BiLyRnrFsfDfq33dPVrs@p4wows8skoks8kkksggg8gwk:5432/jobline"
 
 # Cloudflare R2 (File Storage)
-R2_ACCOUNT_ID="your-cloudflare-account-id"
-R2_ACCESS_KEY_ID="your-r2-access-key-id"
-R2_SECRET_ACCESS_KEY="your-r2-secret-access-key"
-R2_BUCKET_NAME="jobline-files"
-R2_PUBLIC_URL="https://your-bucket.r2.dev"
+R2_ACCOUNT_ID="e57d99b88be371aab5a1bf29839b9a2e"
+R2_ACCESS_KEY_ID="754ac6be3066ce735248d8163c287f78"
+R2_SECRET_ACCESS_KEY="47fabf1adeef8027b0bf703bba06a42c934dad8ddfca3e38d56052f57aac80ed"
+R2_BUCKET_NAME="jobline"
+# Note: This looks like the S3 endpoint. For public access, you usually need a public domain (e.g., https://pub-xxx.r2.dev).
+# If this bucket is not public, images might not load.
+R2_PUBLIC_URL="https://e57d99b88be371aab5a1bf29839b9a2e.r2.cloudflarestorage.com/jobline"
 
 # App Configuration
-# This should match your production domain
-NEXT_PUBLIC_APP_URL="https://your-domain.com"
+NEXT_PUBLIC_APP_URL="https://jobline.37.27.181.201.sslip.io"
 NODE_ENV="production"
 
 # Optional: Email Configuration (SMTP)
