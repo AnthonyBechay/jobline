@@ -8,14 +8,15 @@ import { requireAuth } from '@/lib/auth-utils';
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const { user } = await requireAuth();
 
     // Fetch application with relations and company check
     const application = await db.query.applications.findFirst({
-      where: eq(applications.id, params.id),
+      where: eq(applications.id, id),
       with: {
         candidate: true,
         client: true,
