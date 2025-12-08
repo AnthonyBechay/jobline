@@ -1,6 +1,8 @@
 import { getApplications } from '@/app/actions/applications';
 import { KanbanBoard } from '@/components/pipeline/kanban-board';
 
+export const dynamic = 'force-dynamic';
+
 export default async function PipelinePage() {
     const result = await getApplications();
     const applications = result.success ? result.data : [];

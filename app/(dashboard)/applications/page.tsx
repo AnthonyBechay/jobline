@@ -5,6 +5,8 @@ import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { columns } from './columns';
 
+export const dynamic = 'force-dynamic';
+
 export default async function ApplicationsPage() {
   const result = await getApplications();
   const applications = result.success ? result.data : [];
