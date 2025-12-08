@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { registerSchema, type RegisterInput } from '@/lib/validations/auth';
-import { registerUser } from '@/app/actions/auth';
-import { signIn } from '@/lib/auth-client';
+import { registerUser, loginUser } from '@/app/actions/auth';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -49,9 +48,10 @@ export default function RegisterPage() {
       }
 
       // Auto-login after registration
-      const loginResult = await signIn.email({
+      const loginResult = await loginUser({
         email: data.email,
         password: data.password,
+        companyName: data.companyName,
       });
 
       if (loginResult.error) {

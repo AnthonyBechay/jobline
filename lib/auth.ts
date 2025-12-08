@@ -1,46 +1,91 @@
-import { betterAuth } from 'better-auth';
-import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { db } from './db';
-import * as schema from './db/schema';
+import { SignJWT, jwtVerify } from 'jose';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 
-export const auth = betterAuth({
-  database: drizzleAdapter(db, {
-    provider: 'pg',
-    schema: {
-      ...schema,
-    },
-  }),
-  emailAndPassword: {
-    enabled: true,
-    requireEmailVerification: false,
-  },
-  session: {
-    expiresIn: 60 * 60 * 24 * 7, // 7 days
-    updateAge: 60 * 60 * 24, // 1 day (every 24 hours the session expiry is updated)
-    cookieCache: {
-      enabled: true,
-      maxAge: 5 * 60, // 5 minutes
-    },
-  },
+const secretKey = process.env.BETTER_AUTH_SECRET || 'secret-key-min-32-chars-long';
+const key = new TextEncoder().encode(secretKey);
+
+export interface Session {
   user: {
-    additionalFields: {
-      role: {
-        type: 'string',
-        required: true,
-      },
-      companyId: {
-        type: 'string',
-        required: true,
-      },
-    },
-  },
-  advanced: {
-    generateId: () => crypto.randomUUID(),
-    crossSubDomainCookies: {
-      enabled: false,
-    },
-  },
-});
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    companyId: string;
+  };
+  expires: Date;
+}
 
-export type Session = typeof auth.$Infer.Session.session;
-export type User = typeof auth.$Infer.Session.user;
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  companyId: string;
+}
+
+export async function encrypt(payload: any) {
+  return await new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('7d')
+    .sign(key);
+}
+
+export async function decrypt(input: string): Promise<any> {
+  try {
+    const { payload } = await jwtVerify(input, key, {
+      algorithms: ['HS256'],
+    });
+    return payload;
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function login(userData: User) {
+  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+  const session = await encrypt({ user: userData, expires });
+
+  const cookieStore = await cookies();
+  cookieStore.set('session', session, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    expires,
+    sameSite: 'lax',
+    path: '/',
+  });
+}
+
+export async function logout() {
+  const cookieStore = await cookies();
+  cookieStore.delete('session');
+}
+
+export async function getSession(): Promise<Session | null> {
+  const cookieStore = await cookies();
+  const session = cookieStore.get('session')?.value;
+  if (!session) return null;
+  return await decrypt(session);
+}
+
+export async function updateSession(request: any) {
+  const session = request.cookies.get('session')?.value;
+  if (!session) return;
+
+  // Refresh the session so it doesn't expire
+  const parsed = await decrypt(session);
+  parsed.expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const res = await encrypt(parsed);
+
+  request.cookies.set({
+    name: 'session',
+    value: res,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    expires: parsed.expires,
+    sameSite: 'lax',
+    path: '/',
+  });
+  return res;
+}

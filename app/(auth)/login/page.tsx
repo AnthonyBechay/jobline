@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { signIn } from '@/lib/auth-client';
+// unused import removed
+import { loginUser } from '@/app/actions/auth';
 import { loginSchema, type LoginInput } from '@/lib/validations/auth';
-import { resolveCompanyId } from '@/app/actions/auth';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -40,24 +40,10 @@ export default function LoginPage() {
       setIsLoading(true);
       setError('');
 
-      // Resolve company ID first
-      const companyResult = await resolveCompanyId(data.companyName);
-
-      if (companyResult.error || !companyResult.companyId) {
-        setError(companyResult.error || 'Invalid company name');
-        setIsLoading(false);
-        return;
-      }
-
-      const compositeEmail = `${data.email}#${companyResult.companyId}`;
-
-      const result = await signIn.email({
-        email: compositeEmail,
-        password: data.password,
-      });
+      const result = await loginUser(data);
 
       if (result.error) {
-        setError(result.error.message || 'Invalid email or password');
+        setError(result.error);
         return;
       }
 

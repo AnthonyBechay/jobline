@@ -1,24 +1,12 @@
-import { auth } from './auth';
-import { headers } from 'next/headers';
+import { getSession as getAuthSession, type Session, type User } from './auth';
 import { cache } from 'react';
 import { redirect } from 'next/navigation';
-import type { Session, User } from './auth';
 import { hasPermission, type Permission, type UserRole } from './rbac';
 
 export const getSession = cache(async (): Promise<{ session: Session; user: User } | null> => {
-  try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session) {
-      return null;
-    }
-
-    return session as { session: Session; user: User };
-  } catch (error) {
-    return null;
-  }
+  const session = await getAuthSession();
+  if (!session) return null;
+  return { session, user: session.user };
 });
 
 export const getCurrentUser = cache(async (): Promise<User | null> => {

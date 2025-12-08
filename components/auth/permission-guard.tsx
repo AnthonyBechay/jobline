@@ -1,6 +1,6 @@
 'use client';
 
-import { useSession } from '@/lib/auth-client';
+import { useSession } from '@/hooks/use-auth';
 import { hasPermission, type Permission, type UserRole } from '@/lib/rbac';
 import { ReactNode } from 'react';
 
