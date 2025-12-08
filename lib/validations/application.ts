@@ -26,10 +26,10 @@ export const applicationSchema = z.object({
   laborPermitDate: z.date().optional(),
   residencyPermitDate: z.date().optional(),
   feeTemplateId: z.string().uuid().optional().or(z.literal('')),
-  finalFeeAmount: z.number().optional(),
+  finalFeeAmount: z.string().optional(),
   lawyerServiceRequested: z.boolean().default(false),
-  lawyerFeeCost: z.number().optional(),
-  lawyerFeeCharge: z.number().optional(),
+  lawyerFeeCost: z.string().optional(),
+  lawyerFeeCharge: z.string().optional(),
 });
 
 export type ApplicationInput = z.infer<typeof applicationSchema>;

@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Pencil, Trash } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash, FileDown } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils';
 
@@ -75,6 +75,12 @@ export const columns: ColumnDef<Candidate>[] = [
               <Link href={`/dashboard/candidates/${candidate.id}`}>
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={`/api/pdf/candidate/${candidate.id}`} target="_blank">
+                <FileDown className="mr-2 h-4 w-4" />
+                Download CV
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem className="text-destructive">
