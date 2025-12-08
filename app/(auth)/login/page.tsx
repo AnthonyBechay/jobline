@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { signIn } from '@/lib/auth-client';
 import { loginSchema, type LoginInput } from '@/lib/validations/auth';
+import { resolveCompanyId } from '@/app/actions/auth';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -39,8 +40,19 @@ export default function LoginPage() {
       setIsLoading(true);
       setError('');
 
+      // Resolve company ID first
+      const companyResult = await resolveCompanyId(data.companyName);
+
+      if (companyResult.error || !companyResult.companyId) {
+        setError(companyResult.error || 'Invalid company name');
+        setIsLoading(false);
+        return;
+      }
+
+      const compositeEmail = `${data.email}#${companyResult.companyId}`;
+
       const result = await signIn.email({
-        email: data.email,
+        email: compositeEmail,
         password: data.password,
       });
 
@@ -73,6 +85,19 @@ export default function LoginPage() {
                 <p>{error}</p>
               </Alert>
             )}
+            <div className="space-y-2">
+              <Label htmlFor="companyName">Company Name</Label>
+              <Input
+                id="companyName"
+                type="text"
+                placeholder="Your Company"
+                {...register('companyName')}
+                disabled={isLoading}
+              />
+              {errors.companyName && (
+                <p className="text-sm text-destructive">{errors.companyName.message}</p>
+              )}
+            </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input

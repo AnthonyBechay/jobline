@@ -82,7 +82,8 @@ export const users = pgTable(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     name: varchar('name', { length: 255 }).notNull(),
-    email: varchar('email', { length: 255 }).notNull().unique(),
+    email: varchar('email', { length: 255 }).notNull(),
+    displayEmail: varchar('display_email', { length: 255 }).notNull(),
     passwordHash: varchar('password_hash', { length: 255 }).notNull(),
     role: userRoleEnum('role').notNull(),
     companyId: uuid('company_id')
@@ -93,6 +94,7 @@ export const users = pgTable(
   },
   (table) => ({
     companyIdIdx: index('users_company_id_idx').on(table.companyId),
+    emailCompanyUnique: unique('users_email_company_unique').on(table.email, table.companyId),
   })
 );
 
@@ -278,8 +280,9 @@ export const costs = pgTable(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     applicationId: uuid('application_id')
-      .notNull()
       .references(() => applications.id),
+    candidateId: uuid('candidate_id')
+      .references(() => candidates.id),
     amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
     currency: varchar('currency', { length: 10 }).notNull().default('USD'),
     costDate: timestamp('cost_date').defaultNow().notNull(),
@@ -290,6 +293,7 @@ export const costs = pgTable(
   },
   (table) => ({
     applicationIdIdx: index('costs_application_id_idx').on(table.applicationId),
+    candidateIdIdx: index('costs_candidate_id_idx').on(table.candidateId),
   })
 );
 
@@ -765,6 +769,17 @@ export const applicationsRelations = relations(applications, ({ one, many }) => 
   originalGuarantorChanges: many(guarantorChanges),
   newGuarantorChanges: many(guarantorChanges),
   lifecycleHistory: many(applicationLifecycleHistory),
+}));
+
+export const costsRelations = relations(costs, ({ one }) => ({
+  application: one(applications, {
+    fields: [costs.applicationId],
+    references: [applications.id],
+  }),
+  candidate: one(candidates, {
+    fields: [costs.candidateId],
+    references: [candidates.id],
+  }),
 }));
 
 export const feeTemplatesRelations = relations(feeTemplates, ({ one, many }) => ({

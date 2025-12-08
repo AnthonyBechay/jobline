@@ -47,6 +47,14 @@ export function Sidebar({ user }: SidebarProps) {
       <ScrollArea className="flex-1 px-3 py-4">
         <nav className="space-y-1">
           {navigation.map((item) => {
+            // RBAC: Hide Financial and Settings for non-SUPER_ADMIN
+            if (
+              (item.name === 'Financial' || item.name === 'Settings') &&
+              user.role !== 'SUPER_ADMIN'
+            ) {
+              return null;
+            }
+
             const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <Link key={item.name} href={item.href}>
