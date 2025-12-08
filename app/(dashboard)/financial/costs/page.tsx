@@ -49,7 +49,7 @@ export default async function CostsPage() {
 
       <DataTable
         columns={columns}
-        data={costs}
+        data={costs as any}
         searchKey="costType"
         searchPlaceholder="Search costs..."
       />

@@ -2,74 +2,70 @@
 
 import { db } from '@/lib/db';
 import { candidates } from '@/lib/db/schema';
-import { candidateSchema, type CandidateInput } from '@/lib/validations/candidate';
+import { candidateSchema } from '@/lib/validations/candidates';
 import { requireAuth } from '@/lib/auth-utils';
-import { eq, and } from 'drizzle-orm';
+import { uploadToR2 } from '@/lib/storage';
 import { revalidatePath } from 'next/cache';
+import { eq, desc, and } from 'drizzle-orm';
 
-export async function createCandidate(data: CandidateInput) {
-  try {
-    const { user } = await requireAuth();
-    const validated = candidateSchema.parse(data);
+export async function createCandidate(formData: FormData) {
+  const { user } = await requireAuth();
 
-    const [candidate] = await db
-      .insert(candidates)
-      .values({
-        ...validated,
-        companyId: user.companyId,
-        agentId: validated.agentId || null,
-      })
-      .returning();
+  // Extract files
+  const photo = formData.get('photo') as File | null;
+  const facePhoto = formData.get('facePhoto') as File | null;
+  const fullBodyPhoto = formData.get('fullBodyPhoto') as File | null;
 
-    revalidatePath('/dashboard/candidates');
-    return { success: true, data: candidate };
-  } catch (error) {
-    console.error('Create candidate error:', error);
-    return { error: 'Failed to create candidate' };
+  // Extract data
+  const rawData: Record<string, any> = {};
+  formData.forEach((value, key) => {
+    if (key !== 'photo' && key !== 'facePhoto' && key !== 'fullBodyPhoto') {
+      rawData[key] = value;
+    }
+  });
+
+  // Parse data
+  const validated = candidateSchema.safeParse(rawData);
+
+  if (!validated.success) {
+    return { error: 'Invalid data', details: validated.error.flatten() };
   }
-}
 
-export async function updateCandidate(id: string, data: CandidateInput) {
   try {
-    const { user } = await requireAuth();
-    const validated = candidateSchema.parse(data);
+    let photoUrl = '';
+    let facePhotoUrl = '';
+    let fullBodyPhotoUrl = '';
 
-    const [candidate] = await db
-      .update(candidates)
-      .set({
-        ...validated,
-        agentId: validated.agentId || null,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(candidates.id, id), eq(candidates.companyId, user.companyId)))
-      .returning();
-
-    if (!candidate) {
-      return { error: 'Candidate not found' };
+    // Upload files if present
+    if (photo && photo.size > 0) {
+      const result = await uploadToR2(photo, 'candidates/photos');
+      photoUrl = result.publicUrl || result.url;
     }
 
-    revalidatePath('/dashboard/candidates');
-    revalidatePath(`/dashboard/candidates/${id}`);
-    return { success: true, data: candidate };
-  } catch (error) {
-    console.error('Update candidate error:', error);
-    return { error: 'Failed to update candidate' };
-  }
-}
+    if (facePhoto && facePhoto.size > 0) {
+      const result = await uploadToR2(facePhoto, 'candidates/face');
+      facePhotoUrl = result.publicUrl || result.url;
+    }
 
-export async function deleteCandidate(id: string) {
-  try {
-    const { user } = await requireAuth();
+    if (fullBodyPhoto && fullBodyPhoto.size > 0) {
+      const result = await uploadToR2(fullBodyPhoto, 'candidates/body');
+      fullBodyPhotoUrl = result.publicUrl || result.url;
+    }
 
-    await db
-      .delete(candidates)
-      .where(and(eq(candidates.id, id), eq(candidates.companyId, user.companyId)));
+    // Create candidate
+    await db.insert(candidates).values({
+      ...validated.data,
+      photoUrl,
+      facePhotoUrl,
+      fullBodyPhotoUrl,
+      companyId: user.companyId,
+    });
 
     revalidatePath('/dashboard/candidates');
     return { success: true };
   } catch (error) {
-    console.error('Delete candidate error:', error);
-    return { error: 'Failed to delete candidate' };
+    console.error('Create candidate error:', error);
+    return { error: 'Failed to create candidate' };
   }
 }
 
@@ -77,33 +73,32 @@ export async function getCandidates() {
   try {
     const { user } = await requireAuth();
 
-    const allCandidates = await db.query.candidates.findMany({
+    const items = await db.query.candidates.findMany({
       where: eq(candidates.companyId, user.companyId),
-      orderBy: (candidates, { desc }) => [desc(candidates.createdAt)],
+      orderBy: [desc(candidates.createdAt)],
+      with: {
+        agent: true,
+      },
     });
 
-    return { success: true, data: allCandidates };
+    return { success: true, data: items };
   } catch (error) {
     console.error('Get candidates error:', error);
     return { error: 'Failed to fetch candidates' };
   }
 }
 
-export async function getCandidate(id: string) {
+export async function deleteCandidate(id: string) {
+  const { user } = await requireAuth();
+
   try {
-    const { user } = await requireAuth();
+    await db.delete(candidates)
+      .where(and(eq(candidates.id, id), eq(candidates.companyId, user.companyId)));
 
-    const candidate = await db.query.candidates.findFirst({
-      where: and(eq(candidates.id, id), eq(candidates.companyId, user.companyId)),
-    });
-
-    if (!candidate) {
-      return { error: 'Candidate not found' };
-    }
-
-    return { success: true, data: candidate };
+    revalidatePath('/dashboard/candidates');
+    return { success: true };
   } catch (error) {
-    console.error('Get candidate error:', error);
-    return { error: 'Failed to fetch candidate' };
+    console.error('Delete candidate error:', error);
+    return { error: 'Failed to delete candidate' };
   }
 }

@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { cache } from 'react';
 import { redirect } from 'next/navigation';
 import type { Session, User } from './auth';
+import { hasPermission, type Permission, type UserRole } from './rbac';
 
 export const getSession = cache(async (): Promise<{ session: Session; user: User } | null> => {
   try {
@@ -53,4 +54,37 @@ export const requireSuperAdmin = cache(async (): Promise<{ session: Session; use
 
 export const requireAdmin = cache(async (): Promise<{ session: Session; user: User }> => {
   return requireRole(['SUPER_ADMIN', 'ADMIN']);
+});
+
+/**
+ * Require specific permission
+ * Throws error if user doesn't have permission
+ */
+export const requirePermission = cache(
+  async (permission: Permission): Promise<{ session: Session; user: User }> => {
+    const sessionData = await requireAuth();
+    const userRole = sessionData.user.role as UserRole;
+
+    if (!hasPermission(userRole, permission)) {
+      throw new Error(`Permission denied: ${permission}`);
+    }
+
+    return sessionData;
+  }
+);
+
+/**
+ * Check if current user has a specific permission
+ * Returns boolean, doesn't throw
+ */
+export const checkPermission = cache(async (permission: Permission): Promise<boolean> => {
+  try {
+    const sessionData = await getSession();
+    if (!sessionData) return false;
+
+    const userRole = sessionData.user.role as UserRole;
+    return hasPermission(userRole, permission);
+  } catch {
+    return false;
+  }
 });

@@ -72,6 +72,37 @@ export async function updateApplication(id: string, data: ApplicationInput) {
   }
 }
 
+export async function updateApplicationStatus(id: string, status: string) {
+  try {
+    const { user } = await requireAuth();
+
+    // Validate status is a valid enum value
+    const statusSchema = applicationSchema.shape.status;
+    const validatedStatus = statusSchema.parse(status);
+
+    const [application] = await db
+      .update(applications)
+      .set({
+        status: validatedStatus,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(applications.id, id), eq(applications.companyId, user.companyId)))
+      .returning();
+
+    if (!application) {
+      return { error: 'Application not found' };
+    }
+
+    revalidatePath('/dashboard/applications');
+    revalidatePath('/dashboard/pipeline');
+    revalidatePath(`/dashboard/applications/${id}`);
+    return { success: true, data: application };
+  } catch (error) {
+    console.error('Update application status error:', error);
+    return { error: 'Failed to update application status' };
+  }
+}
+
 export async function deleteApplication(id: string) {
   try {
     const { user } = await requireAuth();

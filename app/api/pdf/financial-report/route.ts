@@ -3,11 +3,12 @@ import { renderToStream } from '@react-pdf/renderer';
 import { FinancialReportTemplate } from '@/components/pdf/financial-report-template';
 import { getPayments } from '@/app/actions/payments';
 import { getCosts } from '@/app/actions/costs';
-import { requireAuth } from '@/lib/auth-utils';
+import { requirePermission } from '@/lib/auth-utils';
 
 export async function GET(request: NextRequest) {
   try {
-    await requireAuth();
+    // Require viewReports permission (SUPER_ADMIN only)
+    await requirePermission('viewReports');
 
     // Get query parameters for date filtering
     const searchParams = request.nextUrl.searchParams;
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
     const stream = await renderToStream(
       FinancialReportTemplate({
         payments,
-        costs,
+        costs: costs as any,
         startDate: startDateParam ? new Date(startDateParam) : undefined,
         endDate: endDateParam ? new Date(endDateParam) : undefined,
       })

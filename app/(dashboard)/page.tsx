@@ -9,6 +9,7 @@ import { getPayments } from '@/app/actions/payments';
 import { formatCurrency } from '@/lib/utils';
 import { RevenueChart } from '@/components/charts/revenue-chart';
 import { ApplicationStatusChart } from '@/components/charts/application-status-chart';
+import { SmartReminders } from '@/components/dashboard/smart-reminders';
 
 export default async function DashboardPage() {
   // Fetch data for dashboard
@@ -52,6 +53,8 @@ export default async function DashboardPage() {
           Welcome to your recruitment management platform
         </p>
       </div>
+
+      <SmartReminders applications={applications as any} />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
