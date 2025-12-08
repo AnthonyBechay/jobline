@@ -1,6 +1,5 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 
 const secretKey = process.env.BETTER_AUTH_SECRET || 'secret-key-min-32-chars-long';
 const key = new TextEncoder().encode(secretKey);
