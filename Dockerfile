@@ -50,9 +50,9 @@ RUN adduser --system --uid 1001 nextjs
 # Install pnpm for running db:push at runtime
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy entrypoint script
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Copy startup script
+COPY scripts/startup.sh /usr/local/bin/startup.sh
+RUN chmod +x /usr/local/bin/startup.sh
 
 # Copy package.json and drizzle config for db:push
 COPY --chown=nextjs:nodejs package.json ./
@@ -80,4 +80,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["/bin/sh", "/usr/local/bin/startup.sh"]
