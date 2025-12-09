@@ -18,11 +18,11 @@ async function checkDatabase() {
     `);
 
     console.log('\nTables in database:');
-    tables.rows.forEach((row: any) => {
+    tables.forEach((row: any) => {
       console.log(`  - ${row.table_name}`);
     });
 
-    console.log(`\nTotal: ${tables.rows.length} tables`);
+    console.log(`\nTotal: ${tables.length} tables`);
 
     process.exit(0);
   } catch (error) {
