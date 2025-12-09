@@ -10,12 +10,14 @@ import { redirect } from 'next/navigation';
 
 export async function registerUser(data: RegisterInput) {
   try {
-    // Check if email already exists within the company context (though for new company, it's global check effectively if we want unique emails)
-    // But here we are creating a NEW company.
-    // We should probably check if user exists globally to avoid confusion, or just proceed.
-    // Given the schema `emailCompanyUnique`, we can have same email in different companies.
-    // But for registration of a NEW company, we don't have a company ID yet.
-    // So we just create it.
+    // Check if company name already exists
+    const existingCompany = await db.query.companies.findFirst({
+      where: eq(companies.name, data.companyName),
+    });
+
+    if (existingCompany) {
+      return { error: 'Company name already exists. Please choose a different name.' };
+    }
 
     // Hash password
     const hashedPassword = await hash(data.password, 10);
@@ -27,6 +29,11 @@ export async function registerUser(data: RegisterInput) {
         name: data.companyName,
       })
       .returning();
+
+    if (!company) {
+      console.error('Failed to create company');
+      return { error: 'Failed to create company. Please try again.' };
+    }
 
     // Create user (Super Admin)
     const [user] = await db
@@ -41,6 +48,11 @@ export async function registerUser(data: RegisterInput) {
       })
       .returning();
 
+    if (!user) {
+      console.error('Failed to create user');
+      return { error: 'Failed to create user account. Please try again.' };
+    }
+
     // Create session
     await authLogin({
       id: user.id,
@@ -51,9 +63,23 @@ export async function registerUser(data: RegisterInput) {
     });
 
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Registration error:', error);
-    return { error: 'Failed to create account' };
+
+    // Provide more specific error messages
+    if (error?.code === 'ECONNREFUSED') {
+      return { error: 'Database connection failed. Please try again later.' };
+    }
+
+    if (error?.code === '23505') {
+      return { error: 'An account with this email or company name already exists.' };
+    }
+
+    if (error?.message) {
+      console.error('Error message:', error.message);
+    }
+
+    return { error: 'Failed to create account. Please try again.' };
   }
 }
 

@@ -31,6 +31,13 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+# Accept DATABASE_URL as build argument
+ARG DATABASE_URL
+ENV DATABASE_URL=${DATABASE_URL}
+
+# Push database schema before building (this will create/update tables)
+RUN pnpm db:push
+
 # Build Next.js application
 RUN pnpm run build
 

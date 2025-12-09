@@ -47,9 +47,12 @@ export async function login(userData: User) {
   const session = await encrypt({ user: userData, expires });
 
   const cookieStore = await cookies();
+  // Only set secure flag if using HTTPS (check if NEXT_PUBLIC_APP_URL starts with https)
+  const isSecure = process.env.NEXT_PUBLIC_APP_URL?.startsWith('https://') ?? false;
+
   cookieStore.set('session', session, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isSecure,
     expires,
     sameSite: 'lax',
     path: '/',
@@ -77,11 +80,14 @@ export async function updateSession(request: any) {
   parsed.expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const res = await encrypt(parsed);
 
+  // Only set secure flag if using HTTPS
+  const isSecure = process.env.NEXT_PUBLIC_APP_URL?.startsWith('https://') ?? false;
+
   request.cookies.set({
     name: 'session',
     value: res,
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isSecure,
     expires: parsed.expires,
     sameSite: 'lax',
     path: '/',
