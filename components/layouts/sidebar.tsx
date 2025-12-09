@@ -19,7 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Applications', href: '/applications', icon: Briefcase },
   { name: 'Candidates', href: '/candidates', icon: Users },
   { name: 'Clients', href: '/clients', icon: Building2 },
