@@ -6,7 +6,7 @@ async function checkDatabase() {
     console.log('Checking database connection...');
 
     // Test connection
-    const result = await db.execute(sql`SELECT NOW()`);
+    await db.execute(sql`SELECT NOW()`);
     console.log('✓ Database connected');
 
     // Check if tables exist
