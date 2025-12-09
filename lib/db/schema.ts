@@ -798,6 +798,38 @@ export const feeComponentsRelations = relations(feeComponents, ({ one }) => ({
   }),
 }));
 
+export const paymentsRelations = relations(payments, ({ one }) => ({
+  application: one(applications, {
+    fields: [payments.applicationId],
+    references: [applications.id],
+  }),
+  client: one(clients, {
+    fields: [payments.clientId],
+    references: [clients.id],
+  }),
+}));
+
+export const documentChecklistItemsRelations = relations(documentChecklistItems, ({ one }) => ({
+  application: one(applications, {
+    fields: [documentChecklistItems.applicationId],
+    references: [applications.id],
+  }),
+}));
+
+export const filesRelations = relations(files, ({ one }) => ({
+  company: one(companies, {
+    fields: [files.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const clientDocumentsRelations = relations(clientDocuments, ({ one }) => ({
+  client: one(clients, {
+    fields: [clientDocuments.clientId],
+    references: [clients.id],
+  }),
+}));
+
 // Type exports for TypeScript
 export type Company = typeof companies.$inferSelect;
 export type NewCompany = typeof companies.$inferInsert;

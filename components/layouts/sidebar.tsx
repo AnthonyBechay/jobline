@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { logoutUser } from '@/app/actions/auth';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -82,10 +83,12 @@ export function Sidebar({ user }: SidebarProps) {
             <p className="text-xs text-muted-foreground">{user.email}</p>
           </div>
         </div>
-        <Button variant="ghost" className="mt-2 w-full justify-start text-destructive">
-          <LogOut className="mr-3 h-4 w-4" />
-          Logout
-        </Button>
+        <form action={logoutUser}>
+          <Button type="submit" variant="ghost" className="mt-2 w-full justify-start text-destructive">
+            <LogOut className="mr-3 h-4 w-4" />
+            Logout
+          </Button>
+        </form>
       </div>
     </div>
   );
