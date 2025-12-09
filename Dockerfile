@@ -31,13 +31,6 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Accept DATABASE_URL as build argument
-ARG DATABASE_URL
-ENV DATABASE_URL=${DATABASE_URL}
-
-# Push database schema before building (this will create/update tables)
-RUN pnpm db:push
-
 # Build Next.js application
 RUN pnpm run build
 
@@ -53,6 +46,21 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
+
+# Install pnpm for running db:push at runtime
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Copy entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Copy package.json and drizzle config for db:push
+COPY --chown=nextjs:nodejs package.json ./
+COPY --chown=nextjs:nodejs drizzle.config.ts ./
+COPY --chown=nextjs:nodejs lib/db ./lib/db
+
+# Copy node_modules for drizzle-kit
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # Copy public assets
 COPY --from=builder /app/public ./public
@@ -72,4 +80,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+ENTRYPOINT ["docker-entrypoint.sh"]
