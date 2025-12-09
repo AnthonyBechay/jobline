@@ -34,6 +34,9 @@ ENV NODE_ENV=production
 # Build Next.js application
 RUN pnpm run build
 
+# Ensure public directory exists with a placeholder
+RUN mkdir -p /app/public && touch /app/public/.gitkeep
+
 # Production image, copy all the files and run next
 FROM base AS runner
 WORKDIR /app
