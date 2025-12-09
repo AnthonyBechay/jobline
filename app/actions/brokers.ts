@@ -20,7 +20,7 @@ export async function createBroker(data: BrokerInput) {
       })
       .returning();
 
-    revalidatePath('/dashboard/brokers');
+    revalidatePath('/brokers');
     return { success: true, data: broker };
   } catch (error) {
     console.error('Create broker error:', error);
@@ -46,7 +46,7 @@ export async function updateBroker(id: string, data: BrokerInput) {
       return { error: 'Broker not found' };
     }
 
-    revalidatePath('/dashboard/brokers');
+    revalidatePath('/brokers');
     return { success: true, data: broker };
   } catch (error) {
     console.error('Update broker error:', error);
@@ -62,7 +62,7 @@ export async function deleteBroker(id: string) {
       .delete(brokers)
       .where(and(eq(brokers.id, id), eq(brokers.companyId, user.companyId)));
 
-    revalidatePath('/dashboard/brokers');
+    revalidatePath('/brokers');
     return { success: true };
   } catch (error) {
     console.error('Delete broker error:', error);

@@ -18,7 +18,7 @@ export default async function ApplicationsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Applications</h1>
           <p className="text-muted-foreground">Manage job applications and track their status</p>
         </div>
-        <Link href="/dashboard/applications/new">
+        <Link href="/applications/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
             New Application

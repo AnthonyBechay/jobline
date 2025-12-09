@@ -51,7 +51,7 @@ export const columns: ColumnDef<Client>[] = [
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href={`/dashboard/clients/${client.id}`}>
+              <Link href={`/clients/${client.id}`}>
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
               </Link>

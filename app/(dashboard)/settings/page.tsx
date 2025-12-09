@@ -11,31 +11,31 @@ const settingsItems = [
   {
     title: 'Fee Templates',
     description: 'Manage fee structures, prices, and ranges.',
-    href: '/dashboard/settings/fee-templates',
+    href: '/settings/fee-templates',
     icon: DollarSign,
   },
   {
     title: 'Office Documents',
     description: 'Manage required documents for the office.',
-    href: '/dashboard/settings/office-documents',
+    href: '/settings/office-documents',
     icon: FileText,
   },
   {
     title: 'Client Documents',
     description: 'Manage required documents for clients.',
-    href: '/dashboard/settings/client-documents',
+    href: '/settings/client-documents',
     icon: Users,
   },
   {
     title: 'Nationalities',
     description: 'Manage active nationalities.',
-    href: '/dashboard/settings/nationalities',
+    href: '/settings/nationalities',
     icon: Globe,
   },
   {
     title: 'Lawyer Fees',
     description: 'Configure internal costs and client prices.',
-    href: '/dashboard/settings/lawyer-fees',
+    href: '/settings/lawyer-fees',
     icon: Scale,
   },
 ];

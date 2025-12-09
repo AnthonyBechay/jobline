@@ -61,7 +61,7 @@ export async function createCandidate(formData: FormData) {
       companyId: user.companyId,
     });
 
-    revalidatePath('/dashboard/candidates');
+    revalidatePath('/candidates');
     return { success: true };
   } catch (error) {
     console.error('Create candidate error:', error);
@@ -95,7 +95,7 @@ export async function deleteCandidate(id: string) {
     await db.delete(candidates)
       .where(and(eq(candidates.id, id), eq(candidates.companyId, user.companyId)));
 
-    revalidatePath('/dashboard/candidates');
+    revalidatePath('/candidates');
     return { success: true };
   } catch (error) {
     console.error('Delete candidate error:', error);

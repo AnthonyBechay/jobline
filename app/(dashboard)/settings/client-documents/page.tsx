@@ -17,7 +17,7 @@ export default async function ClientDocumentsPage() {
                         Manage the list of documents the client needs to provide.
                     </p>
                 </div>
-                <Link href="/dashboard/settings/client-documents/new">
+                <Link href="/settings/client-documents/new">
                     <Button>
                         <Plus className="mr-2 h-4 w-4" />
                         New Document Requirement

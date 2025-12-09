@@ -74,7 +74,7 @@ export function SmartReminders({ applications }: SmartRemindersProps) {
                                     </p>
                                 </div>
                             </div>
-                            <Link href={`/dashboard/applications/${app.id}`}>
+                            <Link href={`/applications/${app.id}`}>
                                 <Button variant="outline" size="sm" className="border-red-200 hover:bg-red-100 hover:text-red-900 dark:border-red-800 dark:hover:bg-red-900">
                                     View
                                 </Button>
@@ -100,7 +100,7 @@ export function SmartReminders({ applications }: SmartRemindersProps) {
                                     </p>
                                 </div>
                             </div>
-                            <Link href={`/dashboard/applications/${app.id}`}>
+                            <Link href={`/applications/${app.id}`}>
                                 <Button variant="outline" size="sm" className="border-amber-200 hover:bg-amber-100 hover:text-amber-900 dark:border-amber-800 dark:hover:bg-amber-900">
                                     View
                                 </Button>

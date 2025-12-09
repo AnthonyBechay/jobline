@@ -17,7 +17,7 @@ export default async function FeeTemplatesPage() {
                         Manage your standard fee structures for applications.
                     </p>
                 </div>
-                <Link href="/dashboard/settings/fee-templates/new">
+                <Link href="/settings/fee-templates/new">
                     <Button>
                         <Plus className="mr-2 h-4 w-4" />
                         New Template

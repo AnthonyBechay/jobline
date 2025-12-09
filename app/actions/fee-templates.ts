@@ -59,7 +59,7 @@ export async function createFeeTemplate(data: FeeTemplateInput) {
       })
       .returning();
 
-    revalidatePath('/dashboard/financial/fee-templates');
+    revalidatePath('/financial/fee-templates');
     return { success: true, data: template };
   } catch (error) {
     console.error('Error creating fee template:', error);
@@ -91,8 +91,8 @@ export async function updateFeeTemplate(id: string, data: FeeTemplateInput) {
       return { success: false, error: 'Fee template not found' };
     }
 
-    revalidatePath('/dashboard/financial/fee-templates');
-    revalidatePath(`/dashboard/financial/fee-templates/${id}`);
+    revalidatePath('/financial/fee-templates');
+    revalidatePath(`/financial/fee-templates/${id}`);
     return { success: true, data: template };
   } catch (error) {
     console.error('Error updating fee template:', error);
@@ -118,7 +118,7 @@ export async function deleteFeeTemplate(id: string) {
       return { success: false, error: 'Fee template not found' };
     }
 
-    revalidatePath('/dashboard/financial/fee-templates');
+    revalidatePath('/financial/fee-templates');
     return { success: true };
   } catch (error) {
     console.error('Error deleting fee template:', error);

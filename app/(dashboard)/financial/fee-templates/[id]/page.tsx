@@ -58,7 +58,7 @@ export default function EditFeeTemplatePage({ params }: { params: { id: string }
         });
       } else {
         toast.error('Fee template not found');
-        router.push('/dashboard/financial/fee-templates');
+        router.push('/financial/fee-templates');
       }
 
       setLoading(false);
@@ -72,7 +72,7 @@ export default function EditFeeTemplatePage({ params }: { params: { id: string }
 
     if (result.success) {
       toast.success('Fee template updated successfully');
-      router.push('/dashboard/financial/fee-templates');
+      router.push('/financial/fee-templates');
       router.refresh();
     } else {
       toast.error(result.error || 'Failed to update fee template');
@@ -90,7 +90,7 @@ export default function EditFeeTemplatePage({ params }: { params: { id: string }
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/dashboard/financial/fee-templates">
+        <Link href="/financial/fee-templates">
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -242,7 +242,7 @@ export default function EditFeeTemplatePage({ params }: { params: { id: string }
                 <Button type="submit" disabled={form.formState.isSubmitting}>
                   {form.formState.isSubmitting ? 'Updating...' : 'Update Template'}
                 </Button>
-                <Link href="/dashboard/financial/fee-templates">
+                <Link href="/financial/fee-templates">
                   <Button type="button" variant="outline">
                     Cancel
                   </Button>

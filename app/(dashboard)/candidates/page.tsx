@@ -17,7 +17,7 @@ export default async function CandidatesPage() {
             Manage your candidate pool, view status, and filter by category.
           </p>
         </div>
-        <Link href="/dashboard/candidates/new">
+        <Link href="/candidates/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
             New Candidate

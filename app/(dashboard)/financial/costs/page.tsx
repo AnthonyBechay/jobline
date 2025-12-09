@@ -22,7 +22,7 @@ export default async function CostsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Costs</h1>
           <p className="text-muted-foreground">Track application-related expenses</p>
         </div>
-        <Link href="/dashboard/financial/costs/new">
+        <Link href="/financial/costs/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
             Record Cost

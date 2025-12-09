@@ -20,7 +20,7 @@ export async function createAgent(data: AgentInput) {
       })
       .returning();
 
-    revalidatePath('/dashboard/agents');
+    revalidatePath('/agents');
     return { success: true, data: agent };
   } catch (error) {
     console.error('Create agent error:', error);
@@ -46,7 +46,7 @@ export async function updateAgent(id: string, data: AgentInput) {
       return { error: 'Agent not found' };
     }
 
-    revalidatePath('/dashboard/agents');
+    revalidatePath('/agents');
     return { success: true, data: agent };
   } catch (error) {
     console.error('Update agent error:', error);
@@ -62,7 +62,7 @@ export async function deleteAgent(id: string) {
       .delete(agents)
       .where(and(eq(agents.id, id), eq(agents.companyId, user.companyId)));
 
-    revalidatePath('/dashboard/agents');
+    revalidatePath('/agents');
     return { success: true };
   } catch (error) {
     console.error('Delete agent error:', error);

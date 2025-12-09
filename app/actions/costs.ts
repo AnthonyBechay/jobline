@@ -17,8 +17,8 @@ export async function createCost(data: CostInput) {
       .values(validated)
       .returning();
 
-    revalidatePath('/dashboard/financial/costs');
-    revalidatePath(`/dashboard/applications/${data.applicationId}`);
+    revalidatePath('/financial/costs');
+    revalidatePath(`/applications/${data.applicationId}`);
     return { success: true, data: cost };
   } catch (error) {
     console.error('Create cost error:', error);
@@ -52,8 +52,8 @@ export async function updateCost(id: string, data: CostInput) {
       .where(eq(costs.id, id))
       .returning();
 
-    revalidatePath('/dashboard/financial/costs');
-    revalidatePath(`/dashboard/applications/${data.applicationId}`);
+    revalidatePath('/financial/costs');
+    revalidatePath(`/applications/${data.applicationId}`);
     return { success: true, data: cost };
   } catch (error) {
     console.error('Update cost error:', error);
@@ -79,8 +79,8 @@ export async function deleteCost(id: string) {
 
     await db.delete(costs).where(eq(costs.id, id));
 
-    revalidatePath('/dashboard/financial/costs');
-    revalidatePath(`/dashboard/applications/${cost.applicationId}`);
+    revalidatePath('/financial/costs');
+    revalidatePath(`/applications/${cost.applicationId}`);
     return { success: true };
   } catch (error) {
     console.error('Delete cost error:', error);

@@ -11,16 +11,25 @@ export async function proxy(request: NextRequest) {
         await updateSession(request);
     }
 
-    // Auth routes (login, register) - redirect to dashboard if logged in
+    // Auth routes (login, register) - redirect to home if logged in
     if (pathname.startsWith('/login') || pathname.startsWith('/register')) {
         if (session) {
-            return NextResponse.redirect(new URL('/dashboard', request.url));
+            return NextResponse.redirect(new URL('/', request.url));
         }
         return NextResponse.next();
     }
 
     // Protected routes - redirect to login if not logged in
-    if (pathname.startsWith('/dashboard') || pathname.startsWith('/api/upload')) {
+    // Protect all routes except login/register
+    if (pathname === '/' ||
+        pathname.startsWith('/applications') ||
+        pathname.startsWith('/candidates') ||
+        pathname.startsWith('/clients') ||
+        pathname.startsWith('/documents') ||
+        pathname.startsWith('/financial') ||
+        pathname.startsWith('/pipeline') ||
+        pathname.startsWith('/settings') ||
+        pathname.startsWith('/api/upload')) {
         if (!session) {
             return NextResponse.redirect(new URL('/login', request.url));
         }

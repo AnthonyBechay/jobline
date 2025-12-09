@@ -20,12 +20,12 @@ import { Separator } from '@/components/ui/separator';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Applications', href: '/dashboard/applications', icon: Briefcase },
-  { name: 'Candidates', href: '/dashboard/candidates', icon: Users },
-  { name: 'Clients', href: '/dashboard/clients', icon: Building2 },
-  { name: 'Documents', href: '/dashboard/documents', icon: FileText },
-  { name: 'Financial', href: '/dashboard/financial', icon: DollarSign },
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { name: 'Applications', href: '/applications', icon: Briefcase },
+  { name: 'Candidates', href: '/candidates', icon: Users },
+  { name: 'Clients', href: '/clients', icon: Building2 },
+  { name: 'Documents', href: '/documents', icon: FileText },
+  { name: 'Financial', href: '/financial', icon: DollarSign },
+  { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
 interface SidebarProps {

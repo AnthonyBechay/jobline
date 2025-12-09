@@ -17,7 +17,7 @@ export default async function NationalitiesPage() {
                         Manage active nationalities for candidates.
                     </p>
                 </div>
-                <Link href="/dashboard/settings/nationalities/new">
+                <Link href="/settings/nationalities/new">
                     <Button>
                         <Plus className="mr-2 h-4 w-4" />
                         New Nationality

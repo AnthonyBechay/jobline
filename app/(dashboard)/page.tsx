@@ -9,7 +9,7 @@ import { getPayments } from '@/app/actions/payments';
 import { formatCurrency } from '@/lib/utils';
 import { RevenueChart } from '@/components/charts/revenue-chart';
 import { ApplicationStatusChart } from '@/components/charts/application-status-chart';
-import { SmartReminders } from '@/components/dashboard/smart-reminders';
+import { SmartReminders } from '@/components/smart-reminders';
 
 export default async function DashboardPage() {
   // Fetch data for dashboard
@@ -128,7 +128,7 @@ export default async function DashboardPage() {
                         {app.client?.name} • {app.status.replace(/_/g, ' ')}
                       </p>
                     </div>
-                    <Link href={`/dashboard/applications/${app.id}`}>
+                    <Link href={`/applications/${app.id}`}>
                       <Button variant="ghost" size="sm">View</Button>
                     </Link>
                   </div>
@@ -144,17 +144,17 @@ export default async function DashboardPage() {
             <CardDescription>Common tasks and shortcuts</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            <Link href="/dashboard/candidates/new">
+            <Link href="/candidates/new">
               <Button variant="outline" className="w-full justify-start">
                 Add new candidate
               </Button>
             </Link>
-            <Link href="/dashboard/applications/new">
+            <Link href="/applications/new">
               <Button variant="outline" className="w-full justify-start">
                 Create application
               </Button>
             </Link>
-            <Link href="/dashboard/clients">
+            <Link href="/clients">
               <Button variant="outline" className="w-full justify-start">
                 Manage clients
               </Button>

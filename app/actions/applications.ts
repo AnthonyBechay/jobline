@@ -31,7 +31,7 @@ export async function createApplication(data: ApplicationInput) {
       })
       .returning();
 
-    revalidatePath('/dashboard/applications');
+    revalidatePath('/applications');
     return { success: true, data: application };
   } catch (error) {
     console.error('Create application error:', error);
@@ -63,8 +63,8 @@ export async function updateApplication(id: string, data: ApplicationInput) {
       return { error: 'Application not found' };
     }
 
-    revalidatePath('/dashboard/applications');
-    revalidatePath(`/dashboard/applications/${id}`);
+    revalidatePath('/applications');
+    revalidatePath(`/applications/${id}`);
     return { success: true, data: application };
   } catch (error) {
     console.error('Update application error:', error);
@@ -93,9 +93,9 @@ export async function updateApplicationStatus(id: string, status: string) {
       return { error: 'Application not found' };
     }
 
-    revalidatePath('/dashboard/applications');
-    revalidatePath('/dashboard/pipeline');
-    revalidatePath(`/dashboard/applications/${id}`);
+    revalidatePath('/applications');
+    revalidatePath('/pipeline');
+    revalidatePath(`/applications/${id}`);
     return { success: true, data: application };
   } catch (error) {
     console.error('Update application status error:', error);
@@ -111,7 +111,7 @@ export async function deleteApplication(id: string) {
       .delete(applications)
       .where(and(eq(applications.id, id), eq(applications.companyId, user.companyId)));
 
-    revalidatePath('/dashboard/applications');
+    revalidatePath('/applications');
     return { success: true };
   } catch (error) {
     console.error('Delete application error:', error);

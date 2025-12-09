@@ -16,7 +16,7 @@ export default async function ClientsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
           <p className="text-muted-foreground">Manage your recruitment clients</p>
         </div>
-        <Link href="/dashboard/clients/new">
+        <Link href="/clients/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
             Add Client

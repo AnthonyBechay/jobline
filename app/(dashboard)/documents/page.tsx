@@ -16,7 +16,7 @@ export default async function DocumentsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
           <p className="text-muted-foreground">Manage client documents and files</p>
         </div>
-        <Link href="/dashboard/documents/upload">
+        <Link href="/documents/upload">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
             Upload Document

@@ -51,7 +51,7 @@ export async function createFeeTemplate(data: FeeTemplateInput) {
             companyId: user.companyId,
         });
 
-        revalidatePath('/dashboard/settings/fee-templates');
+        revalidatePath('/settings/fee-templates');
         return { success: true };
     } catch (error) {
         console.error('Create fee template error:', error);
@@ -66,7 +66,7 @@ export async function deleteFeeTemplate(id: string) {
         await db.delete(feeTemplates)
             .where(and(eq(feeTemplates.id, id), eq(feeTemplates.companyId, user.companyId)));
 
-        revalidatePath('/dashboard/settings/fee-templates');
+        revalidatePath('/settings/fee-templates');
         return { success: true };
     } catch (error) {
         console.error('Delete fee template error:', error);
@@ -102,7 +102,7 @@ export async function createDocumentTemplate(data: DocumentTemplateInput) {
             companyId: user.companyId,
         });
 
-        revalidatePath(`/dashboard/settings/${data.requiredFrom}-documents`);
+        revalidatePath(`/settings/${data.requiredFrom}-documents`);
         return { success: true };
     } catch (error) {
         console.error('Create document template error:', error);
@@ -117,7 +117,7 @@ export async function deleteDocumentTemplate(id: string, requiredFrom: 'office' 
         await db.delete(documentTemplates)
             .where(and(eq(documentTemplates.id, id), eq(documentTemplates.companyId, user.companyId)));
 
-        revalidatePath(`/dashboard/settings/${requiredFrom}-documents`);
+        revalidatePath(`/settings/${requiredFrom}-documents`);
         return { success: true };
     } catch (error) {
         console.error('Delete document template error:', error);
@@ -150,7 +150,7 @@ export async function createNationality(data: NationalityInput) {
             companyId: user.companyId,
         });
 
-        revalidatePath('/dashboard/settings/nationalities');
+        revalidatePath('/settings/nationalities');
         return { success: true };
     } catch (error) {
         console.error('Create nationality error:', error);
@@ -166,7 +166,7 @@ export async function toggleNationality(id: string, active: boolean) {
             .set({ active })
             .where(and(eq(nationalities.id, id), eq(nationalities.companyId, user.companyId)));
 
-        revalidatePath('/dashboard/settings/nationalities');
+        revalidatePath('/settings/nationalities');
         return { success: true };
     } catch (error) {
         console.error('Toggle nationality error:', error);
@@ -214,7 +214,7 @@ export async function updateLawyerFees(data: LawyerFeeInput) {
             });
         }
 
-        revalidatePath('/dashboard/settings/lawyer-fees');
+        revalidatePath('/settings/lawyer-fees');
         return { success: true };
     } catch (error) {
         console.error('Update lawyer fees error:', error);
@@ -229,7 +229,7 @@ export async function deleteNationality(id: string) {
         await db.delete(nationalities)
             .where(and(eq(nationalities.id, id), eq(nationalities.companyId, user.companyId)));
 
-        revalidatePath('/dashboard/settings/nationalities');
+        revalidatePath('/settings/nationalities');
         return { success: true };
     } catch (error) {
         console.error('Delete nationality error:', error);

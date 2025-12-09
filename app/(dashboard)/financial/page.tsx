@@ -32,7 +32,7 @@ export default async function FinancialPage() {
             <p className="text-xs text-muted-foreground mt-1">
               Record and monitor client payments
             </p>
-            <Link href="/dashboard/financial/payments">
+            <Link href="/financial/payments">
               <Button className="mt-4 w-full" variant="outline">
                 View Payments
               </Button>
@@ -50,7 +50,7 @@ export default async function FinancialPage() {
             <p className="text-xs text-muted-foreground mt-1">
               Track application-related expenses
             </p>
-            <Link href="/dashboard/financial/costs">
+            <Link href="/financial/costs">
               <Button className="mt-4 w-full" variant="outline">
                 View Costs
               </Button>
@@ -68,7 +68,7 @@ export default async function FinancialPage() {
             <p className="text-xs text-muted-foreground mt-1">
               Set up pricing templates
             </p>
-            <Link href="/dashboard/financial/fee-templates">
+            <Link href="/financial/fee-templates">
               <Button className="mt-4 w-full" variant="outline">
                 View Templates
               </Button>

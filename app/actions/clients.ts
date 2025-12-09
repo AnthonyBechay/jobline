@@ -21,7 +21,7 @@ export async function createClient(data: ClientInput) {
       })
       .returning();
 
-    revalidatePath('/dashboard/clients');
+    revalidatePath('/clients');
     return { success: true, data: client };
   } catch (error) {
     console.error('Create client error:', error);
@@ -48,8 +48,8 @@ export async function updateClient(id: string, data: ClientInput) {
       return { error: 'Client not found' };
     }
 
-    revalidatePath('/dashboard/clients');
-    revalidatePath(`/dashboard/clients/${id}`);
+    revalidatePath('/clients');
+    revalidatePath(`/clients/${id}`);
     return { success: true, data: client };
   } catch (error) {
     console.error('Update client error:', error);
@@ -65,7 +65,7 @@ export async function deleteClient(id: string) {
       .delete(clients)
       .where(and(eq(clients.id, id), eq(clients.companyId, user.companyId)));
 
-    revalidatePath('/dashboard/clients');
+    revalidatePath('/clients');
     return { success: true };
   } catch (error) {
     console.error('Delete client error:', error);

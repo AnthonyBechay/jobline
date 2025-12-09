@@ -101,7 +101,7 @@ export const columns: ColumnDef<Payment>[] = [
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href={`/dashboard/financial/payments/${payment.id}/edit`}>
+              <Link href={`/financial/payments/${payment.id}/edit`}>
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
               </Link>

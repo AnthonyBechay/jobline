@@ -17,8 +17,8 @@ export async function createPayment(data: PaymentInput) {
       .values(validated)
       .returning();
 
-    revalidatePath('/dashboard/financial/payments');
-    revalidatePath(`/dashboard/applications/${data.applicationId}`);
+    revalidatePath('/financial/payments');
+    revalidatePath(`/applications/${data.applicationId}`);
     return { success: true, data: payment };
   } catch (error) {
     console.error('Create payment error:', error);
@@ -52,8 +52,8 @@ export async function updatePayment(id: string, data: PaymentInput) {
       .where(eq(payments.id, id))
       .returning();
 
-    revalidatePath('/dashboard/financial/payments');
-    revalidatePath(`/dashboard/applications/${data.applicationId}`);
+    revalidatePath('/financial/payments');
+    revalidatePath(`/applications/${data.applicationId}`);
     return { success: true, data: payment };
   } catch (error) {
     console.error('Update payment error:', error);
@@ -79,8 +79,8 @@ export async function deletePayment(id: string) {
 
     await db.delete(payments).where(eq(payments.id, id));
 
-    revalidatePath('/dashboard/financial/payments');
-    revalidatePath(`/dashboard/applications/${payment.applicationId}`);
+    revalidatePath('/financial/payments');
+    revalidatePath(`/applications/${payment.applicationId}`);
     return { success: true };
   } catch (error) {
     console.error('Delete payment error:', error);

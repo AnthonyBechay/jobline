@@ -53,7 +53,7 @@ export default function NewNationalityPage() {
             }
 
             toast.success('Nationality created successfully');
-            router.push('/dashboard/settings/nationalities');
+            router.push('/settings/nationalities');
             router.refresh();
         } catch (error) {
             toast.error('Something went wrong');
@@ -65,7 +65,7 @@ export default function NewNationalityPage() {
     return (
         <div className="space-y-6">
             <div className="flex items-center space-x-4">
-                <Link href="/dashboard/settings/nationalities">
+                <Link href="/settings/nationalities">
                     <Button variant="ghost" size="icon">
                         <ArrowLeft className="h-4 w-4" />
                     </Button>

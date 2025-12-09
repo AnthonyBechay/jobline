@@ -44,7 +44,7 @@ export default function NewFeeTemplatePage() {
 
     if (result.success) {
       toast.success('Fee template created successfully');
-      router.push('/dashboard/financial/fee-templates');
+      router.push('/financial/fee-templates');
       router.refresh();
     } else {
       toast.error(result.error || 'Failed to create fee template');
@@ -54,7 +54,7 @@ export default function NewFeeTemplatePage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/dashboard/financial/fee-templates">
+        <Link href="/financial/fee-templates">
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -206,7 +206,7 @@ export default function NewFeeTemplatePage() {
                 <Button type="submit" disabled={form.formState.isSubmitting}>
                   {form.formState.isSubmitting ? 'Creating...' : 'Create Template'}
                 </Button>
-                <Link href="/dashboard/financial/fee-templates">
+                <Link href="/financial/fee-templates">
                   <Button type="button" variant="outline">
                     Cancel
                   </Button>

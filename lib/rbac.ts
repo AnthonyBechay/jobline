@@ -69,11 +69,11 @@ export function hasAllPermissions(role: UserRole, permissions: Permission[]): bo
  * Maps routes to required permissions
  */
 export const ROUTE_PERMISSIONS: Record<string, Permission[]> = {
-  '/dashboard/financial': ['viewFinancials'],
-  '/dashboard/financial/payments': ['viewFinancials'],
-  '/dashboard/financial/costs': ['viewCosts'],
-  '/dashboard/financial/fee-templates': ['manageSettings'],
-  '/dashboard/settings': ['manageSettings'],
+  '/financial': ['viewFinancials'],
+  '/financial/payments': ['viewFinancials'],
+  '/financial/costs': ['viewCosts'],
+  '/financial/fee-templates': ['manageSettings'],
+  '/settings': ['manageSettings'],
   '/api/pdf/financial-report': ['viewReports'],
 };
 

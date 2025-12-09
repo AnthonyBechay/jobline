@@ -17,7 +17,7 @@ export default async function OfficeDocumentsPage() {
                         Manage the list of documents the office needs to secure.
                     </p>
                 </div>
-                <Link href="/dashboard/settings/office-documents/new">
+                <Link href="/settings/office-documents/new">
                     <Button>
                         <Plus className="mr-2 h-4 w-4" />
                         New Document Requirement

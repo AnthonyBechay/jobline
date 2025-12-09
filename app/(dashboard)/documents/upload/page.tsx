@@ -118,7 +118,7 @@ export default function UploadDocumentPage() {
       }
 
       toast.success('Document uploaded successfully');
-      router.push('/dashboard/documents');
+      router.push('/documents');
       router.refresh();
     } catch (error) {
       console.error('Upload error:', error);
@@ -135,7 +135,7 @@ export default function UploadDocumentPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/dashboard/documents">
+        <Link href="/documents">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Documents
@@ -234,7 +234,7 @@ export default function UploadDocumentPage() {
               />
 
               <div className="flex justify-end space-x-4">
-                <Link href="/dashboard/documents">
+                <Link href="/documents">
                   <Button type="button" variant="outline" disabled={isLoading}>
                     Cancel
                   </Button>

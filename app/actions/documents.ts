@@ -18,8 +18,8 @@ export async function createClientDocument(data: ClientDocumentInput) {
       .values(validated)
       .returning();
 
-    revalidatePath('/dashboard/documents');
-    revalidatePath(`/dashboard/clients/${data.clientId}`);
+    revalidatePath('/documents');
+    revalidatePath(`/clients/${data.clientId}`);
     return { success: true, data: document };
   } catch (error) {
     console.error('Create document error:', error);
@@ -53,8 +53,8 @@ export async function updateClientDocument(id: string, data: ClientDocumentInput
       .where(eq(clientDocuments.id, id))
       .returning();
 
-    revalidatePath('/dashboard/documents');
-    revalidatePath(`/dashboard/clients/${data.clientId}`);
+    revalidatePath('/documents');
+    revalidatePath(`/clients/${data.clientId}`);
     return { success: true, data: document };
   } catch (error) {
     console.error('Update document error:', error);
@@ -92,8 +92,8 @@ export async function deleteClientDocument(id: string) {
     // Delete from database
     await db.delete(clientDocuments).where(eq(clientDocuments.id, id));
 
-    revalidatePath('/dashboard/documents');
-    revalidatePath(`/dashboard/clients/${document.clientId}`);
+    revalidatePath('/documents');
+    revalidatePath(`/clients/${document.clientId}`);
     return { success: true };
   } catch (error) {
     console.error('Delete document error:', error);

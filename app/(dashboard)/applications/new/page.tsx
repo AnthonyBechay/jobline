@@ -89,7 +89,7 @@ export default function NewApplicationPage() {
       }
 
       toast.success('Application created successfully');
-      router.push('/dashboard/applications');
+      router.push('/applications');
       router.refresh();
     } catch (error) {
       toast.error('Failed to create application');
@@ -105,7 +105,7 @@ export default function NewApplicationPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/dashboard/applications">
+        <Link href="/applications">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Applications
@@ -422,7 +422,7 @@ export default function NewApplicationPage() {
               </div>
 
               <div className="flex justify-end space-x-4">
-                <Link href="/dashboard/applications">
+                <Link href="/applications">
                   <Button type="button" variant="outline" disabled={isLoading}>
                     Cancel
                   </Button>

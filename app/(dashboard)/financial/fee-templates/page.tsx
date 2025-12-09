@@ -22,7 +22,7 @@ export default async function FeeTemplatesPage() {
           <h1 className="text-3xl font-bold tracking-tight">Fee Templates</h1>
           <p className="text-muted-foreground">Manage pricing templates for different services</p>
         </div>
-        <Link href="/dashboard/financial/fee-templates/new">
+        <Link href="/financial/fee-templates/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
             Create Template

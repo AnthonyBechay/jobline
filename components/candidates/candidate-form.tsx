@@ -87,7 +87,7 @@ export function CandidateForm() {
             }
 
             toast.success('Candidate created successfully');
-            router.push('/dashboard/candidates');
+            router.push('/candidates');
             router.refresh();
         } catch (error) {
             toast.error('Something went wrong');

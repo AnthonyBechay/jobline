@@ -82,7 +82,7 @@ export default function NewDocumentTemplatePage() {
             }
 
             toast.success('Document requirement created successfully');
-            router.push(`/dashboard/settings/${requiredFrom}-documents`);
+            router.push(`/settings/${requiredFrom}-documents`);
             router.refresh();
         } catch (error) {
             toast.error('Something went wrong');
@@ -94,7 +94,7 @@ export default function NewDocumentTemplatePage() {
     return (
         <div className="space-y-6">
             <div className="flex items-center space-x-4">
-                <Link href={`/dashboard/settings/${requiredFrom}-documents`}>
+                <Link href={`/settings/${requiredFrom}-documents`}>
                     <Button variant="ghost" size="icon">
                         <ArrowLeft className="h-4 w-4" />
                     </Button>

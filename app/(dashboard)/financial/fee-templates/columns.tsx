@@ -101,7 +101,7 @@ export const columns: ColumnDef<FeeTemplate>[] = [
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => router.push(`/dashboard/financial/fee-templates/${template.id}`)}
+              onClick={() => router.push(`/financial/fee-templates/${template.id}`)}
             >
               <Pencil className="mr-2 h-4 w-4" />
               Edit
