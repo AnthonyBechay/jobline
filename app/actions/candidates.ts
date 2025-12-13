@@ -28,6 +28,7 @@ export async function createCandidate(formData: FormData) {
   const validated = candidateSchema.safeParse(rawData);
 
   if (!validated.success) {
+    console.error('Candidate validation error:', validated.error.flatten());
     return { error: 'Invalid data', details: validated.error.flatten() };
   }
 
@@ -65,6 +66,9 @@ export async function createCandidate(formData: FormData) {
     return { success: true };
   } catch (error) {
     console.error('Create candidate error:', error);
+    if (error instanceof Error) {
+      return { error: `Failed to create candidate: ${error.message}` };
+    }
     return { error: 'Failed to create candidate' };
   }
 }

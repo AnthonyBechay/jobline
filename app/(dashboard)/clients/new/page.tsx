@@ -168,15 +168,14 @@ export default function NewClientPage() {
                         name="referredByClient"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Referred By Client</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value}>
+                                <FormLabel>Referred By Client (Optional)</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value || undefined}>
                                     <FormControl>
                                         <SelectTrigger>
-                                            <SelectValue placeholder="Select referring client (optional)" />
+                                            <SelectValue placeholder="None" />
                                         </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                        <SelectItem value="">None</SelectItem>
                                         {clients.map((client) => (
                                             <SelectItem key={client.id} value={client.id}>
                                                 {client.name}
@@ -185,7 +184,7 @@ export default function NewClientPage() {
                                     </SelectContent>
                                 </Select>
                                 <FormDescription>
-                                    Select a client who referred this new client (if applicable)
+                                    Select a client who referred this new client (leave empty if none)
                                 </FormDescription>
                                 <FormMessage />
                             </FormItem>
