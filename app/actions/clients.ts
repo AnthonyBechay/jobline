@@ -28,11 +28,22 @@ export async function createClient(formData: FormData | ClientInput) {
       const rawData: Record<string, any> = {};
       formData.forEach((value, key) => {
         if (key !== 'identityDocument' && key !== 'document1' && key !== 'document2') {
-          rawData[key] = value;
+          // Only include non-empty values
+          if (value && String(value).trim() !== '') {
+            rawData[key] = value;
+          }
         }
       });
 
-      validated = clientSchema.parse(rawData);
+      console.log('Client raw data:', rawData);
+      const validationResult = clientSchema.safeParse(rawData);
+
+      if (!validationResult.success) {
+        console.error('Client validation error:', validationResult.error.flatten());
+        return { error: 'Invalid data', details: validationResult.error.flatten() };
+      }
+
+      validated = validationResult.data;
 
       // Upload files if present
       if (identityDoc && identityDoc.size > 0) {
@@ -72,6 +83,9 @@ export async function createClient(formData: FormData | ClientInput) {
     return { success: true, data: client };
   } catch (error) {
     console.error('Create client error:', error);
+    if (error instanceof Error) {
+      return { error: `Failed to create client: ${error.message}` };
+    }
     return { error: 'Failed to create client' };
   }
 }
