@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { candidateSchema, type CandidateInput } from '@/lib/validations/candidates';
 import { createCandidate } from '@/app/actions/candidates';
+import { getNationalities } from '@/app/actions/settings';
 import { Button } from '@/components/ui/button';
 import {
     Form,
@@ -36,9 +37,17 @@ const STATUS_OPTIONS = [
     'PLACED',
 ];
 
+interface Nationality {
+    id: string;
+    code: string;
+    name: string;
+    active: boolean;
+}
+
 export function CandidateForm() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
+    const [nationalities, setNationalities] = useState<Nationality[]>([]);
 
     const form = useForm<CandidateInput>({
         resolver: zodResolver(candidateSchema),
@@ -53,6 +62,19 @@ export function CandidateForm() {
             weight: '',
         },
     });
+
+    useEffect(() => {
+        async function loadNationalities() {
+            try {
+                const data = await getNationalities();
+                setNationalities(data.filter(n => n.active));
+            } catch (error) {
+                console.error('Failed to load nationalities:', error);
+                toast.error('Failed to load nationalities');
+            }
+        }
+        loadNationalities();
+    }, []);
 
     async function onSubmit(data: CandidateInput) {
         try {
@@ -134,9 +156,20 @@ export function CandidateForm() {
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Nationality</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="Ethiopian" {...field} />
-                                </FormControl>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select nationality" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        {nationalities.map((nationality) => (
+                                            <SelectItem key={nationality.id} value={nationality.name}>
+                                                {nationality.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                                 <FormMessage />
                             </FormItem>
                         )}

@@ -9,7 +9,9 @@
       "Bash(pnpm type-check:*)",
       "Bash(pnpm run build:*)",
       "Bash(dos2unix:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

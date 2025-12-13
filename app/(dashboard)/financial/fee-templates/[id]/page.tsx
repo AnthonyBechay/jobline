@@ -21,11 +21,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 
-export default function EditFeeTemplatePage({ params }: { params: { id: string } }) {
+export default function EditFeeTemplatePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const { id } = use(params);
 
   const form = useForm<FeeTemplateInput>({
     resolver: zodResolver(feeTemplateSchema),
@@ -43,7 +44,7 @@ export default function EditFeeTemplatePage({ params }: { params: { id: string }
 
   useEffect(() => {
     async function loadTemplate() {
-      const result = await getFeeTemplate(params.id);
+      const result = await getFeeTemplate(id);
 
       if (result.success && result.data) {
         form.reset({
@@ -65,10 +66,10 @@ export default function EditFeeTemplatePage({ params }: { params: { id: string }
     }
 
     loadTemplate();
-  }, [params.id, form, router]);
+  }, [id, form, router]);
 
   async function onSubmit(data: FeeTemplateInput) {
-    const result = await updateFeeTemplate(params.id, data);
+    const result = await updateFeeTemplate(id, data);
 
     if (result.success) {
       toast.success('Fee template updated successfully');
