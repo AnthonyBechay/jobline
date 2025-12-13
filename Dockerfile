@@ -47,20 +47,20 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Install pnpm for running db:push at runtime
+# Install pnpm for running migrations at runtime
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy startup script
-COPY scripts/startup.sh /usr/local/bin/startup.sh
+# Copy startup script from builder
+COPY --from=builder /app/scripts/startup.sh /usr/local/bin/startup.sh
 RUN chmod +x /usr/local/bin/startup.sh
 
 # Copy package.json and drizzle config for migrations
-COPY --chown=nextjs:nodejs package.json ./
-COPY --chown=nextjs:nodejs drizzle.config.ts ./
-COPY --chown=nextjs:nodejs lib/db ./lib/db
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
+COPY --from=builder --chown=nextjs:nodejs /app/drizzle.config.ts ./
+COPY --from=builder --chown=nextjs:nodejs /app/lib/db ./lib/db
 
-# Copy migrations directory
-COPY --chown=nextjs:nodejs drizzle ./drizzle
+# Copy migrations directory from builder
+COPY --from=builder --chown=nextjs:nodejs /app/drizzle ./drizzle
 
 # Copy node_modules for drizzle-kit
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
