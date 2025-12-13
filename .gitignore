@@ -50,7 +50,8 @@ coverage/
 *.sqlite3
 *.db
 prisma/migrations/dev/
-drizzle/
+# Keep drizzle migrations but ignore meta snapshots
+drizzle/meta/
 
 # Uploads & temporary files
 uploads/
