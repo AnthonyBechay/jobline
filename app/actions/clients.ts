@@ -4,13 +4,57 @@ import { db } from '@/lib/db';
 import { clients } from '@/lib/db/schema';
 import { clientSchema, type ClientInput } from '@/lib/validations/client';
 import { requireAuth } from '@/lib/auth-utils';
+import { uploadToR2 } from '@/lib/storage';
 import { eq, and } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 
-export async function createClient(data: ClientInput) {
+export async function createClient(formData: FormData | ClientInput) {
   try {
     const { user } = await requireAuth();
-    const validated = clientSchema.parse(data);
+
+    // Handle both FormData (with files) and plain object
+    let validated: ClientInput;
+    let identityDocUrl = '';
+    let doc1Url = '';
+    let doc2Url = '';
+
+    if (formData instanceof FormData) {
+      // Extract files
+      const identityDoc = formData.get('identityDocument') as File | null;
+      const document1 = formData.get('document1') as File | null;
+      const document2 = formData.get('document2') as File | null;
+
+      // Extract data
+      const rawData: Record<string, any> = {};
+      formData.forEach((value, key) => {
+        if (key !== 'identityDocument' && key !== 'document1' && key !== 'document2') {
+          rawData[key] = value;
+        }
+      });
+
+      validated = clientSchema.parse(rawData);
+
+      // Upload files if present
+      if (identityDoc && identityDoc.size > 0) {
+        const result = await uploadToR2(identityDoc, 'clients/identity');
+        identityDocUrl = result.publicUrl || result.url;
+      }
+
+      if (document1 && document1.size > 0) {
+        const result = await uploadToR2(document1, 'clients/documents');
+        doc1Url = result.publicUrl || result.url;
+      }
+
+      if (document2 && document2.size > 0) {
+        const result = await uploadToR2(document2, 'clients/documents');
+        doc2Url = result.publicUrl || result.url;
+      }
+    } else {
+      validated = clientSchema.parse(formData);
+      identityDocUrl = validated.identityDocumentUrl || '';
+      doc1Url = validated.document1Url || '';
+      doc2Url = validated.document2Url || '';
+    }
 
     const [client] = await db
       .insert(clients)
@@ -18,6 +62,9 @@ export async function createClient(data: ClientInput) {
         ...validated,
         companyId: user.companyId,
         referredByClient: validated.referredByClient || null,
+        identityDocumentUrl: identityDocUrl || null,
+        document1Url: doc1Url || null,
+        document2Url: doc2Url || null,
       })
       .returning();
 

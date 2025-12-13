@@ -6,6 +6,13 @@ export const clientSchema = z.object({
   address: z.string().optional(),
   notes: z.string().optional(),
   referredByClient: z.string().uuid().optional().or(z.literal('')),
+  // Document fields
+  identityDocumentUrl: z.string().optional(),
+  identityDocumentTag: z.string().optional(),
+  document1Url: z.string().optional(),
+  document1Tag: z.string().optional(),
+  document2Url: z.string().optional(),
+  document2Tag: z.string().optional(),
 });
 
 export type ClientInput = z.infer<typeof clientSchema>;

@@ -67,7 +67,25 @@ export default function NewClientPage() {
     async function onSubmit(data: ClientInput) {
         try {
             setIsLoading(true);
-            const result = await createClient(data);
+            const formData = new FormData();
+
+            // Append text fields
+            Object.entries(data).forEach(([key, value]) => {
+                if (value !== undefined && value !== null && value !== '') {
+                    formData.append(key, String(value));
+                }
+            });
+
+            // Append files
+            const identityDocInput = document.querySelector('input[name="identityDocument"]') as HTMLInputElement;
+            const document1Input = document.querySelector('input[name="document1"]') as HTMLInputElement;
+            const document2Input = document.querySelector('input[name="document2"]') as HTMLInputElement;
+
+            if (identityDocInput?.files?.[0]) formData.append('identityDocument', identityDocInput.files[0]);
+            if (document1Input?.files?.[0]) formData.append('document1', document1Input.files[0]);
+            if (document2Input?.files?.[0]) formData.append('document2', document2Input.files[0]);
+
+            const result = await createClient(formData);
 
             if (result.error) {
                 toast.error(result.error);
@@ -191,6 +209,86 @@ export default function NewClientPage() {
                             </FormItem>
                         )}
                     />
+
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-semibold">Documents</h3>
+
+                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                            <div className="space-y-4">
+                                <FormItem>
+                                    <FormLabel>Identity Document</FormLabel>
+                                    <FormControl>
+                                        <Input type="file" name="identityDocument" accept="image/*,.pdf" />
+                                    </FormControl>
+                                    <FormDescription>Upload ID, passport, or other identification</FormDescription>
+                                </FormItem>
+
+                                <FormField
+                                    control={form.control}
+                                    name="identityDocumentTag"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Identity Document Tag</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="e.g., Passport, National ID" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+
+                            <div className="space-y-4">
+                                <FormItem>
+                                    <FormLabel>Additional Document 1</FormLabel>
+                                    <FormControl>
+                                        <Input type="file" name="document1" accept="image/*,.pdf" />
+                                    </FormControl>
+                                    <FormDescription>Upload additional paperwork</FormDescription>
+                                </FormItem>
+
+                                <FormField
+                                    control={form.control}
+                                    name="document1Tag"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Document 1 Tag</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="e.g., Work Permit, Contract" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                            <div className="space-y-4">
+                                <FormItem>
+                                    <FormLabel>Additional Document 2</FormLabel>
+                                    <FormControl>
+                                        <Input type="file" name="document2" accept="image/*,.pdf" />
+                                    </FormControl>
+                                    <FormDescription>Upload additional paperwork</FormDescription>
+                                </FormItem>
+
+                                <FormField
+                                    control={form.control}
+                                    name="document2Tag"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Document 2 Tag</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="e.g., License, Certificate" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+                        </div>
+                    </div>
 
                     <Button type="submit" disabled={isLoading}>
                         {isLoading ? 'Creating...' : 'Create Client'}

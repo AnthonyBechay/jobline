@@ -54,10 +54,13 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 COPY scripts/startup.sh /usr/local/bin/startup.sh
 RUN chmod +x /usr/local/bin/startup.sh
 
-# Copy package.json and drizzle config for db:push
+# Copy package.json and drizzle config for migrations
 COPY --chown=nextjs:nodejs package.json ./
 COPY --chown=nextjs:nodejs drizzle.config.ts ./
 COPY --chown=nextjs:nodejs lib/db ./lib/db
+
+# Copy migrations directory
+COPY --chown=nextjs:nodejs drizzle ./drizzle
 
 # Copy node_modules for drizzle-kit
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules

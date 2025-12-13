@@ -172,6 +172,13 @@ export const clients = pgTable(
     address: text('address'),
     notes: text('notes'),
     referredByClient: uuid('referred_by_client_id').references((): any => clients.id),
+    // Document uploads
+    identityDocumentUrl: text('identity_document_url'),
+    identityDocumentTag: varchar('identity_document_tag', { length: 255 }),
+    document1Url: text('document_1_url'),
+    document1Tag: varchar('document_1_tag', { length: 255 }),
+    document2Url: text('document_2_url'),
+    document2Tag: varchar('document_2_tag', { length: 255 }),
     companyId: uuid('company_id')
       .notNull()
       .references(() => companies.id),
